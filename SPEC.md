@@ -290,9 +290,10 @@ versioned/idempotent command envelope. Only the active seat may move its own uni
 during its movement phase. Phase 2 verifies expected version, unit and seat
 ownership, an authoritative on-board deployed location, an eligible movable
 status, board bounds, destination existence, and counter occupancy, then persists
-the location mutation and serialized result atomically. Reinforcement, eliminated,
-and other off-board units are rejected. Phase 2 permits at most one general in a
-hex. A destination without a general permits at most one combat unit; a
+the location mutation and serialized result atomically. Reinforcement units are
+rejected by `moveUnit` and must use `enterReinforcement`; eliminated and other
+off-board units are rejected. Phase 2 permits at most one general in a hex. A
+destination without a general permits at most one combat unit; a
 destination with one general permits at most two combat units. An empty
 destination accepts either unit type; a general-only destination accepts up to
 two combat units; and a one-combat-unit destination rejects another combat unit

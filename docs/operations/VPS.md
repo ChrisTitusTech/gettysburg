@@ -246,9 +246,12 @@ sshd -t
 sshd -T | grep -E \
   '^(passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|permitrootlogin|maxsessions|persourcepenaltyexemptlist) '
 ufw status numbered
-curl -fsS https://gettysburg.christitus.com/healthz
-curl -fsSI http://gettysburg.christitus.com/
-curl -fsSI https://gettysburg.christitus.com/
+curl -fsS --connect-timeout 5 --max-time 15 \
+  https://gettysburg.christitus.com/healthz
+curl -fsSI --connect-timeout 5 --max-time 15 \
+  http://gettysburg.christitus.com/
+curl -fsSI --connect-timeout 5 --max-time 15 \
+  https://gettysburg.christitus.com/
 ```
 
 Then verify the service-account manager and rootless runtime with the explicit
