@@ -6,6 +6,10 @@ PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
 decisions remain open.
 
+Local implementation is complete on `codex/phase-1-scaffold` as of 2026-08-15.
+The phase remains open only for the owner-controlled review/publication gates
+recorded below; no implementation or local-validation failure remains.
+
 - [ ] Resolve the minimum content and rights decisions for prototype work.
   - Scope: Obtain or explicitly defer the Battle Manual, complete counter faces,
     scenario setup, victory/objective rules, optional rules, and art-use decision.
@@ -15,6 +19,11 @@ decisions remain open.
     inputs are present; clean-clone content-schema checks pass independently.
   - Manual validation: Project owner reviews the interpretation/rights ledger.
   - Dependencies or blockers: Additional physical source material and owner input.
+  - Status: Implementation complete. The ledger explicitly defers every missing
+    input, names ChrisTitusTech as owner, and blocks later fidelity/public-release
+    claims at the appropriate phase. Owner review is still unobserved. Follow-up:
+    ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before Phase 1 is
+    marked complete.
 
 - [ ] Scaffold the typed pnpm workspace and CI gate.
   - Scope: Create `apps/web`, `apps/server`, `packages/game`, and
@@ -29,12 +38,15 @@ decisions remain open.
   - Manual validation: `pnpm dev` starts the browser and server together for
     interactive development and stops cleanly on operator request.
   - Dependencies or blockers: None.
-  - Status: In progress. The local frozen install, format, lint, type-check,
-    tests, build, bounded smoke check, and interactive start/stop check pass on
-    Node.js 24.13.1 with pnpm 11.21.0. Exact-head CI remains pending publication,
-    so this task is not complete.
+  - Status: Local implementation complete. The frozen install, format, lint,
+    type-check, 62 tests, build, bounded smoke check, and interactive start/stop
+    check pass on Node.js 24.13.1 with pnpm 11.21.0. Exact-head CI is unavailable
+    because the completed work is uncommitted and unpublished; committing,
+    pushing, and opening a pull request require explicit owner authorization.
+    Follow-up: ChrisTitusTech authorizes publication, then CI must pass at that
+    exact head before this task is checked.
 
-- [ ] Implement the board calibration and accessible two-counter client.
+- [x] Implement the board calibration and accessible two-counter client.
   - Scope: Create an approved original or clean-room fixture board, map the
     playable A-U/1-11 coordinates, and add SVG pan, zoom, select, and move intent
     for two fixture counters. Keep scan-derived intermediates local and ignored.
@@ -45,8 +57,12 @@ decisions remain open.
   - Manual validation: Desktop and tablet screenshots at minimum, fit, and zoomed
     views; pointer, touch, and keyboard inspection.
   - Dependencies or blockers: Board geometry calibration.
+  - Status: Complete. Content and component tests pass. Playwright verified
+    pointer, keyboard, and touch flows at 1440 x 900 and 1024 x 768, and refreshed
+    minimum, fit, and zoomed evidence is checked in under
+    `docs/evidence/phase-1`.
 
-- [ ] Implement the authoritative multiplayer room.
+- [x] Implement the authoritative multiplayer room.
   - Scope: Create/join, one-time invitation claim, Union/Confederate seats,
     hashed browser-session credentials and multi-game seat bindings, audited
     operator recovery, versioned `moveUnit`,
@@ -64,8 +80,14 @@ decisions remain open.
     covered explicitly.
   - Manual validation: Two independent browser contexts complete the full flow.
   - Dependencies or blockers: Workspace scaffold and protocol types.
+  - Status: Complete for the Phase 1 live-process persistence boundary. Tests
+    cover credential hardening, invitation replay, multiple-game bindings,
+    reconnect, seat recovery/revocation, binding-scoped idempotency, crash/retry,
+    invalid/stale/unauthorized commands, ordered events, gap detection, and exact
+    WebSocket-origin rejection. The two-context browser flow passes at both
+    required viewport sizes.
 
-- [ ] Add the production-shaped local runtime and health checks.
+- [x] Add the production-shaped local runtime and health checks.
   - Scope: Rootless-compatible container image, local compose/development path,
     `/healthz` liveness, `/readyz` readiness, graceful shutdown, and documented
     environment contract without secrets. Phase 1 runs in explicitly configured
@@ -82,6 +104,11 @@ decisions remain open.
     equivalent reverse-proxy test and confirm the proxied application process is
     non-root.
   - Dependencies or blockers: Server entry point.
+  - Status: Complete. `pnpm container:smoke` passes with Podman at UID/GID
+    1000:1000, zero added capabilities, read-only root filesystem, ready and
+    fail-closed dependency modes, and clean shutdown. The same-origin Caddy
+    compose path passes at `http://127.0.0.1:8080`; both application and proxy
+    run non-root with all capabilities dropped and were removed after validation.
 
 - [ ] Complete Phase 1 review and evidence.
   - Scope: Final diff, complete local gate, built-in review, independent review,
@@ -97,6 +124,15 @@ decisions remain open.
     and follow-up before leaving this task open; never mark it complete on an
     unexplained skip.
   - Dependencies or blockers: All Phase 1 implementation tasks.
+  - Status: Local evidence complete. The full repository gate, browser
+    acceptance, container smoke, compose proxy run, Markdown lint, Action lint,
+    source-asset boundary, secret scan, and final diff checks pass. Built-in
+    review found a cross-binding idempotency disclosure; the fix and regression
+    tests pass. CodeRabbit was stopped after exceeding the owner's duration
+    tolerance and must not block progress. Remaining owners and follow-up:
+    ChrisTitusTech reviews the rights ledger and authorizes commit/push/PR;
+    independent review and exact-head GitHub CI then run on the published head.
+    This task and Phase 1 remain open until those results are observed.
 
 ## Backlog by phase
 

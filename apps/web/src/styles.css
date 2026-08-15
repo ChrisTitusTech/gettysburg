@@ -1,7 +1,7 @@
 :root {
   color: #f4ead7;
-  background: #111813;
-  font-family: Georgia, "Times New Roman", serif;
+  background: #101612;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
@@ -15,91 +15,457 @@ body {
   min-width: 320px;
   min-height: 100vh;
   background:
-    radial-gradient(
-      circle at 75% 15%,
-      rgb(130 101 58 / 24%),
-      transparent 34rem
-    ),
+    radial-gradient(circle at 75% 8%, rgb(145 108 57 / 24%), transparent 32rem),
     linear-gradient(145deg, #17241a, #0d120f 70%);
 }
 
-main {
+button,
+input {
+  font: inherit;
+}
+
+button {
+  min-height: 44px;
+  padding: 0.7rem 1rem;
+  border: 1px solid #a88e5d;
+  border-radius: 0.25rem;
+  color: #fff8e9;
+  background: #604426;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  background: #765631;
+}
+
+button:focus-visible,
+input:focus-visible,
+[role="button"]:focus-visible {
+  outline: 3px solid #f1ca76;
+  outline-offset: 3px;
+}
+
+button:disabled,
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+h1,
+h2,
+p {
+  margin-top: 0;
+}
+
+h1,
+h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
+
+h1 {
+  margin-bottom: 0;
+  font-size: clamp(2.7rem, 8vw, 5.5rem);
+  letter-spacing: -0.055em;
+  line-height: 0.9;
+}
+
+h2 {
+  margin-bottom: 0;
+  font-size: clamp(1.35rem, 3vw, 2rem);
+}
+
+.eyebrow {
+  margin-bottom: 0.55rem;
+  color: #d5bc8c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.lobby-shell {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 2rem;
 }
 
-.hero {
+.lobby-card {
   width: min(48rem, 100%);
   padding: clamp(2rem, 6vw, 5rem);
   border: 1px solid #806d4f;
   border-radius: 0.25rem;
-  background: rgb(24 34 25 / 92%);
+  background: rgb(24 34 25 / 94%);
   box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 35%);
-}
-
-.eyebrow {
-  margin: 0 0 0.75rem;
-  color: #d5bc8c;
-  font-family: system-ui, sans-serif;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(3.5rem, 12vw, 7rem);
-  font-weight: 500;
-  letter-spacing: -0.055em;
-  line-height: 0.9;
 }
 
 .summary {
   max-width: 40rem;
   margin: 1.75rem 0 2.5rem;
   color: #ddd4c2;
+  font-family: Georgia, "Times New Roman", serif;
   font-size: 1.15rem;
   line-height: 1.65;
 }
 
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
-  gap: 1px;
-  margin: 0;
-  background: #6b5f49;
-  border: 1px solid #6b5f49;
+.seat-actions,
+.destination-row {
+  display: flex;
+  gap: 0.75rem;
 }
 
-.status-grid div {
+.join-panel {
+  padding: 1.25rem;
+  border-left: 4px solid #c7a667;
+  background: #202d22;
+}
+
+.join-panel p {
+  margin: 0.75rem 0 1rem;
+  color: #d8d1c4;
+}
+
+.lobby-status {
+  min-height: 1.5rem;
+  margin: 1.25rem 0 0;
+  color: #f1ca76;
+}
+
+.game-shell {
+  width: min(100%, 112rem);
+  margin: 0 auto;
   padding: 1rem;
-  background: #1c281e;
 }
 
-.status-grid dt {
-  color: #b7a986;
-  font-family: system-ui, sans-serif;
-  font-size: 0.72rem;
-  font-weight: 700;
+.game-header,
+.invitation-panel,
+.board-workspace,
+.action-log {
+  border: 1px solid #716448;
+  background: rgb(21 30 22 / 96%);
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.2rem 1.5rem;
+}
+
+.game-header h1 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+}
+
+.game-facts {
+  display: flex;
+  flex: 1;
+  justify-content: flex-end;
+  gap: clamp(1rem, 4vw, 3rem);
+  margin: 0;
+}
+
+.game-facts div {
+  min-width: 5rem;
+}
+
+.game-facts dt,
+.inspector-label,
+.counter-inspector label {
+  margin: 0 0 0.25rem;
+  color: #bfb08e;
+  font-size: 0.7rem;
+  font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.status-grid dd {
-  margin: 0.35rem 0 0;
-  font-family: system-ui, sans-serif;
-  font-size: 0.95rem;
+.game-facts dd {
+  margin: 0;
+  font-weight: 700;
+  text-transform: capitalize;
 }
 
-@media (max-width: 36rem) {
-  main {
-    padding: 1rem;
+.connection-connected {
+  color: #a9db9f;
+}
+
+.connection-connecting {
+  color: #f1ca76;
+}
+
+.connection-disconnected,
+.move-error {
+  color: #ff9f8d;
+}
+
+.invitation-panel {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.7fr) minmax(16rem, 1.5fr) auto;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.invitation-panel input,
+.counter-inspector input {
+  min-height: 44px;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid #81765f;
+  border-radius: 0.2rem;
+  color: #f8f1e4;
+  background: #0f1711;
+}
+
+.copy-status {
+  grid-column: 2 / -1;
+  min-height: 1.25rem;
+  margin: -0.5rem 0 0;
+  color: #d8c79f;
+}
+
+.board-workspace {
+  margin-top: 0.75rem;
+  padding: 1rem;
+}
+
+.board-heading-row {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.zoom-controls button {
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
+}
+
+.zoom-controls output {
+  min-width: 3.5rem;
+  color: #d8c79f;
+  text-align: right;
+}
+
+.board-frame {
+  height: clamp(28rem, 67vh, 58rem);
+  overflow: hidden;
+  border: 1px solid #7b6c4d;
+  background: #b4a477;
+}
+
+.board-svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.board-svg:active {
+  cursor: grabbing;
+}
+
+.board-ground {
+  fill: #b9aa7d;
+}
+
+.hex {
+  stroke: #5a533d;
+  stroke-width: 1.35;
+  cursor: crosshair;
+  transition: filter 100ms ease;
+}
+
+.hex:hover {
+  filter: brightness(1.14);
+}
+
+.terrain-clear {
+  fill: #c3b786;
+}
+
+.terrain-woods {
+  fill: #77805c;
+}
+
+.terrain-hill {
+  fill: #ac8d62;
+}
+
+.terrain-town {
+  fill: #9b8067;
+}
+
+.hex-label {
+  fill: #3d382a;
+  font-size: 10px;
+  font-weight: 700;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.counter {
+  cursor: default;
+}
+
+.counter[tabindex="0"] {
+  cursor: pointer;
+}
+
+.counter rect {
+  stroke: #18130d;
+  stroke-width: 3;
+  filter: drop-shadow(0 4px 3px rgb(0 0 0 / 38%));
+}
+
+.counter-confederate rect {
+  fill: #c7a36b;
+}
+
+.counter-union rect {
+  fill: #627c96;
+}
+
+.counter path {
+  fill: none;
+  stroke: #17120d;
+  stroke-width: 3;
+}
+
+.counter text {
+  fill: #17120d;
+  font-size: 11px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.counter.selected rect {
+  stroke: #fff2a8;
+  stroke-width: 7;
+}
+
+.counter-inspector {
+  display: grid;
+  grid-template-columns:
+    minmax(8rem, 0.5fr) minmax(13rem, 1fr) minmax(15rem, 1fr)
+    minmax(16rem, 1.5fr);
+  align-items: center;
+  gap: 1.25rem;
+  padding: 1rem 0 0;
+}
+
+.counter-inspector p {
+  margin-bottom: 0.2rem;
+}
+
+.counter-inspector form label {
+  display: block;
+}
+
+.destination-row input {
+  width: 7rem;
+}
+
+.move-status,
+.move-error {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.action-log {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.4fr) 1fr;
+  gap: 2rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.action-log p,
+.action-log ol {
+  margin: 0;
+  color: #d8d1c4;
+}
+
+.action-log ol {
+  padding-left: 1.5rem;
+}
+
+footer {
+  padding: 0.85rem 0.25rem;
+  color: #aaa28f;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 64rem) {
+  .game-header,
+  .board-heading-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
   }
 
-  .hero {
-    padding: 2rem 1.5rem;
+  .game-facts {
+    order: 3;
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .invitation-panel,
+  .counter-inspector,
+  .action-log {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-status {
+    grid-column: 1;
+  }
+
+  .board-frame {
+    height: 60vh;
+    min-height: 30rem;
+  }
+}
+
+@media (max-width: 42rem) {
+  .lobby-shell,
+  .game-shell {
+    padding: 0.6rem;
+  }
+
+  .lobby-card {
+    padding: 2rem 1.25rem;
+  }
+
+  .seat-actions,
+  .zoom-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .game-facts {
+    gap: 0.75rem;
+  }
+
+  .invitation-panel input {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
   }
 }

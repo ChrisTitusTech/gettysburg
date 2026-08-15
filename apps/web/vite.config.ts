@@ -11,8 +11,9 @@ export default defineConfig({
     port: Number(process.env.GETTYSBURG_WEB_PORT ?? "5173"),
     proxy: {
       "/healthz": serverOrigin,
+      "/matchmake": serverOrigin,
       "/readyz": serverOrigin,
-      "/ws": {
+      "^/[A-Za-z0-9_-]{8,}/[A-Za-z0-9_-]{8,}(?:\\?|$)": {
         target: serverOrigin,
         ws: true,
       },

@@ -16,9 +16,12 @@
     "@colyseus/ws-transport": "0.17.13",
     "@gettysburg/content": "workspace:*",
     "@gettysburg/game": "workspace:*",
+    "canonicalize": "4.0.0",
+    "cookie": "2.0.1",
     "express": "5.2.1"
   },
   "devDependencies": {
+    "@colyseus/sdk": "0.17.43",
     "@types/express": "5.0.6",
     "tsx": "4.23.12"
   }

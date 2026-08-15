@@ -1,0 +1,4 @@
+:8080 {
+	encode zstd gzip
+	reverse_proxy app:3000
+}

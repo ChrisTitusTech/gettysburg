@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FIXTURE_CONTENT_REVISION, FIXTURE_UNITS } from "./index";
+import { FIXTURE_CONTENT_REVISION, FIXTURE_UNITS } from "./fixture";
 
 describe("Phase 1 fixture content", () => {
   it("is explicitly identified as non-production fixture data", () => {

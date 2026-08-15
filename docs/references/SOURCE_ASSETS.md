@@ -82,6 +82,27 @@ Counter back/reduced-state artwork is not fully represented by these pages.
 Fixture values may support the Phase 1 architecture slice, but must be visibly
 labelled and must not be presented as final game content.
 
+## Phase 1 interpretation and rights ledger
+
+Phase 1 uses an algorithmically generated A-U/1-11 field, original counter
+symbols, and two conspicuously labelled fixture units. It does not transcribe
+scenario setup, rule wording, unit values, objectives, or supplied artwork. The
+project owner remains responsible for closing the deferred source and rights
+gates before the listed later phase can claim fidelity or public-release use.
+
+| Input or decision | Phase 1 disposition | Owner | Required phase gate |
+| --- | --- | --- | --- |
+| Battle Manual | Deferred; no Phase 1 rule behavior is inferred from it | ChrisTitusTech | Obtain and approve before Phase 3 rule implementation |
+| Complete counter faces | Deferred; use two original fixture symbols only | ChrisTitusTech | Obtain, inventory, and approve before Phase 2 full order of battle |
+| Scenario setup and variants | Deferred; use the explicit two-unit fixture only | ChrisTitusTech | Approve before Phase 2 scenario-fidelity claim |
+| Objective scoring and victory | Deferred; Phase 1 has no victory calculation | ChrisTitusTech | Approve before Phase 2 complete-game claim |
+| Optional rules | Deferred and out of Phase 1 scope | ChrisTitusTech | Decide scope before Phase 3 rule implementation |
+| Public use of supplied art or wording | Prohibited by default; Phase 1 ships original presentation only | ChrisTitusTech | Record license or clean-room decision before any public release |
+
+The existing approved Phase 1 direction permits these explicit fixture
+deferrals. Continuing beyond the named gates requires a new owner decision; it
+must not be inferred from this ledger.
+
 ## Reverification
 
 Run:

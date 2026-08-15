@@ -1,0 +1,40 @@
+import { Server } from "@colyseus/core";
+import { WebSocketTransport } from "@colyseus/ws-transport";
+
+import type { InMemoryGameService } from "./game-service.js";
+import { configureHttpApplication, type ReadinessState } from "./http.js";
+import { createGettysburgRoom } from "./room.js";
+
+export interface GettysburgServerOptions {
+  readonly gameService: InMemoryGameService;
+  readonly readiness: ReadinessState;
+  readonly staticDirectory?: string;
+  readonly trustedWebSocketOrigin: string;
+}
+
+export function isTrustedWebSocketOrigin(
+  trustedOrigin: string,
+  requestOrigin: string | undefined,
+): boolean {
+  return requestOrigin === trustedOrigin;
+}
+
+export function createGettysburgServer(
+  options: GettysburgServerOptions,
+): Server {
+  const gameServer = new Server({
+    express: (application) => {
+      configureHttpApplication(application, options);
+    },
+    gracefullyShutdown: false,
+    greet: false,
+    transport: new WebSocketTransport({
+      verifyClient: ({ origin }: { readonly origin: string }) =>
+        isTrustedWebSocketOrigin(options.trustedWebSocketOrigin, origin),
+    }),
+  });
+  gameServer
+    .define("game", createGettysburgRoom(options.gameService))
+    .filterBy(["gameId"]);
+  return gameServer;
+}

@@ -105,14 +105,25 @@ try {
   const server = start("server", ["--filter", "@gettysburg/server", "start"], {
     GETTYSBURG_SERVER_HOST: "127.0.0.1",
     GETTYSBURG_SERVER_PORT: String(serverPort),
+    GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
   });
   const web = start("web", ["--filter", "@gettysburg/web", "dev"], {
     GETTYSBURG_SERVER_ORIGIN: `http://127.0.0.1:${serverPort}`,
     GETTYSBURG_WEB_HOST: "127.0.0.1",
     GETTYSBURG_WEB_PORT: String(webPort),
   });
+  const unavailableServer = start(
+    "unavailable-server",
+    ["--filter", "@gettysburg/server", "start"],
+    {
+      GETTYSBURG_REQUIRED_DEPENDENCY: "unavailable",
+      GETTYSBURG_SERVER_HOST: "127.0.0.1",
+      GETTYSBURG_SERVER_PORT: String(serverPort + 1),
+      GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
+    },
+  );
 
-  for (const runningChild of [server, web]) {
+  for (const runningChild of [server, web, unavailableServer]) {
     runningChild.child.once("exit", (code, signal) => {
       if (!isStopping && code !== null && code !== 0) {
         process.exitCode = 1;
@@ -142,8 +153,10 @@ try {
 
   await waitFor(`http://127.0.0.1:${webPort}/`, 200, deadline);
   await waitFor(`http://127.0.0.1:${webPort}/healthz`, 200, deadline);
+  await waitFor(`http://127.0.0.1:${serverPort + 1}/healthz`, 200, deadline);
+  await waitFor(`http://127.0.0.1:${serverPort + 1}/readyz`, 503, deadline);
   console.log(
-    "Smoke check passed: web and server are ready through the dev proxy",
+    "Smoke check passed: web/server ready through proxy and missing dependency fails readiness",
   );
 } catch (error) {
   for (const runningChild of children) {

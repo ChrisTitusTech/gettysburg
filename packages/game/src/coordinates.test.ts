@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isHexCoordinate } from "./index";
+import { isHexCoordinate } from "./coordinates";
 
 describe("isHexCoordinate", () => {
   it.each(["A1", "K6", "U11"])("accepts playable coordinate %s", (value) => {
