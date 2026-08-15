@@ -1,0 +1,265 @@
+# Gettysburg VPS baseline and deployment plan
+
+## Scope and snapshot
+
+This document records the dedicated development/production target verified over
+`ssh gettysburg` on 2026-08-14 America/Chicago (2026-08-15 UTC). It contains no
+credentials, public keys, invitation secrets, or maintainer source address.
+Values such as versions, capacity, certificate dates, and patch status are a
+point-in-time baseline and must be refreshed before a production change.
+
+## Identity and public edge
+
+| Item | Verified value |
+| --- | --- |
+| SSH alias | `gettysburg` |
+| Hostname | `Gettysburg` |
+| Public IPv4 | `64.52.108.19` |
+| Domain | `gettysburg.christitus.com` |
+| Virtualization/architecture | KVM, x86_64 |
+| Operating system | Ubuntu 26.04 LTS |
+| Kernel | `7.0.0-29-generic` |
+| Time | UTC, NTP synchronized |
+
+DNS resolves the domain to the public IPv4. Caddy redirects HTTP to HTTPS,
+serves the current placeholder over HTTP/2, and returns `ok` at `/healthz`.
+The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
+start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
+Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
+
+## Capacity
+
+| Resource | Verified value |
+| --- | --- |
+| CPU | 4 vCPU |
+| Memory | 3.7 GiB total, 3.3 GiB available at audit |
+| Swap | Persistent 2 GiB `/swapfile`, unused at audit |
+| Swappiness | 10 |
+| Root disk | 96 GiB total, 90 GiB available, 7 percent used at audit |
+
+This is enough for development and an initial private deployment, but no public
+concurrency claim exists until Phase 4 load testing. PostgreSQL memory limits,
+Node.js limits, container logs, and backup retention must fit this single host.
+
+## SSH baseline
+
+Effective server settings:
+
+```text
+PermitRootLogin prohibit-password
+PubkeyAuthentication yes
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+MaxSessions 32
+```
+
+Key-only root SSH is an owner-approved break-glass choice for this dedicated VPS,
+not the application runtime identity. Root is required for host firewall, SSH,
+Caddy, packages, and recovery because the locked `gettysburg` service account
+has no administrative group membership. Keep keys scoped to trusted maintainer
+workstations, remove/replace a key after suspected compromise, retain an active
+recovery session during access changes, and confirm provider-console recovery
+before removing the last working root key.
+
+The maintainer IPv4 `/32` is listed in `PerSourcePenaltyExemptList`; its value is
+intentionally excluded from the repository. Verify it on the host rather than
+copying it into tickets or logs.
+
+Active drop-ins:
+
+- `/etc/ssh/sshd_config.d/00-gettysburg-key-only.conf`
+- `/etc/ssh/sshd_config.d/01-gettysburg-ssh-exempt.conf`
+- `/etc/ssh/sshd_config.d/60-gettysburg-concurrency.conf`
+
+The removed provider override is retained only as a recovery backup at:
+
+- `/root/ssh-config-backups/00-skysilk.conf.disabled-20260815T025031Z`
+
+The workstation alias uses public-key-only authentication, connection
+multiplexing with a dedicated socket, a 30-minute control persist window,
+keepalives, timeouts, and `IdentitiesOnly`. A 24-session multiplexed concurrency
+test passed. Root key access is intentionally accepted because the VPS is
+dedicated, but application processes and deployments run as the unprivileged
+service account.
+
+Before changing SSH, keep an existing root session open, run `sshd -t`, reload
+rather than restart, open a second session, and verify effective authentication
+settings. Never remove the last verified key path in the same operation.
+
+## Network and security services
+
+- UFW is active and enabled with default deny incoming and allow outgoing.
+- Only TCP 22 (SSH), 80 (HTTP), and 443 (HTTPS) are allowed, including matching
+  IPv6 rules.
+- Fail2ban is active and enabled with the SSH jail active; no bans existed at
+  the audit.
+- Unattended upgrades are active and enabled.
+- Zero packages were pending and no reboot was required at the audit.
+- The system service manager and the lingering `gettysburg` user manager had
+  zero failed units after clearing the completed smoke-test record.
+
+Do not expose application port 3000 or PostgreSQL through UFW. Bind the web
+container to loopback and keep the database solely on a private container
+network.
+
+## Installed development and operations toolchain
+
+| Tool | Verified version |
+| --- | --- |
+| Git | 2.53.0 |
+| Git LFS | 3.7.1 |
+| ripgrep | 15.1.0 |
+| GCC/G++ | 15.2.0 |
+| Make | 4.4.1 |
+| Python | 3.14.4 |
+| ShellCheck | 0.11.0 |
+| Podman | 5.7.0 |
+| Buildah | 1.42.1 |
+| Skopeo | 1.21.0-dev |
+| Node.js | 24.18.0 LTS |
+| npm | 11.16.0 |
+| pnpm | 10.34.5 |
+| Corepack | 0.35.0 |
+| Caddy | 2.11.4 |
+| PostgreSQL client/pg_dump | 18.4 |
+
+Phase 1 must pin compatible Node.js and pnpm versions in the repository. A later
+host package update does not by itself change the supported project toolchain.
+
+## Service account and storage
+
+The locked-password account `gettysburg` has UID/GID 1000, home
+`/srv/gettysburg`, and a Bash shell. Subordinate UID and GID ranges are
+`100000:65536`. Lingering is enabled so the user systemd manager starts at boot.
+
+Verified rootless Podman characteristics:
+
+```text
+rootless=true
+cgroups=v2
+cgroupManager=systemd
+network=netavark
+graph=/srv/gettysburg/.local/share/containers/storage
+```
+
+The rootless build/run path and a temporary Quadlet boot test passed. The smoke
+container and unit were removed, leaving no application containers or Quadlet
+files after validation.
+
+Persistent layout:
+
+```text
+/srv/gettysburg/src
+/srv/gettysburg/backups
+/srv/gettysburg/.config/containers/systemd
+/srv/gettysburg/.local/share/containers/storage
+```
+
+Planned secret environment files should live under a dedicated path such as
+`/srv/gettysburg/.config/gettysburg/`, owned by `gettysburg`, mode 0700 for the
+directory and 0600 for files. Do not put secrets in the checkout, container
+image, Quadlet file, command line, or project documentation.
+
+## Caddy and application topology
+
+Caddy 2.11.4 is installed from the official package repository and runs as an
+enabled host service. Its configuration is `/etc/caddy/Caddyfile`. The current
+site is a readiness placeholder.
+
+The intended production flow is:
+
+```text
+Internet :80/:443
+  -> host Caddy and automatic TLS
+  -> 127.0.0.1:3000
+  -> rootless Gettysburg web/server container
+  -> private rootless network
+  -> PostgreSQL container and persistent volume
+```
+
+The application should serve the browser bundle, `/api/`, and `/ws/` from the
+same origin. Caddy stays host-managed so certificate access and privileged ports
+do not enter the rootless application boundary.
+
+`/healthz` is the public process-liveness endpoint and must reveal no internal
+detail. `/readyz` is the distinct deployment-readiness endpoint and verifies
+required dependencies such as PostgreSQL and migration state. Readiness may be
+restricted at Caddy if its detail becomes useful only to operators.
+
+## Deployment contract
+
+Phase 2 should implement these steps as a reviewed script or runbook, not as
+unrecorded shell history:
+
+1. Fetch the exact reviewed revision into `/srv/gettysburg/src`.
+2. Build or pull an immutable image and record its digest.
+3. Back up PostgreSQL and persistent state before a migration.
+4. Install/update Quadlet files under the service account.
+5. Reload the user manager, start the database, run reviewed migrations, and
+   start the application.
+6. Verify local liveness/readiness, the Caddy route, WebSocket upgrade, and a
+   two-client smoke flow.
+7. Retain the last compatible image and backup until the release is accepted.
+
+Use the real lingering user manager for service actions. From a root SSH shell,
+an explicit non-interactive invocation is:
+
+```bash
+cd /srv/gettysburg
+runuser -u gettysburg -- env \
+  HOME=/srv/gettysburg \
+  XDG_RUNTIME_DIR=/run/user/1000 \
+  DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+  systemctl --user status
+```
+
+The matching Podman environment avoids falling back from the user systemd cgroup
+manager during root-driven diagnostics.
+
+## Backups and recovery artifacts
+
+Existing host-configuration backups:
+
+- `/root/vps-bootstrap-backups/fstab.pre-swap-20260815T025031Z`
+- `/root/vps-bootstrap-backups/Caddyfile.package-default-20260815T025031Z`
+- `/root/ssh-config-backups/00-skysilk.conf.disabled-20260815T025031Z`
+
+These are local rollback artifacts, not application backups. Before production,
+add scheduled PostgreSQL dumps and persistent-volume backups under
+`/srv/gettysburg/backups`, copy encrypted backups off-host, set retention, and
+prove restore. A backup is not accepted until a restore has been verified.
+
+## Verification commands
+
+Run a focused pre-deployment audit:
+
+```bash
+ssh gettysburg
+systemctl --failed
+systemctl is-active ssh ufw fail2ban caddy
+systemctl is-active apt-daily.timer apt-daily-upgrade.timer
+systemctl is-enabled apt-daily.timer apt-daily-upgrade.timer
+grep -RhsE 'APT::Periodic::(Update-Package-Lists|Unattended-Upgrade)' \
+  /etc/apt/apt.conf.d/
+sshd -t
+sshd -T | grep -E \
+  '^(passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|permitrootlogin|maxsessions|persourcepenaltyexemptlist) '
+ufw status numbered
+curl -fsS https://gettysburg.christitus.com/healthz
+curl -sSI http://gettysburg.christitus.com/
+curl -sSI https://gettysburg.christitus.com/
+```
+
+Then verify the service-account manager and rootless runtime with the explicit
+environment from the deployment section. Check pending packages and
+`/var/run/reboot-required` before calling the host ready.
+
+## Change boundaries
+
+- DNS, firewall, SSH, Caddy, database migration, secrets, and production service
+  changes require a reviewed plan and live post-change validation.
+- Preserve an active SSH recovery session during access-control changes.
+- Do not run the application or database as root.
+- Do not delete host backups until replacements and their restores are verified.
+- Stop a deployment when build, migration, health, WebSocket, persistence, or
+  rollback validation fails. Report partial state instead of forcing forward.

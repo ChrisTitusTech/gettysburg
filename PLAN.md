@@ -1,0 +1,131 @@
+# Gettysburg project plan
+
+## Goal
+
+Deliver the easiest credible digital version of the supplied tabletop design: a
+modern web application that runs in a browser, keeps the physical game's
+turn-based character, and lets two people play through a self-hosted server
+without installing a desktop client.
+
+Success means a player can open `https://gettysburg.christitus.com`, create or
+join a private game, take the Union or Confederate seat, play a complete saved
+match on the hex board, and recover cleanly from a disconnected browser.
+
+## Product strategy
+
+Start as a rules-light digital tabletop and add rules enforcement in layers.
+This gets the real board, counters, multiplayer synchronization, and save/resume
+flow in players' hands before every historical rule has been encoded.
+
+The delivery order is:
+
+1. Resolve source, scenario, and rights gates while creating a vertical slice.
+2. Deliver the complete board and order of battle as a playable digital tabletop.
+3. Add rule assistance and validation behind tested server commands.
+4. Harden the experience for production, asynchronous play, and replay.
+
+Each phase is a separately reviewable outcome with automated validation, manual
+browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
+
+## Approved decisions
+
+| Area | Decision | Reason |
+| --- | --- | --- |
+| Client | React, TypeScript, Vite | Familiar browser stack with fast iteration and static typing |
+| Board | SVG first | Hexes, paths, labels, hit targets, and zoom remain inspectable and accessible |
+| Multiplayer | Colyseus authoritative rooms | Provides room lifecycle, reconnection, and synchronized schema state |
+| Rules | Pure shared TypeScript package | Keeps command validation deterministic and easy to test |
+| Storage | PostgreSQL | Durable matches, actions, invitations, and future replay queries |
+| Hosting | One self-hosted VPS | Lowest operational complexity for the current scale |
+| Edge | Caddy with same-origin routing | Automatic HTTPS and no cross-origin client configuration |
+| Runtime | Rootless Podman Quadlets | Reproducible containers managed by the existing user systemd service |
+| Presentation | Original web UI | Avoid a dated virtual-tabletop shell and support a rights-safe release path |
+
+PixiJS is deferred. It may replace or complement SVG only if measured board
+performance, animation volume, or mobile interaction proves SVG insufficient.
+
+## Initial game model
+
+The server-owned state contains:
+
+- scenario identity and Union/Confederate seat assignment
+- turn number 1 through 24 and the current side/phase
+- units, reinforcement schedules, locations, strength steps, and status
+- declared combats, pending loss/retreat/advance choices, and results
+- objectives, victory state, server-generated die results, and an action log
+
+The initial command vocabulary is:
+
+- `moveUnit`
+- `declareCombat`
+- `rollCombat`
+- `confirmCombatResult`
+- `allocateLoss`
+- `retreatUnit`
+- `advanceAfterCombat`
+- `endPhase`
+
+Every command includes a client-generated command ID, game identifier, acting
+player identity, expected state version, and command payload. The server stores
+the command ID with the resulting action so retries are idempotent. It rejects
+stale, unauthorized, or illegal commands without mutating state.
+
+## Delivery and deployment shape
+
+The browser bundle and Node.js game server ship as one web service bound only to
+`127.0.0.1:3000` on the VPS. Caddy proxies the public domain to that service.
+The public routes remain same-origin:
+
+- `/` - browser application
+- `/healthz` - unauthenticated process liveness with no internal detail
+- `/readyz` - deployment readiness, including required dependencies
+- `/api/` - other HTTP API endpoints
+- `/ws/` - multiplayer WebSocket transport
+
+PostgreSQL is reachable only on the private container network. Persistent data,
+secrets, images, and backups remain outside the Git checkout. Production rollout
+uses immutable image tags, a health check, and a documented previous-image
+rollback. The verified host baseline is in `docs/operations/VPS.md`.
+
+## Key risks and controls
+
+| Risk | Control |
+| --- | --- |
+| Incomplete rules and scenario information | Treat missing inputs as explicit gates; do not invent rule behavior |
+| Copyrighted board and counter artwork | Keep source scans local and Git-ignored; decide licensed use versus original clean-room presentation before public release |
+| Desynchronized multiplayer state | Server authority, versioned commands, deterministic tests, and reconnect integration tests |
+| Rule implementation slows delivery | Ship rules-light tabletop milestones before full enforcement |
+| Single-VPS failure | Automated database and volume backups, restore tests, health checks, and rollback tags |
+| Database migration loss | Back up first, test migrations on a copy, and require explicit production approval |
+| Mobile board complexity | Target desktop and tablet first; validate touch interactions before claiming phone support |
+
+## Decision gates before full content implementation
+
+- Obtain the Battle Manual referenced by the supplied rules.
+- Obtain complete counter fronts and reduced-strength backs.
+- Confirm initial setup, scenario victory conditions, and objective scoring.
+- Decide whether optional rules are in scope.
+- Decide whether the supplied scans may be used beyond a private prototype or
+  whether the release must use entirely original art and wording.
+
+Phase 1 may proceed using clearly labelled fixture data while these gates are
+open. Phase 2 cannot claim complete scenario fidelity until they are closed.
+
+## Planning ranges
+
+After the decision gates are answered, the expected effort is approximately:
+
+- Phase 1 vertical slice: 3 to 5 focused development days
+- Phase 2 digital-tabletop MVP: 2 to 4 weeks
+- Phase 3 rules-assisted game: 4 to 8 additional weeks
+
+These are planning ranges, not release commitments. Scope, asset cleanup, rules
+ambiguity, and the amount of original presentation work can materially change
+them.
+
+## Definition of done
+
+The project is done for its first production release only when all Phase 4 exit
+criteria pass, deployment and restore procedures have been exercised, the
+public presentation has a resolved rights basis, exact-head CI and independent
+review are clear, and two players have completed a full 24-turn acceptance game.
