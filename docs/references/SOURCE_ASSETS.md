@@ -87,8 +87,15 @@ labelled and must not be presented as final game content.
 Run:
 
 ```bash
+set -euo pipefail
 file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf
-sha256sum gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf
+sha256sum --check --strict <<'EOF'
+feb21385186ed2c94822dc7e23e4da53eff8d61b63e8f12e76717408467b0d4e  gameboard.jpg
+7901bb1f3551e4ca456e3beb8b07c8262dbf9ff79ae8bae08d68d569cf312ffe  Rules1.pdf
+a31a2db5dc39e98b199e6942546b1901d82cf0ccfe0865982de0a40ef4f19381  Rules2.pdf
+9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681  OOP-Union.pdf
+dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290  OOP-Confederate.pdf
+EOF
 identify gameboard.jpg
 pdfinfo Rules1.pdf
 pdfinfo Rules2.pdf

@@ -229,9 +229,10 @@ add scheduled PostgreSQL dumps and persistent-volume backups under
 `/srv/gettysburg/backups`, copy encrypted backups off-host, set retention, and
 prove restore. A backup is not accepted until a restore has been verified.
 
-## Verification commands
+## Host-baseline verification commands
 
-Run a focused pre-deployment audit:
+This is a host-only audit of the current placeholder and does not accept an
+application release. Run:
 
 ```bash
 ssh gettysburg
@@ -246,13 +247,35 @@ sshd -T | grep -E \
   '^(passwordauthentication|kbdinteractiveauthentication|pubkeyauthentication|permitrootlogin|maxsessions|persourcepenaltyexemptlist) '
 ufw status numbered
 curl -fsS https://gettysburg.christitus.com/healthz
-curl -sSI http://gettysburg.christitus.com/
-curl -sSI https://gettysburg.christitus.com/
+curl -fsSI http://gettysburg.christitus.com/
+curl -fsSI https://gettysburg.christitus.com/
 ```
 
 Then verify the service-account manager and rootless runtime with the explicit
 environment from the deployment section. Check pending packages and
 `/var/run/reboot-required` before calling the host ready.
+
+## Application release gate
+
+Beginning with the first deployed application, the reviewed deployment script or
+runbook must fail closed unless all of these checks pass against the candidate
+revision and image digest:
+
+1. Local and public `/healthz` return success.
+2. Local and public `/readyz` return success for the configured phase; HTTP error
+   responses fail the gate.
+3. A real WebSocket client completes the HTTPS upgrade, origin/cookie checks, and
+   an authenticated room connection through Caddy.
+4. Two independent browser/client sessions create or join opposing seats, observe
+   the same accepted command, receive an intentional rejection without state
+   divergence, disconnect, and reconnect.
+5. The running container is the reviewed digest and its application process is
+   non-root.
+
+Phase 1 performs this gate in explicit in-memory mode without claiming restart
+durability. Phase 2 and later additionally require PostgreSQL/migration readiness
+and a resume-after-restart check. A header-only curl is not sufficient evidence
+for readiness, WebSocket, or multiplayer behavior.
 
 ## Change boundaries
 

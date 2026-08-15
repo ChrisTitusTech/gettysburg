@@ -70,9 +70,12 @@ that survives reconnect.
 - Define protocol and persistence interfaces. Fixture/in-memory persistence is
   permitted only as a temporary, non-production Phase 1 exception for reconnect
   while the server process remains alive. It provides no restart durability;
-  PostgreSQL-backed state and atomic commands are required in Phase 2.
+  Phase 1 does not provision PostgreSQL. PostgreSQL-backed state and atomic
+  commands are required in Phase 2.
 - Add a local container development path plus production-shaped `/healthz`
-  liveness and `/readyz` readiness endpoints.
+  liveness and `/readyz` readiness endpoints. In Phase 1 in-memory mode,
+  readiness checks only the configured application dependencies and must not
+  claim restart durability or require a database.
 
 ### Dependencies and risks
 
@@ -247,6 +250,6 @@ controls.
 
 ### Pause or rollback point
 
-Use a maintenance gate, immutable image tags, the last compatible image, and a
-verified pre-migration backup. Stop or roll back when readiness, data integrity,
-or health validation fails.
+Use a maintenance gate, the reviewed image digest, the previous compatible image
+digest, and a verified pre-migration backup. Stop or roll back when readiness,
+data integrity, or health validation fails.

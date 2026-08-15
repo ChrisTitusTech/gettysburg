@@ -52,6 +52,10 @@ jobs:
           set -euo pipefail
           git ls-files -z |
           while IFS= read -r -d '' path; do
+            if [[ -L "$path" || ! -f "$path" ]]; then
+              echo "Tracked non-regular path is not allowed: $path" >&2
+              exit 1
+            fi
             line=$(sha256sum -- "$path")
             hash=${line%% *}
             hash=${hash#\\}

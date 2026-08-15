@@ -65,21 +65,24 @@ ambiguity must be recorded and resolved, not guessed. See
   body. The page loads no third-party scripts and sends
   `Referrer-Policy: no-referrer`; secrets never enter request paths, query
   strings, referrers, or access logs.
-- Game creation persists a separate `HostBinding` to the creating browser
-  session with `binding_version = 1`. In one transaction it creates or reuses the
-  caller's `BrowserSession`, persists the HostBinding, and stores the session
-  credential verifier; the successful HTTPS response sets the secure session
-  cookie. Only that durable binding authorizes host actions such as issuing
-  invitations and `deleteGame`; connection order, seat side, and connection state
-  never confer host authority. Seat invitations claim only `SeatBinding` records
-  and cannot create host authority. Seat surrender does not revoke a HostBinding.
+- Game creation requires the host to choose an open Union or Confederate side.
+  In one transaction it creates or reuses the caller's `BrowserSession`, stores
+  its credential verifier, persists a separate `HostBinding` with
+  `binding_version = 1`, and creates the host's initial `SeatBinding` for that
+  side. The successful HTTPS response sets the secure session cookie and returns
+  an invitation restricted to the opposing open seat. Only the durable
+  HostBinding authorizes host actions such as issuing invitations and
+  `deleteGame`; connection order, seat side, and connection state never confer
+  host authority. Seat invitations claim only `SeatBinding` records and cannot
+  create host authority. Seat surrender does not revoke a HostBinding.
   Lost host credentials require an audited local-operator recovery that rotates
   only that game's HostBinding and atomically increments its persisted positive
   `binding_version`, while preserving every SeatBinding and any host authority in
   other games. Revocation tombstones retain the binding ID/version required for
   terminal retry proof. Tests cover restart, reconnect, seat surrender, seat
-  claims, first-time host creation without an existing session, host recovery,
-  version rotation, and rejection of non-host delete/invitation attempts.
+  claims, first-time host creation without an existing session, atomic initial
+  host-seat creation, host recovery, version rotation, and rejection of non-host
+  delete/invitation attempts.
 - The invitation permits a one-time claim of an open seat; it does not prove
   ownership of a seat after that claim.
 - A second player can claim the open seat and both clients see the same state.
@@ -101,7 +104,9 @@ ambiguity must be recorded and resolved, not guessed. See
   or game deletion. Seat recovery binds only that seat to the new browser session
   without invalidating unrelated seat or host bindings and never changes gameplay
   state. Host recovery is the separate HostBinding-only rotation defined above.
-- Game state and action history survive server and browser restarts.
+- Beginning in Phase 2, game state and action history survive server and browser
+  restarts. Phase 1 guarantees browser restart and live-process reconnect only;
+  a server-process restart intentionally loses its fixture game.
 - A game can be paused between commands without a connection remaining open.
 
 Invitation, `RecoveryGrant`, and `BrowserSession` bearer credentials are each
@@ -134,7 +139,8 @@ values are never persisted or logged.
   revision. This reference is historical evidence, not transferable authority.
 - Duplicate command identifiers are idempotent. Stale commands receive the
   current version and a recoverable error.
-- `command_id` is client-generated and unique per game in PostgreSQL. The state
+- `command_id` is client-generated and unique per game in the configured
+  persistence adapter. PostgreSQL enforces this beginning in Phase 2. The state
   mutation, action row, and serialized command result commit in one transaction.
   The action also stores a hash of the canonical object containing exactly
   `schema`, `command_name`, and `payload`, using the UTF-8, no-BOM JCS bytes
@@ -232,8 +238,9 @@ consumes the grant, and appends one audit action without changing `Game.version`
 Tests cover gameplay sequence 10/version 7, audit sequence 11/version 7, and
 gameplay sequence 12/version 8 without a false gap or repeated-version rejection.
 
-HostBinding-authorized `issueInvitation` and `deleteGame` commands use the common
-canonical command envelope and create one `host_management` Action. The
+HostBinding-authorized `issueInvitation`, `revokeInvitation`, and `deleteGame`
+commands use the common canonical command envelope and create one
+`host_management` Action. The
 client-generated `command_id` is their idempotency key, scoped to the game, and
 the canonical hash, serialized result, management mutation, and Action commit in
 one transaction. Each consumes the next `Action.sequence` but records non-null
@@ -248,11 +255,21 @@ server key outside the database and is recoverable only until claim, revocation,
 or expiry. `Invitation.token_hash` stores only the domain-separated verifier; the
 recoverable ciphertext exists only in the Action result and is erased at that
 terminal event. Raw bearer values are never stored or logged. Later retries return
-the stored terminal status and never mint a new secret. Redacted management
-events are broadcast/logged under the event-sequence contract without exposing
-invitation or session credentials. Tests cover atomic
-retry, conflicting command-ID reuse, management events between gameplay events,
-delete retries during soft deletion, and the post-purge `game_purged` response.
+the stored terminal status and never mint a new secret.
+
+`revokeInvitation` supplies only the invitation's non-secret lookup ID. The
+server derives and verifies its game, authorizes the current HostBinding, locks
+the invitation against a concurrent claim, and accepts only an unclaimed,
+unexpired invitation. It atomically records `revocation_timestamp`, destroys any
+sealed result ciphertext, stores the result, and appends the management Action.
+The same command ID is idempotent; another command against an already claimed,
+expired, or revoked invitation returns `invitation_unavailable` without mutation.
+A claim/revoke race can commit only one outcome. Redacted management events are
+broadcast/logged under the event-sequence contract without exposing invitation
+or session credentials. Tests cover atomic retry, leaked-invitation revocation,
+claim/revoke races, conflicting command-ID reuse, management events between
+gameplay events, delete retries during soft deletion, and the post-purge
+`game_purged` response.
 
 ### Rules enforcement stages
 
@@ -285,19 +302,32 @@ Terrain cost, path, ZOC, stream, road, and other advanced stacking legality rema
 player-adjudicated until Phase 3. Acceptance cases cover empty, general-only,
 combat-only, general-plus-one-combat, and full destinations for both mover types.
 
+### Phase 2 reinforcement-entry command contract
+
+`enterReinforcement` supplies one reinforcement unit ID and destination through
+the common command envelope. Only the active seat may call it during its movement
+phase. The server verifies the unit belongs to the active side, is off-board in
+an available reinforcement state, satisfies its approved scheduled entry window,
+and has not already entered or been eliminated. The destination must exist, be
+one of that unit's typed entry hexes, and satisfy the Phase 2 stacking invariant.
+The state transition, action, and result persist atomically and idempotently.
+Phase 3 adds any further rule-derived entry restrictions; `moveUnit` remains
+limited to already deployed units. Tests cover early, on-schedule, duplicate,
+wrong-side, wrong-entry-hex, occupied, and already-entered cases.
+
 ### Phase 2 combat command contract
 
 Phase 2 provides an authoritative adjudication workflow without claiming Phase 3
 legality checks:
 
-- `declareCombat` supplies a new combat ID plus attacker and defender unit IDs.
-  Only the active seat may call it during that side's combat phase. The server
-  requires at least one defender and rejects a duplicate ID within defenders or
-  across attacker and defenders. It verifies existing units, that the attacker
-  belongs to the active seat and `active_side`, that every defender belongs to
-  the opposing side, and that none are already committed. Every participant must
-  have an authoritative on-board deployed location. The server then creates the
-  declared combat without adding Phase 3 adjacency or grouping checks.
+- `declareCombat` supplies a new combat ID plus nonempty attacker and defender
+  unit-ID lists. Only the active seat may call it during that side's combat phase.
+  The server rejects duplicate IDs within either list or across both lists. It
+  verifies every unit exists, every attacker belongs to the active seat and
+  `active_side`, every defender belongs to the opposing side, and no participant
+  is already committed. Every participant must have an authoritative on-board
+  deployed location. The server then creates the declared combat without adding
+  Phase 3 adjacency or grouping checks.
 - `rollCombat` supplies the combat ID. Only the active seat may call it for a
   declared unresolved combat. The server generates/stores both dice and moves
   the combat to `awaitingResultConfirmation`.
@@ -358,7 +388,8 @@ Phase 3 adds adjacency, grouping, modifiers, loss, retreat, and advance legality
   stale board.
 - Server errors preserve the last confirmed client snapshot and offer retry.
 - A failed persistence transaction does not broadcast an uncommitted action.
-- A process restart reconstructs active rooms from PostgreSQL.
+- Beginning in Phase 2, a process restart reconstructs active rooms from
+  PostgreSQL. Phase 1 in-memory mode exposes no restart-durability claim.
 - Maintenance mode prevents new commands while allowing a clear operator
   message and controlled shutdown.
 
@@ -573,9 +604,10 @@ counter, and explanatory assets.
 
 ## Operations requirements
 
-- `/healthz` reports process liveness without exposing internals. `/readyz`
-  verifies database connectivity, migration state, and other required
-  dependencies.
+- `/healthz` reports process liveness without exposing internals. `/readyz` is
+  mode-aware: Phase 1 in-memory mode verifies only configured application
+  dependencies, while Phase 2 and production additionally require PostgreSQL
+  connectivity and migration state. The response identifies no sensitive detail.
 - Deploy application images by immutable digest and record both that digest and
   the reviewed source revision. Do not rely on mutable tags.
 - Back up PostgreSQL and persistent application data on a schedule outside the

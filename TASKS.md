@@ -62,12 +62,16 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 - [ ] Add the production-shaped local runtime and health checks.
   - Scope: Rootless-compatible container image, local compose/development path,
     `/healthz` liveness, `/readyz` readiness, graceful shutdown, and documented
-    environment contract without secrets.
+    environment contract without secrets. Phase 1 runs in explicitly configured
+    in-memory mode and does not provision PostgreSQL.
   - Acceptance criteria: The image and every application service in the local
     compose/development path run as a non-root user, serve the vertical slice,
-    and terminate cleanly; readiness fails when dependencies are unavailable.
+    and terminate cleanly; readiness fails when its configured Phase 1
+    dependencies are unavailable and does not report database durability.
   - Automated validation: Container build, health, shutdown, and configuration
-    tests assert a nonzero runtime UID/GID for application processes.
+    tests assert a nonzero runtime UID/GID for application processes. The smoke
+    test proves in-memory readiness passes without PostgreSQL and fails when a
+    required application dependency is removed.
   - Manual validation: Run through the same origin behind a local Caddy or
     equivalent reverse-proxy test and confirm the proxied application process is
     non-root.

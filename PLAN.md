@@ -57,6 +57,7 @@ The server-owned state contains:
 The initial command vocabulary is:
 
 - `moveUnit`
+- `enterReinforcement`
 - `declareCombat`
 - `rollCombat`
 - `confirmCombatResult`
@@ -64,11 +65,18 @@ The initial command vocabulary is:
 - `retreatUnit`
 - `advanceAfterCombat`
 - `endPhase`
+- `surrenderSeat`
+- `issueInvitation`
+- `revokeInvitation`
+- `deleteGame`
 
-Every command includes a client-generated command ID, game identifier, acting
-player identity, expected state version, and command payload. The server stores
-the command ID with the resulting action so retries are idempotent. It rejects
-stale, unauthorized, or illegal commands without mutating state.
+Every client gameplay or host-management command includes a client-generated
+command ID, game identifier, expected state version, and command payload. The
+server derives the acting `SeatBinding` or `HostBinding` from the authenticated
+session; clients never supply actor identity. Operator audit actions use the
+server-generated `operator_request_id` contract. The server stores command IDs
+with resulting actions so retries are idempotent and rejects stale, unauthorized,
+or illegal commands without mutation.
 
 ## Delivery and deployment shape
 
@@ -84,8 +92,10 @@ The public routes remain same-origin:
 
 PostgreSQL is reachable only on the private container network. Persistent data,
 secrets, images, and backups remain outside the Git checkout. Production rollout
-uses immutable image tags, a health check, and a documented previous-image
-rollback. The verified host baseline is in `docs/operations/VPS.md`.
+deploys an immutable image digest recorded with the reviewed source revision,
+uses a health/readiness gate, and retains the previous compatible digest for
+rollback. Mutable tags are not deployment identities. The verified host baseline
+is in `docs/operations/VPS.md`.
 
 ## Key risks and controls
 

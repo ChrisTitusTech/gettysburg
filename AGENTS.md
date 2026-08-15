@@ -55,7 +55,8 @@ Before the Phase 1 scaffold, clean-clone repository checks are:
 git diff-tree --check --no-commit-id --root -r HEAD
 git diff --check origin/main...HEAD
 git diff HEAD --check
-markdownlint-cli2 --config .markdownlint-cli2.yaml '**/*.md' '#.git/**'
+npx --yes markdownlint-cli2@0.23.0 --config .markdownlint-cli2.yaml \
+  '**/*.md' '#.git/**'
 git ls-files | sort
 ```
 
