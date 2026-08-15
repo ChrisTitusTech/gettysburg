@@ -1,0 +1,25 @@
+{
+  "name": "@gettysburg/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx watch src/index.ts",
+    "serve": "node dist/index.js",
+    "start": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@colyseus/core": "0.17.42",
+    "@colyseus/ws-transport": "0.17.13",
+    "@gettysburg/content": "workspace:*",
+    "@gettysburg/game": "workspace:*",
+    "express": "5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "5.0.6",
+    "tsx": "4.23.12"
+  }
+}

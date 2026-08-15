@@ -28,6 +28,30 @@ development begins with the Phase 1 vertical slice in `ROADMAP.md`.
 - PostgreSQL for durable games and action logs
 - Caddy in front of rootless Podman Quadlet services on the VPS
 
-No application scaffold has been committed yet. Phase 1 will establish the
-workspace, automated checks, and first playable multiplayer slice.
-Before merging Phase 1, complete an independent review and verify exact-head CI.
+Phase 1 implementation is underway. The repository now contains the typed pnpm
+workspace, a minimal React browser application, a Colyseus server with Phase 1
+health/readiness behavior, and shared game/content package foundations.
+
+## Development
+
+Use Node.js 24 and pnpm 11.21.0. Install dependencies and run the terminating
+local gate with:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm format:check
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm smoke
+```
+
+For interactive development, run `pnpm dev`. The web client listens on
+`http://127.0.0.1:5173` and proxies health, readiness, and WebSocket traffic to
+the server on `http://127.0.0.1:2567`.
+
+The current content is explicitly labelled Phase 1 fixture data. It is not a
+source-derived scenario or a claim of restart durability. Before merging Phase
+1, complete the remaining implementation tasks, independent review, browser
+evidence, and exact-head CI.

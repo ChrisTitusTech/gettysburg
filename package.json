@@ -1,0 +1,31 @@
+{
+  "name": "gettysburg",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A browser-native, server-authoritative Gettysburg game",
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
+  "packageManager": "pnpm@11.21.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "dev": "pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && concurrently --kill-others --names server,web --prefix-colors blue,green \"pnpm --filter @gettysburg/server dev\" \"pnpm --filter @gettysburg/web dev\"",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "smoke": "node scripts/smoke.mjs",
+    "test": "pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/node": "26.2.0",
+    "concurrently": "9.2.1",
+    "eslint": "10.0.1",
+    "globals": "17.4.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.67.0",
+    "vitest": "4.1.10"
+  }
+}

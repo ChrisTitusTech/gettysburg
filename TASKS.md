@@ -1,8 +1,10 @@
 # Gettysburg project tasks
 
-## Current phase: Phase 0 project foundation
+## Current phase: Phase 1 multiplayer vertical slice
 
-Phase 1 tasks are queued below and must not start until PR #1 merges.
+PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
+Phase 1 work may use clearly labelled fixture content while the source and rights
+decisions remain open.
 
 - [ ] Resolve the minimum content and rights decisions for prototype work.
   - Scope: Obtain or explicitly defer the Battle Manual, complete counter faces,
@@ -27,6 +29,10 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
   - Manual validation: `pnpm dev` starts the browser and server together for
     interactive development and stops cleanly on operator request.
   - Dependencies or blockers: None.
+  - Status: In progress. The local frozen install, format, lint, type-check,
+    tests, build, bounded smoke check, and interactive start/stop check pass on
+    Node.js 24.13.1 with pnpm 11.21.0. Exact-head CI remains pending publication,
+    so this task is not complete.
 
 - [ ] Implement the board calibration and accessible two-counter client.
   - Scope: Create an approved original or clean-room fixture board, map the
@@ -123,7 +129,7 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 
 ## Phase 0 completion gate
 
-- [ ] Merge PR #1 to establish the project foundation and implementation
+- [x] Merge PR #1 to establish the project foundation and implementation
   direction.
   - Scope: Source inventory, product plan, specification, phased roadmap, current
     tasks, repository instructions, and verified VPS operations baseline.
@@ -138,8 +144,9 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 
 ### Phase 0 gate evidence
 
-- Status: In progress until PR #1 is merged; the completion checkbox remains
-  open and Phase 1 work remains blocked.
+- Status: Complete. PR #1 merged as
+  `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15 after the exact-head
+  Documentation check passed.
 - Final diff: Planning, repository-policy, documentation-validation, source
   boundary, and VPS baseline files only. The supplied JPG/PDF inputs are ignored,
   untracked, and absent from the staged diff.
@@ -158,8 +165,6 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 | Browser | ChrisTitusTech | Not run: there is no runnable UI | Phase 0 has no client | Run two sessions at desktop and tablet widths in Phase 1 |
 | Container | ChrisTitusTech | Not run: there is no application image | Phase 0 has no runtime | Add and run the non-root container smoke gate in Phase 1 |
 | Independent review | ChrisTitusTech | CodeRabbit CLI returned zero findings on the staged diff | No unavailable check | Reverify the published exact head before merge |
-| Exact-head CI | ChrisTitusTech | Not run: no published PR head exists | PR #1 is not yet published | Require the final-head Documentation check before merge |
+| Exact-head CI | ChrisTitusTech | Passed: Validate planning foundation | No unavailable check | Reverify the Phase 1 exact head before merge |
 
-- Post-merge follow-up: Project owner marks the Phase 0 checkbox complete, changes
-  the current-phase heading to Phase 1, and records the merge commit in the first
-  Phase 1 task-status update.
+- Post-merge follow-up: Completed in the first Phase 1 task-status update.
