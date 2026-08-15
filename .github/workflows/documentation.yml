@@ -1,0 +1,72 @@
+name: Documentation
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate planning foundation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Check event-range whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        shell: bash
+        run: |
+          if [[ "$BASE_SHA" =~ ^0+$ ]]; then
+            BASE_SHA=$(git hash-object -t tree /dev/null)
+          fi
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            git diff --check --no-renames "$BASE_SHA...$HEAD_SHA"
+          else
+            git diff --check --no-renames "$BASE_SHA" "$HEAD_SHA"
+          fi
+
+      - name: Lint Markdown
+        run: npx --yes markdownlint-cli2@0.23.0 '**/*.md' '#.git/**'
+
+      # Regression guard for the exact supplied bytes. Asset provenance and
+      # licensing still require the manual review defined in SOURCE_ASSETS.md.
+      - name: Block known local-only source bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-files -z |
+          while IFS= read -r -d '' path; do
+            if [[ -L "$path" || ! -f "$path" ]]; then
+              echo "Tracked non-regular path is not allowed: $path" >&2
+              exit 1
+            fi
+            line=$(sha256sum -- "$path")
+            hash=${line%% *}
+            hash=${hash#\\}
+            case "$hash" in
+              feb21385186ed2c94822dc7e23e4da53eff8d61b63e8f12e76717408467b0d4e|\
+              7901bb1f3551e4ca456e3beb8b07c8262dbf9ff79ae8bae08d68d569cf312ffe|\
+              a31a2db5dc39e98b199e6942546b1901d82cf0ccfe0865982de0a40ef4f19381|\
+              9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681|\
+              dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290)
+                echo "Local-only source content is tracked at: $path" >&2
+                exit 1
+                ;;
+            esac
+          done
