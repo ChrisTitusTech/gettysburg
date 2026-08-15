@@ -1,10 +1,17 @@
 import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { startPostgres } from "./postgres-test-service.mjs";
 
 const timeoutMs = 25_000;
 const serverPort = 32_000 + (process.pid % 1_000);
 const webPort = 42_000 + (process.pid % 1_000);
 const children = [];
 let isStopping = false;
+let postgres;
+let runtimeDirectory;
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -99,10 +106,17 @@ async function stop(runningChild) {
 }
 
 try {
+  postgres = await startPostgres();
+  runtimeDirectory = await mkdtemp(join(tmpdir(), "gettysburg-smoke-"));
   await run("pnpm", ["--filter", "@gettysburg/game", "build"]);
   await run("pnpm", ["--filter", "@gettysburg/content", "build"]);
 
   const server = start("server", ["--filter", "@gettysburg/server", "start"], {
+    DATABASE_URL: postgres.connectionString,
+    GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+      runtimeDirectory,
+      "credential-pepper",
+    ),
     GETTYSBURG_SERVER_HOST: "127.0.0.1",
     GETTYSBURG_SERVER_PORT: String(serverPort),
     GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
@@ -116,6 +130,11 @@ try {
     "unavailable-server",
     ["--filter", "@gettysburg/server", "start"],
     {
+      DATABASE_URL: postgres.connectionString,
+      GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+        runtimeDirectory,
+        "unavailable-pepper",
+      ),
       GETTYSBURG_REQUIRED_DEPENDENCY: "unavailable",
       GETTYSBURG_SERVER_HOST: "127.0.0.1",
       GETTYSBURG_SERVER_PORT: String(serverPort + 1),
@@ -143,11 +162,11 @@ try {
   const readyBody = await readyResponse.json();
 
   if (
-    readyBody.mode !== "in-memory" ||
-    readyBody.durability !== "process-lifetime"
+    readyBody.mode !== "postgresql" ||
+    readyBody.durability !== "restart-safe"
   ) {
     throw new Error(
-      "Readiness did not report the Phase 1 persistence boundary",
+      "Readiness did not report the Phase 2 persistence boundary",
     );
   }
 
@@ -170,4 +189,7 @@ try {
 } finally {
   isStopping = true;
   await Promise.all(children.map(stop));
+  postgres?.stop();
+  if (runtimeDirectory !== undefined)
+    await rm(runtimeDirectory, { force: true, recursive: true });
 }

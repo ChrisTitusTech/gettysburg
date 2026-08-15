@@ -19,7 +19,7 @@ created content.
 
 ## Verified inventory
 
-The metadata and hashes below were verified on 2026-08-14 (America/Chicago).
+The metadata and hashes below were verified on 2026-08-15 (America/Chicago).
 The inventory intentionally records only metadata and interpretation, not the
 binary files.
 
@@ -30,6 +30,7 @@ binary files.
 | `Rules2.pdf` | PDF 1.4 | 1 page, 612 x 1008 pt | 756,254 | `a31a2db5dc39e98b199e6942546b1901d82cf0ccfe0865982de0a40ef4f19381` |
 | `OOP-Union.pdf` | PDF 1.4 | 1 US Letter page | 290,844 | `9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681` |
 | `OOP-Confederate.pdf` | PDF 1.4 | 1 US Letter page | 234,927 | `dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290` |
+| `gettysburg-battle-manual_OCR.pdf` | PDF 1.4 | 10 US Letter pages | 1,459,481 | `115f1d120aa6912847f7f2ffb694e86ec02f42f549f9341683ecfc3888162bbb` |
 
 `OOP` is retained in the supplied filenames even though the documents function
 as orders of battle. Renaming is deferred to avoid breaking provenance.
@@ -69,13 +70,25 @@ values, and scheduled entries used by the scenario. Phase 2 must transcribe them
 to typed content, verify every record against the scan, and preserve provenance.
 Counter back/reduced-state artwork is not fully represented by these pages.
 
+### Battle Manual
+
+The locally supplied OCR edition was rendered and visually checked page by page.
+For Scenario Five, it confirms the Scenario One initial setup, all 24 turns,
+night turns 8, 16, and 24, initial Union control of every objective, casualty and
+objective scoring, Confederate automatic-victory checks after turns 8 and 16,
+and the final turn-24 comparison. The eight printed board objectives were also
+verified against `gameboard.jpg`: F6 (5), I11 (3), K6 (1), K7 (1), L6 (1), L7
+(1), M7 (1), and M9 (3).
+
+This transcription supports the rules-light Phase 2 state model. It does not
+authorize public reproduction of the manual and does not supply the missing
+counter backs.
+
 ## Missing or unresolved source inputs
 
-- The Battle Manual referenced by the rules pages
 - Complete counter sheets including every full and reduced face
-- Exact starting setup and any scenario variants
-- Objective scoring and victory conditions
 - Optional rules and whether they are in scope
+- Reviewed per-hex terrain transcription for the irregular board
 - Rights or licensing basis for any public use of the supplied scans, names,
   artwork, or wording
 
@@ -92,7 +105,7 @@ gates before the listed later phase can claim fidelity or public-release use.
 
 | Input or decision | Phase 1 disposition | Owner | Required phase gate |
 | --- | --- | --- | --- |
-| Battle Manual | Deferred; no Phase 1 rule behavior is inferred from it | ChrisTitusTech | Obtain and approve before Phase 3 rule implementation |
+| Battle Manual | Supplied locally after Phase 1; remains ignored and private | ChrisTitusTech | Phase 2 may encode Scenario Five facts; approve exact interpretations before Phase 3 enforcement |
 | Complete counter faces | Deferred; use two original fixture symbols only | ChrisTitusTech | Obtain, inventory, and approve before Phase 2 full order of battle |
 | Scenario setup and variants | Deferred; use the explicit two-unit fixture only | ChrisTitusTech | Approve before Phase 2 scenario-fidelity claim |
 | Objective scoring and victory | Deferred; Phase 1 has no victory calculation | ChrisTitusTech | Approve before Phase 2 complete-game claim |
@@ -109,21 +122,25 @@ Run:
 
 ```bash
 set -euo pipefail
-file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf
+file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
+  gettysburg-battle-manual_OCR.pdf
 sha256sum --check --strict <<'EOF'
 feb21385186ed2c94822dc7e23e4da53eff8d61b63e8f12e76717408467b0d4e  gameboard.jpg
 7901bb1f3551e4ca456e3beb8b07c8262dbf9ff79ae8bae08d68d569cf312ffe  Rules1.pdf
 a31a2db5dc39e98b199e6942546b1901d82cf0ccfe0865982de0a40ef4f19381  Rules2.pdf
 9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681  OOP-Union.pdf
 dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290  OOP-Confederate.pdf
+115f1d120aa6912847f7f2ffb694e86ec02f42f549f9341683ecfc3888162bbb  gettysburg-battle-manual_OCR.pdf
 EOF
 identify gameboard.jpg
 pdfinfo Rules1.pdf
 pdfinfo Rules2.pdf
 pdfinfo OOP-Union.pdf
 pdfinfo OOP-Confederate.pdf
+pdfinfo gettysburg-battle-manual_OCR.pdf
 for asset in \
-  gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf; do
+  gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
+  gettysburg-battle-manual_OCR.pdf; do
   git check-ignore -q -- "$asset" || {
     echo "Not ignored: $asset" >&2
     exit 1

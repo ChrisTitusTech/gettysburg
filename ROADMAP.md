@@ -118,8 +118,8 @@ an auditable action log.
   reinforcement schedule as typed content with provenance.
 - Add full/reduced/eliminated counter state and required general stacking support.
 - Implement all phase transitions across 24 turns and identify night turns.
-- Add server dice, manual combat declarations/results workflow, losses, retreat,
-  advance, objectives, and completion state.
+- Add automatic server dice and unit-factor combat results, confirmation,
+  losses, retreat, advance, objectives, and completion state.
 - Add PostgreSQL schema, migrations, snapshots, ordered actions, and resume.
 - Add invite lifecycle and the operator-recovery contract from `SPEC.md`:
   authenticated local action, old-binding revocation, a single-use recovery
@@ -128,8 +128,8 @@ an auditable action log.
 
 ### Dependencies and risks
 
-- Requires the missing Battle Manual, complete counter faces, setup, objective,
-  victory, and optional-rule decisions for a fidelity claim.
+- Requires reviewed counter backs/reduced values, per-hex terrain, and remaining
+  optional-rule decisions for a complete fidelity claim.
 - Database migration and backup procedures must be ready before durable staging.
 - Supplied art remains private unless the rights decision allows its use.
 
@@ -171,9 +171,10 @@ from a connection or persistence failure.
 
 ### Included work
 
-- Implement path cost, roads, terrain, streams, zones of control, generals, and
-  stacking validation.
-- Implement combat grouping, adjacency, modifiers/cap, die interpretation,
+- Extend the Phase 2 one-point-per-hex movement budget with path cost, roads,
+  terrain, streams, zones of control, generals, and stacking validation.
+- Extend adjacent contact discovery, same-hex grouping, and capped unit-factor
+  modifiers with complete ZOC grouping, terrain modifiers, die interpretation,
   defender tie, loss thresholds, allocation, retreat, and advance.
 - Implement reinforcement entry, night-turn behavior, objective control, and
   final victory evaluation.

@@ -11,7 +11,7 @@
     "build": "pnpm -r build",
     "browser:acceptance": "pnpm build && node scripts/browser-acceptance.mjs",
     "container:smoke": "node scripts/container-smoke.mjs",
-    "dev": "pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && concurrently --kill-others --names server,web --prefix-colors blue,green \"pnpm --filter @gettysburg/server dev\" \"pnpm --filter @gettysburg/web dev\"",
+    "dev": "pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && node scripts/dev.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",

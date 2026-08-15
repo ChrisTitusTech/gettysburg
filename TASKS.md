@@ -1,6 +1,12 @@
 # Gettysburg project tasks
 
-## Current phase: Phase 1 multiplayer vertical slice
+## Current phase: Phase 2 digital-tabletop MVP
+
+Phase 2 local implementation is active on `codex/phase-2-tabletop` as of
+2026-08-15. The local PostgreSQL/Caddy stack is available at
+`http://127.0.0.1:8080`. Source fidelity, host lifecycle, publication, staging,
+and owner-controlled acceptance gates below remain open; the phase is not marked
+complete while any is unresolved.
 
 PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
@@ -139,17 +145,76 @@ recorded below; no implementation or local-validation failure remains.
 ### Phase 2
 
 - [ ] Encode the complete approved map, units, counter states, setup, and entries.
-- [ ] Implement the 24-turn rules-light tabletop workflow and server dice.
-- [ ] Add PostgreSQL migrations, transactions, snapshots, actions, and resume.
+  - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
+    turns/hexes, eight objectives, night turns, and victory schedule are typed
+    with local-source provenance and tests. The newly supplied Battle Manual is
+    ignored, hashed, visually reviewed, and not committed. Remaining owner:
+    ChrisTitusTech supplies the counter backs/reduced combat values and reviews
+    a per-hex terrain/irregular-boundary transcription. The client now has an
+    original vector terrain presentation based on the local board reference,
+    including woods, hills, roads, streams, town, and landmark layers; these are
+    deliberately not used as rules data until that review. The typed terrain
+    fields therefore stay explicitly unavailable and this task remains open.
+- [x] Implement the 24-turn rules-light tabletop workflow and server dice.
+  - Status: Movement, stacking, reinforcement entry, phase progression,
+    cryptographic d10 rolls, confirmation, loss, retreat, advance, objectives,
+    casualty scoring, night checks, automatic victory, and completion are
+    server-authoritative. Combat entry now discovers every adjacent occupied-hex
+    contact, draws the contact on the board, presents both stacks without raw ID
+    entry, tallies the capped printed combat-factor modifiers, rolls one d10 for
+    each side on declaration, and automatically applies the margin table. The
+    server rechecks adjacency, same-hex participation, single-use participants,
+    and basic grouping shape. Defender terrain adjustments remain excluded until
+    the per-hex transcription is reviewed. Normal board drag now moves a whole
+    friendly stack atomically at its slowest allowance; Ctrl-drag selects one
+    counter. Retreat is also board drag, and every surviving counter and general
+    from one losing hex moves together along connected hexes to the first empty
+    hex. Advance and decline are board drag actions too: winning stacks are
+    highlighted, vacated defender hexes are authoritative drop targets, and a
+    visible tray accepts a declined advance. No board action requires typed hex
+    coordinates. The empty Confederate opening is skipped so turn 1 starts at Union
+    movement without artificial actions. Tests cover every phase-table row,
+    adjacent-contact combat entry, nonadjacent combat skipping and declaration
+    rejection, stacking shape, atomic movement and retreat, reinforcement gates,
+    defender-wins-ties and every loss threshold, multi-choice combat, and a
+    gap-free 47-action two-seat game through turn 24.
+- [x] Add PostgreSQL migrations, transactions, snapshots, actions, and resume.
+  - Status: Migrations are concurrent-start safe and idempotent. Real PostgreSQL
+    tests prove restart reconstruction and atomic rollback on injected action-row
+    failure. Startup, browser, and container checks pass; the container check
+    resumes a secure-cookie session after application restart. A local `pg_dump`
+    restore reproduced the game ID, versions, and state hash exactly.
 - [ ] Add secure invitations and operator recovery.
+  - Status: One-use fragment invitations, hashed credentials, replay/mismatch
+    rejection, binding-scoped authorization, and audited one-use operator seat
+    recovery persist across restart and pass tests. The fuller SPEC lifecycle -
+    host-issued/revoked replacement invitations, seat surrender, and deletion -
+    is not yet implemented, so this task remains open.
 - [ ] Deploy and restore-test the private staging service on the VPS.
+  - Status: The local rootless-shaped compose path, migration readiness,
+    application restart, backup, and restore pass. No VPS state was changed from
+    this uncommitted branch. Owner: ChrisTitusTech authorizes publication and the
+    private staging deployment of an exact reviewed commit; then retain the prior
+    image/backup and verify the public domain, WebSocket, two-client, restart, and
+    restore gates.
 - [ ] Complete a full two-player Phase 2 acceptance game.
+  - Status: Automated two-seat turn-24 completion passes, and real two-browser
+    create/join/reject/reconnect workflows pass at 1440 x 900 and 1024 x 768 with
+    refreshed evidence in `test-results/phase-2`. A human two-player 24-turn game,
+    independent review, and exact-head CI remain unobserved. CodeRabbit is skipped
+    if slow or rate-limited per owner direction and cannot block progress.
 
 ### Phase 3
 
-- [ ] Implement and test movement, terrain, roads, streams, ZOC, and stacking.
-- [ ] Implement and test combat grouping, modifiers, results, loss, retreat, and
-  advance.
+- [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
+  stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
+  spending, atomic stack drag, Ctrl single-counter drag, and a capped route
+  preview are complete in Phase 2.
+- [ ] Implement and test complete ZOC combat grouping, terrain modifiers,
+  loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
+  automatic two-die unit-factor result interpretation, and printed-factor
+  modifier totals are complete in Phase 2. Phase 3 retains ZOC grouping and
+  verified per-hex terrain modifiers.
 - [ ] Implement and test reinforcement, night, objective, and victory rules.
 - [ ] Add rule versions, explanations, previews, and deterministic replay.
 - [ ] Complete a full rules-enforced acceptance game.

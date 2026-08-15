@@ -20,7 +20,8 @@ body {
 }
 
 button,
-input {
+input,
+select {
   font: inherit;
 }
 
@@ -40,6 +41,7 @@ button:hover:not(:disabled) {
 
 button:focus-visible,
 input:focus-visible,
+select:focus-visible,
 [role="button"]:focus-visible {
   outline: 3px solid #f1ca76;
   outline-offset: 3px;
@@ -140,6 +142,7 @@ h2 {
 
 .game-header,
 .invitation-panel,
+.tabletop-controls,
 .board-workspace,
 .action-log {
   border: 1px solid #716448;
@@ -230,6 +233,209 @@ h2 {
   padding: 1rem;
 }
 
+.tabletop-controls {
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.turn-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.turn-summary p:last-child,
+.combat-card p,
+.counter-roster {
+  color: #d8d1c4;
+}
+
+details {
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid #574f3d;
+  background: #111a13;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.reinforcements-ready {
+  border-color: #c7a667;
+  background: #263321;
+  box-shadow: inset 4px 0 0 #c7a667;
+}
+
+.reinforcements-ready summary {
+  color: #f1ca76;
+  font-size: 1.05rem;
+}
+
+.reinforcement-guidance {
+  max-width: 62rem;
+  color: #e2dac8;
+}
+
+.reinforcement-list {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  list-style: none;
+}
+
+.reinforcement-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.combat-opportunities {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #a66f55;
+  background: #2e211d;
+}
+
+.combat-opportunities h3 {
+  margin: 0;
+  color: #f0c29d;
+}
+
+.combat-opportunity {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.65rem 1rem;
+  align-items: center;
+  padding: 0.85rem;
+  border-left: 4px solid #bd5e43;
+  background: #171d18;
+}
+
+.combat-opportunity > div {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-wrap: wrap;
+}
+
+.combat-edge-symbol {
+  color: #ed8a68;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+
+.combat-tally {
+  grid-column: 1 / 2;
+  margin: 0;
+  color: #f1ca76;
+  font-weight: 800;
+}
+
+.combat-separation {
+  margin: 0;
+  color: #f0c29d;
+  font-weight: 700;
+}
+
+.modifier-guidance {
+  margin: 0;
+  color: #d8d1c4;
+  font-size: 0.82rem;
+}
+
+.declare-combat,
+.combat-form,
+.choice-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.declare-combat label,
+.combat-form label,
+.choice-form label {
+  display: grid;
+  gap: 0.3rem;
+  color: #bfb08e;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.declare-combat input,
+.combat-form input,
+.combat-form select,
+.choice-form input {
+  min-height: 42px;
+  padding: 0.55rem;
+  border: 1px solid #81765f;
+  color: #f8f1e4;
+  background: #0f1711;
+}
+
+.combat-form .check-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.check-field input {
+  min-height: auto;
+}
+
+.wide-field {
+  grid-column: 1 / -1;
+}
+
+.calculated-combat-result,
+.confirmed-combat-result {
+  padding: 0.85rem 1rem;
+  border: 1px solid #9e7b3e;
+  background: rgb(10 25 17 / 58%);
+}
+
+.calculated-combat-result p,
+.confirmed-combat-result p {
+  margin-bottom: 0;
+}
+
+.confirmed-combat-result {
+  margin-top: 0.9rem;
+  border-color: #648861;
+  background: rgb(26 56 35 / 58%);
+}
+
+.combat-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-left: 4px solid #c7a667;
+  background: #202d22;
+}
+
+.combat-card h3 {
+  margin-top: 0;
+}
+
+.dice-result {
+  color: #f1ca76 !important;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.counter-roster div {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  font-size: 0.82rem;
+}
+
 .board-heading-row {
   display: flex;
   align-items: end;
@@ -258,8 +464,11 @@ h2 {
 .board-frame {
   height: clamp(28rem, 67vh, 58rem);
   overflow: hidden;
-  border: 1px solid #7b6c4d;
-  background: #b4a477;
+  border: 1px solid #827451;
+  background: #9d997d;
+  box-shadow:
+    inset 0 0 0 3px rgb(41 35 22 / 34%),
+    0 14px 38px rgb(0 0 0 / 24%);
 }
 
 .board-svg {
@@ -276,12 +485,12 @@ h2 {
 }
 
 .board-ground {
-  fill: #b9aa7d;
+  fill: #aaa381;
 }
 
 .hex {
-  stroke: #5a533d;
-  stroke-width: 1.35;
+  stroke: #514c35;
+  stroke-width: 1.2;
   cursor: crosshair;
   transition: filter 100ms ease;
 }
@@ -291,26 +500,91 @@ h2 {
 }
 
 .terrain-clear {
-  fill: #c3b786;
+  fill: url("#terrain-clear-pattern");
 }
 
 .terrain-woods {
-  fill: #77805c;
+  fill: url("#terrain-woods-pattern");
 }
 
 .terrain-hill {
-  fill: #ac8d62;
+  fill: url("#terrain-hill-pattern");
+}
+
+.terrain-rough-hill {
+  fill: url("#terrain-rough-pattern");
 }
 
 .terrain-town {
-  fill: #9b8067;
+  fill: url("#terrain-town-pattern");
+}
+
+.board-feature-layer {
+  pointer-events: none;
+}
+
+.board-feature-layer path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.road-edge {
+  stroke: #8f5d42;
+  stroke-width: 5;
+  opacity: 0.66;
+}
+
+.road-center {
+  stroke: #ddb472;
+  stroke-width: 2;
+  opacity: 0.96;
+}
+
+.railroad-edge {
+  stroke: #493c32;
+  stroke-width: 4.5;
+  opacity: 0.78;
+}
+
+.railroad-ties {
+  stroke: #ba8a5f;
+  stroke-dasharray: 2 6;
+  stroke-width: 2;
+}
+
+.stream-bank {
+  stroke: #304e68;
+  stroke-width: 9;
+  opacity: 0.78;
+}
+
+.stream-water {
+  stroke: #5aa5c5;
+  stroke-width: 5;
+}
+
+.terrain-label {
+  fill: #302d1e;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 7px;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.35px;
+  paint-order: stroke;
+  stroke: rgb(224 207 143 / 82%);
+  stroke-width: 2.2px;
+  text-anchor: middle;
 }
 
 .hex-label {
-  fill: #3d382a;
-  font-size: 10px;
-  font-weight: 700;
+  fill: #332f22;
+  font-size: 9px;
+  font-weight: 800;
+  paint-order: stroke;
   pointer-events: none;
+  stroke: rgb(224 211 151 / 78%);
+  stroke-width: 2.6px;
   text-anchor: middle;
 }
 
@@ -319,40 +593,162 @@ h2 {
 }
 
 .counter[tabindex="0"] {
-  cursor: pointer;
+  cursor: grab;
 }
 
-.counter rect {
+.counter.dragging {
+  cursor: grabbing;
+}
+
+.counter.dragging > rect {
+  filter: drop-shadow(0 8px 6px rgb(0 0 0 / 48%));
+}
+
+.counter > rect {
   stroke: #18130d;
-  stroke-width: 3;
+  stroke-width: 2.5;
   filter: drop-shadow(0 4px 3px rgb(0 0 0 / 38%));
 }
 
-.counter-confederate rect {
-  fill: #c7a36b;
+.counter-confederate > rect {
+  fill: #999c98;
 }
 
-.counter-union rect {
-  fill: #627c96;
+.counter-union > rect {
+  fill: #668cad;
 }
 
-.counter path {
-  fill: none;
+.counter-kind rect {
+  fill: rgb(255 248 226 / 18%);
   stroke: #17120d;
-  stroke-width: 3;
+  stroke-width: 1.25;
+  filter: none;
 }
 
 .counter text {
   fill: #17120d;
-  font-size: 11px;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.counter-name {
+  font-size: 7px;
+  letter-spacing: -0.15px;
+}
+
+.counter-turn {
+  font-size: 6.5px;
+}
+
+.counter-kind text {
+  font-size: 6px;
+  letter-spacing: 0.4px;
+}
+
+.counter-org {
+  font-size: 7px;
+}
+
+.counter-factor {
+  font-size: 12px;
+  letter-spacing: -0.5px;
+}
+
+.counter.retreat-required > rect {
+  stroke: #ffb347;
+  stroke-width: 5;
+}
+
+.counter.advance-eligible > rect {
+  stroke: #72e3b2;
+  stroke-width: 5;
+}
+
+.counter.selected > rect {
+  stroke: #fff2a8;
+  stroke-width: 6;
+}
+
+.movement-route {
+  pointer-events: none;
+}
+
+.combat-links {
+  pointer-events: none;
+}
+
+.advance-target {
+  fill: rgb(92 228 171 / 28%);
+  pointer-events: none;
+  stroke: #72e3b2;
+  stroke-dasharray: 12 7;
+  stroke-width: 6;
+  filter: drop-shadow(0 0 7px rgb(65 213 153 / 80%));
+}
+
+.advance-decline-target {
+  pointer-events: none;
+}
+
+.advance-decline-target rect {
+  fill: rgb(66 27 24 / 92%);
+  stroke: #f09b78;
+  stroke-dasharray: 9 6;
+  stroke-width: 4;
+}
+
+.advance-decline-target.active rect {
+  fill: rgb(124 49 37 / 96%);
+  stroke: #ffe0b2;
+  filter: drop-shadow(0 0 8px rgb(255 181 112 / 85%));
+}
+
+.advance-decline-target text {
+  fill: #ffe6c4;
+  font-size: 14px;
   font-weight: 900;
   pointer-events: none;
   text-anchor: middle;
 }
 
-.counter.selected rect {
-  stroke: #fff2a8;
+.advance-decline-target .advance-decline-hint {
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.combat-links line {
+  stroke: #b73327;
+  stroke-width: 10;
+  stroke-linecap: round;
+  stroke-dasharray: 14 8;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 60%));
+}
+
+.movement-route polyline {
+  fill: none;
+  stroke: #ffe08a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   stroke-width: 7;
+  filter: drop-shadow(0 2px 2px rgb(0 0 0 / 70%));
+}
+
+.movement-route-step {
+  fill: #fff2aa;
+  stroke: #4c3514;
+  stroke-width: 2;
+}
+
+.movement-route text {
+  fill: #fff4bd;
+  font-size: 13px;
+  font-weight: 900;
+  paint-order: stroke;
+  stroke: #23180b;
+  stroke-width: 4px;
+  text-anchor: middle;
 }
 
 .counter-inspector {
@@ -371,6 +767,21 @@ h2 {
 
 .counter-inspector form label {
   display: block;
+}
+
+.drag-guidance {
+  display: grid;
+  gap: 0.2rem;
+  color: #d8d1c4;
+  font-size: 0.85rem;
+}
+
+.counter-details {
+  display: grid;
+  gap: 0.15rem;
+  margin-top: 0.2rem;
+  font-size: 0.82rem;
+  line-height: 1.3;
 }
 
 .destination-row input {
@@ -409,7 +820,8 @@ footer {
 
 @media (max-width: 64rem) {
   .game-header,
-  .board-heading-row {
+  .board-heading-row,
+  .turn-summary {
     align-items: flex-start;
     flex-wrap: wrap;
   }

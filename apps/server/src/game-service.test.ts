@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { COMMAND_SCHEMA_VERSION, type MoveUnitCommand } from "@gettysburg/game";
+import {
+  COMMAND_SCHEMA_VERSION,
+  type GameplayCommand,
+  type MoveUnitCommand,
+} from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -9,6 +13,7 @@ import {
   FIXED_CANONICAL_COMMAND,
   InMemoryGameService,
   ServiceError,
+  type StoredAction,
 } from "./game-service.js";
 
 function moveCommand(
@@ -24,6 +29,21 @@ function moveCommand(
     expected_version: expectedVersion,
     game_id: gameId,
     payload: { destination, unit_id: unitId },
+    schema: COMMAND_SCHEMA_VERSION,
+  };
+}
+
+function endPhaseCommand(
+  gameId: string,
+  expectedVersion: number,
+  commandId = randomUUID(),
+): GameplayCommand {
+  return {
+    command_id: commandId,
+    command_name: "endPhase",
+    expected_version: expectedVersion,
+    game_id: gameId,
+    payload: {},
     schema: COMMAND_SCHEMA_VERSION,
   };
 }
@@ -64,6 +84,248 @@ describe("canonical command input", () => {
 });
 
 describe("in-memory game lifecycle", () => {
+  it("starts turn 1 with Union because Confederate has no available units", () => {
+    const service = new InMemoryGameService();
+    const game = service.createGame("confederate");
+
+    expect(service.getGameState(game.gameId)).toMatchObject({
+      active_side: "union",
+      event_sequence: 0,
+      phase: "movement",
+      turn: 1,
+      version: 0,
+    });
+  });
+
+  it("upgrades a saved empty Confederate opening to Union movement", () => {
+    const original = new InMemoryGameService();
+    const game = original.createGame("confederate");
+    const snapshot = original.exportSnapshot();
+    const legacySnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === game.gameId
+            ? {
+                ...record,
+                state: {
+                  ...record.state,
+                  active_side: "confederate",
+                  event_sequence: 1,
+                  phase: "combat",
+                  version: 1,
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+
+    const restored = new InMemoryGameService({ snapshot: legacySnapshot });
+    expect(restored.getGameState(game.gameId)).toMatchObject({
+      active_side: "union",
+      event_sequence: 1,
+      phase: "movement",
+      version: 1,
+    });
+  });
+
+  it("upgrades a saved retreat choice to include its whole original stack", () => {
+    const original = new InMemoryGameService();
+    const game = original.createGame("confederate");
+    const snapshot = original.exportSnapshot();
+    const combatId = "22222222-2222-4222-8222-222222222222";
+    const upgradedSnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === game.gameId
+            ? {
+                ...record,
+                state: {
+                  ...record.state,
+                  active_side: "confederate",
+                  phase: "combat",
+                  turn: 4,
+                  combats: {
+                    [combatId]: {
+                      attacker_loss_allocated: false,
+                      attacker_retreated: false,
+                      attackers: ["c-heth"],
+                      confirmation: {
+                        advance_offered: true,
+                        attacker_losses: 0,
+                        attacker_modifier: 5,
+                        attacker_retreat: false,
+                        defender_losses: 0,
+                        defender_modifier: 2,
+                        defender_retreat: true,
+                        result: "attacker_win",
+                      },
+                      defender_loss_allocated: false,
+                      defender_retreated: false,
+                      defenders: ["u-devin", "u-gamble"],
+                      id: combatId,
+                      pending_choice: {
+                        kind: "retreat",
+                        side: "union",
+                        unit_ids: ["u-devin", "u-gamble"],
+                      },
+                      rolls: { attacker: 8, defender: 1 },
+                      status: "pending_choice",
+                    },
+                  },
+                  units: {
+                    ...record.state.units,
+                    "u-buford": {
+                      ...record.state.units["u-buford"]!,
+                      location: "M9",
+                      status: "deployed",
+                    },
+                    "u-devin": {
+                      ...record.state.units["u-devin"]!,
+                      location: "M9",
+                      status: "deployed",
+                    },
+                    "u-gamble": {
+                      ...record.state.units["u-gamble"]!,
+                      location: "M9",
+                      status: "deployed",
+                    },
+                  },
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+
+    const restored = new InMemoryGameService({ snapshot: upgradedSnapshot });
+    expect(
+      restored.getGameState(game.gameId).combats[combatId]?.pending_choice,
+    ).toMatchObject({
+      kind: "retreat",
+      side: "union",
+      unit_ids: ["u-devin", "u-gamble", "u-buford"],
+    });
+    expect(
+      restored.getGameState(game.gameId).combats[combatId]?.defender_hexes,
+    ).toEqual(["M9"]);
+    expect(restored.getGameState(game.gameId).version).toBe(0);
+  });
+
+  it("restores drag-only advance data from a legacy retreat action", () => {
+    const original = new InMemoryGameService();
+    const game = original.createGame("confederate");
+    const snapshot = original.exportSnapshot();
+    const combatId = "33333333-3333-4333-8333-333333333333";
+    const retreatAction = {
+      authorizingId: "legacy-seat",
+      authorizingType: "seat",
+      authorizingVersion: 1,
+      canonicalRequestHash: "legacy-hash",
+      canonicalizationVersion: "jcs-v1",
+      commandId: "44444444-4444-4444-8444-444444444444",
+      commandName: "retreatStack",
+      contentRevision: "gettysburg-source-cards-v1",
+      expectedVersion: 4,
+      kind: "gameplay",
+      operatorRequestId: null,
+      payload: {
+        combat_id: combatId,
+        path: ["M9", "M10"],
+        unit_ids: ["u-devin", "u-gamble", "u-buford"],
+      },
+      result: null,
+      resultingVersion: 5,
+      rulesetVersion: "phase-2-tabletop-v1",
+      sequence: 5,
+    } satisfies StoredAction;
+    const legacySnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === game.gameId
+            ? {
+                ...record,
+                actions: [...record.actions, retreatAction],
+                state: {
+                  ...record.state,
+                  active_side: "confederate",
+                  phase: "combat",
+                  turn: 4,
+                  combats: {
+                    [combatId]: {
+                      attacker_loss_allocated: false,
+                      attacker_retreated: false,
+                      attackers: ["c-heth"],
+                      confirmation: {
+                        advance_offered: true,
+                        attacker_losses: 0,
+                        attacker_modifier: 5,
+                        attacker_retreat: false,
+                        defender_losses: 0,
+                        defender_modifier: 2,
+                        defender_retreat: true,
+                        result: "attacker_win",
+                      },
+                      defender_loss_allocated: false,
+                      defender_retreated: true,
+                      defenders: ["u-devin", "u-gamble"],
+                      id: combatId,
+                      pending_choice: {
+                        eligible_unit_ids: ["c-heth"],
+                        kind: "advance",
+                        side: "confederate",
+                      },
+                      rolls: { attacker: 8, defender: 1 },
+                      status: "pending_choice",
+                    },
+                  },
+                  units: {
+                    ...record.state.units,
+                    "c-a-p-hill": {
+                      ...record.state.units["c-a-p-hill"]!,
+                      location: "L8",
+                      status: "deployed",
+                    },
+                    "c-heth": {
+                      ...record.state.units["c-heth"]!,
+                      location: "L8",
+                      status: "deployed",
+                    },
+                    "u-devin": {
+                      ...record.state.units["u-devin"]!,
+                      location: "M10",
+                      status: "deployed",
+                    },
+                    "u-gamble": {
+                      ...record.state.units["u-gamble"]!,
+                      location: "M10",
+                      status: "deployed",
+                    },
+                  },
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+
+    const restored = new InMemoryGameService({ snapshot: legacySnapshot });
+    expect(restored.getGameState(game.gameId).combats[combatId]).toMatchObject({
+      defender_hexes: ["M9"],
+      pending_choice: {
+        destination_hexes: ["M9"],
+        eligible_unit_ids: ["c-heth", "c-a-p-hill"],
+        kind: "advance",
+      },
+    });
+  });
+
   it("creates opposing bindings and rejects a copied invitation after claim", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("confederate");
@@ -146,10 +408,47 @@ describe("in-memory game lifecycle", () => {
   });
 });
 
-describe("authoritative move commands", () => {
-  it("synchronizes accepted moves and rejects wrong-seat, invalid, and stale input", () => {
+describe("authoritative gameplay commands", () => {
+  it("completes a gap-free two-seat 24-turn game without server-data edits", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("confederate");
+    const guest = service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    const authorizations = {
+      confederate: service.authenticate(host.credential, host.gameId),
+      union: service.authenticate(guest.credential, host.gameId),
+    };
+
+    while (service.getGameState(host.gameId).phase !== "completed") {
+      const current = service.getGameState(host.gameId);
+      const side = current.active_side;
+      if (side === null) throw new Error("Active game has no acting seat");
+      expect(
+        service.executeCommand(
+          authorizations[side],
+          endPhaseCommand(host.gameId, current.version),
+        ),
+      ).toMatchObject({ ok: true });
+    }
+
+    expect(service.getGameState(host.gameId)).toMatchObject({
+      active_side: null,
+      event_sequence: 47,
+      phase: "completed",
+      turn: 24,
+      version: 47,
+      victory: { confederate: 0, status: "union", union: 16 },
+    });
+    expect(
+      service.getActions(host.gameId).map((action) => action.sequence),
+    ).toEqual(Array.from({ length: 47 }, (_, index) => index + 1));
+  });
+
+  it("synchronizes accepted commands and rejects wrong-seat, invalid, and stale input", () => {
+    const service = new InMemoryGameService();
+    const host = service.createGame("union");
     const guest = service.claimInvitation({
       lookupId: host.invitation.lookup_id,
       secret: host.invitation.secret,
@@ -158,54 +457,49 @@ describe("authoritative move commands", () => {
     const guestAuth = service.authenticate(guest.credential, host.gameId);
 
     expect(
-      service.executeMove(
-        hostAuth,
-        moveCommand(host.gameId, 0, "fixture-confederate-1", "G5"),
-      ),
-    ).toMatchObject({ ok: true, state: { version: 1 } });
+      service.executeCommand(hostAuth, endPhaseCommand(host.gameId, 0)),
+    ).toMatchObject({
+      ok: true,
+      state: {
+        active_side: "confederate",
+        phase: "movement",
+        turn: 2,
+        version: 1,
+      },
+    });
     expect(
-      service.executeMove(
-        guestAuth,
-        moveCommand(host.gameId, 1, "fixture-confederate-1", "H5"),
-      ),
+      service.executeCommand(hostAuth, endPhaseCommand(host.gameId, 1)),
     ).toMatchObject({ error: "wrong_seat", ok: false });
     expect(
-      service.executeMove(guestAuth, {
-        ...moveCommand(host.gameId, 1, "fixture-union-1", "Q7"),
-        payload: { destination: "Z99", unit_id: "fixture-union-1" },
+      service.executeCommand(guestAuth, {
+        ...moveCommand(host.gameId, 1, "u-wadsworth", "Q7"),
+        payload: { destination: "Z99", unit_id: "u-wadsworth" },
       }),
     ).toMatchObject({ error: "invalid_payload", ok: false });
     expect(
-      service.executeMove(
-        guestAuth,
-        moveCommand(host.gameId, 0, "fixture-union-1", "Q7"),
-      ),
+      service.executeCommand(guestAuth, endPhaseCommand(host.gameId, 0)),
     ).toMatchObject({ current_version: 1, error: "stale_version", ok: false });
     expect(service.getGameState(host.gameId)).toMatchObject({
-      units: { "fixture-confederate-1": { location: "G5" } },
+      active_side: "confederate",
+      phase: "movement",
+      turn: 2,
       version: 1,
     });
   });
 
   it("returns an identical duplicate and rejects conflicting command reuse", () => {
     const service = new InMemoryGameService();
-    const host = service.createGame("confederate");
+    const host = service.createGame("union");
     const authorization = service.authenticate(host.credential, host.gameId);
     const commandId = randomUUID();
-    const command = moveCommand(
-      host.gameId,
-      0,
-      "fixture-confederate-1",
-      "G5",
-      commandId,
-    );
+    const command = endPhaseCommand(host.gameId, 0, commandId);
 
-    const first = service.executeMove(authorization, command);
-    expect(service.executeMove(authorization, command)).toEqual(first);
+    const first = service.executeCommand(authorization, command);
+    expect(service.executeCommand(authorization, command)).toEqual(first);
     expect(
-      service.executeMove(
+      service.executeCommand(
         authorization,
-        moveCommand(host.gameId, 0, "fixture-confederate-1", "H5", commandId),
+        moveCommand(host.gameId, 0, "u-wadsworth", "E3", commandId),
       ),
     ).toMatchObject({ error: "command_id_conflict", ok: false });
     expect(service.getActions(host.gameId)).toHaveLength(1);
@@ -213,7 +507,7 @@ describe("authoritative move commands", () => {
 
   it("does not disclose a duplicate result to another seat binding", () => {
     const service = new InMemoryGameService();
-    const host = service.createGame("confederate");
+    const host = service.createGame("union");
     const guest = service.claimInvitation({
       lookupId: host.invitation.lookup_id,
       secret: host.invitation.secret,
@@ -226,12 +520,12 @@ describe("authoritative move commands", () => {
       guest.credential,
       host.gameId,
     );
-    const command = moveCommand(host.gameId, 0, "fixture-confederate-1", "G5");
+    const command = endPhaseCommand(host.gameId, 0);
 
-    expect(service.executeMove(hostAuthorization, command)).toMatchObject({
+    expect(service.executeCommand(hostAuthorization, command)).toMatchObject({
       ok: true,
     });
-    expect(service.executeMove(guestAuthorization, command)).toMatchObject({
+    expect(service.executeCommand(guestAuthorization, command)).toMatchObject({
       error: "unauthorized",
       ok: false,
     });
@@ -240,18 +534,18 @@ describe("authoritative move commands", () => {
 
   it("survives a crash after commit without reapplying the retry", () => {
     const service = new InMemoryGameService();
-    const host = service.createGame("confederate");
+    const host = service.createGame("union");
     const authorization = service.authenticate(host.credential, host.gameId);
-    const command = moveCommand(host.gameId, 0, "fixture-confederate-1", "G5");
+    const command = endPhaseCommand(host.gameId, 0);
 
     expect(() =>
-      service.executeMove(authorization, command, {
+      service.executeCommand(authorization, command, {
         afterCommit: () => {
           throw new Error("simulated response crash");
         },
       }),
     ).toThrow("simulated response crash");
-    expect(service.executeMove(authorization, command)).toMatchObject({
+    expect(service.executeCommand(authorization, command)).toMatchObject({
       ok: true,
       state: { version: 1 },
     });
@@ -262,20 +556,15 @@ describe("authoritative move commands", () => {
 describe("operator seat recovery", () => {
   it("revokes only the old binding and appends a version-neutral audit action", () => {
     const service = new InMemoryGameService();
-    const host = service.createGame("confederate");
-    const otherGame = service.createGame("union", host.credential);
+    const host = service.createGame("union");
+    const otherGame = service.createGame("confederate", host.credential);
     const oldAuthorization = service.authenticate(host.credential, host.gameId);
-    const acceptedCommand = moveCommand(
-      host.gameId,
-      0,
-      "fixture-confederate-1",
-      "G5",
-    );
-    service.executeMove(oldAuthorization, acceptedCommand);
+    const acceptedCommand = endPhaseCommand(host.gameId, 0);
+    service.executeCommand(oldAuthorization, acceptedCommand);
 
     const grant = service.issueSeatRecovery(
       host.gameId,
-      "confederate",
+      "union",
       "local-operator:test",
     );
     const recovered = service.claimSeatRecovery({
@@ -288,7 +577,7 @@ describe("operator seat recovery", () => {
       "unauthorized",
     );
     expect(service.authenticate(host.credential, otherGame.gameId).side).toBe(
-      "union",
+      "confederate",
     );
     const recoveredAuthorization = service.authenticate(
       recovered.credential,
@@ -296,10 +585,10 @@ describe("operator seat recovery", () => {
     );
     expect(recoveredAuthorization).toMatchObject({
       bindingVersion: 2,
-      side: "confederate",
+      side: "union",
     });
     expect(
-      service.executeMove(recoveredAuthorization, acceptedCommand),
+      service.executeCommand(recoveredAuthorization, acceptedCommand),
     ).toMatchObject({ error: "unauthorized", ok: false });
     expect(service.getGameState(host.gameId)).toMatchObject({
       event_sequence: 2,

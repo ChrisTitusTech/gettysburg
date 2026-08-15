@@ -18,6 +18,20 @@ jobs:
     name: Validate workspace
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GETTYSBURG_POSTGRES_TEST_URL: postgresql://gettysburg@127.0.0.1:5432/gettysburg_test
+    services:
+      postgres:
+        image: postgres:18.1-alpine
+        env:
+          POSTGRES_DB: gettysburg_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: gettysburg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gettysburg -d gettysburg_test"
+          --health-interval 2s --health-timeout 2s --health-retries 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4

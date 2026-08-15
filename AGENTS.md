@@ -65,9 +65,9 @@ inputs are present. This is not a clean-clone or CI requirement:
 
 ```bash
 sha256sum gameboard.jpg Rules1.pdf Rules2.pdf \
-  OOP-Union.pdf OOP-Confederate.pdf
+  OOP-Union.pdf OOP-Confederate.pdf gettysburg-battle-manual_OCR.pdf
 git check-ignore gameboard.jpg Rules1.pdf Rules2.pdf \
-  OOP-Union.pdf OOP-Confederate.pdf
+  OOP-Union.pdf OOP-Confederate.pdf gettysburg-battle-manual_OCR.pdf
 ```
 
 Phase 1 must add working scripts with these stable repository entry points:

@@ -6,10 +6,10 @@ import {
   type HexCoordinate,
 } from "@gettysburg/game";
 
-export const HEX_RADIUS = 40;
+export const HEX_RADIUS = 44;
 export const HEX_HORIZONTAL_SPACING = HEX_RADIUS * 1.5;
 export const HEX_VERTICAL_SPACING = Math.sqrt(3) * HEX_RADIUS;
-export const BOARD_PADDING = 58;
+export const BOARD_PADDING = 64;
 
 export interface BoardPoint {
   readonly x: number;

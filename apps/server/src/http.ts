@@ -10,21 +10,21 @@ import express, {
   type Response,
 } from "express";
 
+import { ServiceError, type ServiceErrorCode } from "./game-service.js";
 import {
-  InMemoryGameService,
-  ServiceError,
-  type ServiceErrorCode,
-} from "./game-service.js";
+  InMemoryAsyncGameService,
+  type GameService,
+} from "./postgres-store.js";
 
 export const SESSION_COOKIE_NAME = "__Host-gettysburg-session";
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 export interface ReadinessState {
-  isReady(): boolean;
+  isReady(): boolean | Promise<boolean>;
 }
 
 export interface HttpApplicationOptions {
-  readonly gameService: InMemoryGameService;
+  readonly gameService: GameService;
   readonly readiness: ReadinessState;
   readonly staticDirectory?: string;
 }
@@ -55,17 +55,15 @@ function setSessionCookie(response: Response, credential: string): void {
   );
 }
 
-function gameplayActionLog(
-  gameService: InMemoryGameService,
+async function gameplayActionLog(
+  gameService: GameService,
   gameId: string,
-): GameplayEvent[] {
-  return gameService
-    .getActions(gameId)
-    .flatMap((action) =>
-      action.kind === "gameplay" && action.result?.ok
-        ? [action.result.event]
-        : [],
-    );
+): Promise<GameplayEvent[]> {
+  return (await gameService.getActions(gameId)).flatMap((action) =>
+    action.kind === "gameplay" && action.result?.ok
+      ? [action.result.event]
+      : [],
+  );
 }
 
 function errorStatus(code: ServiceErrorCode): number {
@@ -105,20 +103,24 @@ export function configureHttpApplication(
     response.status(200).json({ status: "ok" });
   });
 
-  application.get("/readyz", (_request, response) => {
-    if (!readiness.isReady()) {
-      response.status(503).json({ status: "unavailable" });
-      return;
-    }
+  application.get("/readyz", async (_request, response, next) => {
+    try {
+      if (!(await readiness.isReady())) {
+        response.status(503).json({ status: "unavailable" });
+        return;
+      }
 
-    response.status(200).json({
-      durability: "process-lifetime",
-      mode: "in-memory",
-      status: "ready",
-    });
+      response.status(200).json({
+        durability: "restart-safe",
+        mode: "postgresql",
+        status: "ready",
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
-  application.post("/api/games", (request, response, next) => {
+  application.post("/api/games", async (request, response, next) => {
     try {
       const seat = request.body?.seat;
       if (seat !== "confederate" && seat !== "union") {
@@ -126,13 +128,13 @@ export function configureHttpApplication(
         return;
       }
 
-      const result = gameService.createGame(
+      const result = await gameService.createGame(
         seat,
         readSessionCredential(request),
       );
       setSessionCookie(response, result.credential);
       response.status(201).json({
-        action_log: gameplayActionLog(gameService, result.gameId),
+        action_log: await gameplayActionLog(gameService, result.gameId),
         game_id: result.gameId,
         invitation: result.invitation,
         seat: result.seat,
@@ -145,7 +147,7 @@ export function configureHttpApplication(
 
   application.post(
     "/api/invitations/:lookupId/claim",
-    (request, response, next) => {
+    async (request, response, next) => {
       try {
         const secret = request.body?.secret;
         if (typeof secret !== "string") {
@@ -162,7 +164,7 @@ export function configureHttpApplication(
           request.body?.seat === "confederate" || request.body?.seat === "union"
             ? request.body.seat
             : undefined;
-        const result = gameService.claimInvitation({
+        const result = await gameService.claimInvitation({
           ...(credential === undefined ? {} : { credential }),
           lookupId: request.params.lookupId ?? "",
           ...(requestedGameId === undefined ? {} : { requestedGameId }),
@@ -171,7 +173,7 @@ export function configureHttpApplication(
         });
         setSessionCookie(response, result.credential);
         response.status(200).json({
-          action_log: gameplayActionLog(gameService, result.gameId),
+          action_log: await gameplayActionLog(gameService, result.gameId),
           game_id: result.gameId,
           seat: result.seat,
           state: result.state,
@@ -184,7 +186,7 @@ export function configureHttpApplication(
 
   application.post(
     "/api/recovery/:lookupId/claim",
-    (request, response, next) => {
+    async (request, response, next) => {
       try {
         const secret = request.body?.secret;
         if (typeof secret !== "string") {
@@ -193,14 +195,14 @@ export function configureHttpApplication(
         }
 
         const credential = readSessionCredential(request);
-        const result = gameService.claimSeatRecovery({
+        const result = await gameService.claimSeatRecovery({
           ...(credential === undefined ? {} : { credential }),
           lookupId: request.params.lookupId ?? "",
           secret,
         });
         setSessionCookie(response, result.credential);
         response.status(200).json({
-          action_log: gameplayActionLog(gameService, result.gameId),
+          action_log: await gameplayActionLog(gameService, result.gameId),
           game_id: result.gameId,
           seat: result.seat,
           state: result.state,
@@ -211,18 +213,18 @@ export function configureHttpApplication(
     },
   );
 
-  application.get("/api/games/:gameId", (request, response, next) => {
+  application.get("/api/games/:gameId", async (request, response, next) => {
     try {
       const gameId = request.params.gameId ?? "";
-      const authorization = gameService.authenticate(
+      const authorization = await gameService.authenticate(
         readSessionCredential(request),
         gameId,
       );
       response.status(200).json({
-        action_log: gameplayActionLog(gameService, gameId),
+        action_log: await gameplayActionLog(gameService, gameId),
         game_id: gameId,
         seat: authorization.side,
-        state: gameService.getAuthorizedState(authorization),
+        state: await gameService.getAuthorizedState(authorization),
       });
     } catch (error) {
       next(error);
@@ -274,7 +276,7 @@ export function configureHttpApplication(
 
 export function createHttpApplication(
   readiness: ReadinessState,
-  gameService = new InMemoryGameService(),
+  gameService: GameService = new InMemoryAsyncGameService(),
 ): Application {
   return configureHttpApplication(express(), { gameService, readiness });
 }

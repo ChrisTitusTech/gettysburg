@@ -8,7 +8,8 @@ interface that can be self-hosted on the dedicated Gettysburg VPS.
 The local project workspace contains supplied board, rules, and order-of-battle
 references that are deliberately ignored by Git. The repository contains only
 the approved implementation plan and rights-safe project work. Application
-development begins with the Phase 1 vertical slice in `ROADMAP.md`.
+the current local candidate implements the Phase 2 rules-light tabletop in
+`ROADMAP.md`.
 
 ## Project documents
 
@@ -28,10 +29,12 @@ development begins with the Phase 1 vertical slice in `ROADMAP.md`.
 - PostgreSQL for durable games and action logs
 - Caddy in front of rootless Podman Quadlet services on the VPS
 
-The Phase 1 implementation provides the typed pnpm workspace, responsive SVG
-fixture board, authoritative Colyseus room and reconnect flow, bounded browser
-acceptance, and a non-root production-shaped local container path. Phase 1 is
-explicitly process-lifetime only; PostgreSQL durability begins in Phase 2.
+The Phase 2 implementation provides all 82 source-card counters, 24 turns,
+reinforcement entry, automatic two-die combat results using verified unit
+factors, objective and casualty scoring, PostgreSQL state/actions/snapshots,
+restart-safe browser
+sessions, and a non-root production-shaped local container path. Remaining
+source and publication gates are recorded in `TASKS.md`.
 
 ## Development
 
@@ -56,18 +59,23 @@ For interactive development, run `pnpm dev`. The web client listens on
 the server on `http://127.0.0.1:2567`.
 
 The browser acceptance command creates two isolated sessions at desktop and
-tablet widths and writes rights-safe board captures to `test-results/phase-1`.
-Reviewed reference captures are checked in under `docs/evidence/phase-1`; its
-README contains the regeneration command. The current content is explicitly
-labelled Phase 1 fixture data. It is not a source-derived scenario or a claim of
-restart durability.
+tablet widths and writes rights-safe board captures to `test-results/phase-2`.
+The private source scans and Battle Manual remain local and ignored.
+
+On the board, drag any friendly counter to move its entire stack. Hold Ctrl
+before dragging to move only the grabbed counter, or Ctrl-click once to keep it
+in single-counter mode for a later drag. A normal click rejoins its stack. When
+a retreat is pending, the highlighted losing stack is dragged together to the
+first empty hex. When an advance is pending, drag a highlighted winning stack
+to a highlighted vacated defender hex, or into the visible Decline advance
+tray. All board movement and combat movement is coordinate-entry-free.
 
 ## Local container path
 
 `pnpm container:smoke` builds the production-shaped image with Podman (or Docker
 when Podman is unavailable), proves the application runs with a nonzero UID/GID,
-checks both ready and dependency-unavailable modes, serves the built same-origin
-client, and verifies graceful shutdown.
+checks PostgreSQL readiness and fail-closed mode, restarts the application, and
+proves the saved browser session resumes before clean shutdown.
 
 For an interactive same-origin proxy path, run:
 
@@ -76,8 +84,8 @@ podman compose up --build
 ```
 
 The local Caddy endpoint is `http://127.0.0.1:8080`. The application container
-uses `GETTYSBURG_SERVER_HOST`, `GETTYSBURG_SERVER_PORT`, the exact public origin
-in `GETTYSBURG_TRUSTED_ORIGIN`, and the optional Phase 1 readiness-test switch
-`GETTYSBURG_REQUIRED_DEPENDENCY=unavailable`.
-Phase 1 generates its in-memory credential pepper at process start; no runtime
-secret or PostgreSQL service is committed or required.
+uses `DATABASE_URL`, a persistent `GETTYSBURG_CREDENTIAL_PEPPER_FILE`,
+`GETTYSBURG_SERVER_HOST`, `GETTYSBURG_SERVER_PORT`, the exact public origin in
+`GETTYSBURG_TRUSTED_ORIGIN`, and the readiness-test switch
+`GETTYSBURG_REQUIRED_DEPENDENCY=unavailable`. PostgreSQL and the credential
+pepper use private persistent volumes; no runtime secret is committed.

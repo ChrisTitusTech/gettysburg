@@ -277,20 +277,39 @@ Phase 2 is a rules-light digital tabletop: the server enforces seat ownership,
 turn order, state shape, unit ownership, counter occupancy, die rolls, and
 persistence while players may adjudicate advanced rules.
 
-Phase 3 adds automated validation for movement costs, roads, terrain, streams,
-zones of control, generals, stacking, combat grouping, modifiers, losses,
-retreats, advances, reinforcement entry, night turns, objectives, and victory.
+Scenario Five starts at Union movement on turn 1 because Confederate has no
+deployed or eligible reinforcement counters. This opening skip does not consume
+state or event versions. Turn 2 starts with Confederate movement normally once
+its scheduled reinforcements are available.
+
+Phase 2 enforces the printed movement allowance as a simple one-point-per-hex
+budget. Phase 3 adds automated validation for variable movement costs, roads,
+terrain, streams, zones of control, generals, stacking, combat grouping,
+modifiers, losses, retreats, advances, reinforcement entry, night turns,
+objectives, and victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
 
 ### Phase 2 movement command contract
 
-`moveUnit` supplies a unit ID and destination coordinate through the common
-versioned/idempotent command envelope. Only the active seat may move its own unit
-during its movement phase. Phase 2 verifies expected version, unit and seat
+`moveUnit` supplies one unit ID and a destination coordinate; `moveStack`
+supplies two or more unit IDs from the same hex and one shared destination.
+Both use the common versioned/idempotent command envelope. The board sends
+`moveStack` by default when a dragged counter shares its hex with friendly
+counters; holding Ctrl before dragging explicitly selects only that counter and
+sends `moveUnit`. Ctrl-click also keeps that explicit single-counter selection
+for a later drag; a normal click returns the counter to whole-stack selection.
+The browser derives the destination from the dropped board hex; players never
+type a coordinate. Only the active seat may move its own unit or stack during
+its movement phase. Phase 2 verifies expected version, unit and seat
 ownership, an authoritative on-board deployed location, an eligible movable
 status, board bounds, destination existence, and counter occupancy, then persists
-the location mutation and serialized result atomically. Reinforcement units are
+the location mutation and serialized result atomically. A stack move is one
+atomic command: every submitted counter moves or none does, and the slowest
+counter's remaining allowance limits the route. Each crossed hex spends one
+movement point, including across multiple moves in the same movement phase; no
+counter can exceed its printed allowance and each budget resets at the start of
+its side's next movement phase. Reinforcement units are
 rejected by `moveUnit` and must use `enterReinforcement`; eliminated and other
 off-board units are rejected. Phase 2 permits at most one general in a hex. A
 destination without a general permits at most one combat unit; a
@@ -299,9 +318,10 @@ destination accepts either unit type; a general-only destination accepts up to
 two combat units; and a one-combat-unit destination rejects another combat unit
 but accepts one general. A general-plus-one-combat destination accepts one more
 combat unit. A second general and any move beyond those capacities are rejected.
-Terrain cost, path, ZOC, stream, road, and other advanced stacking legality remain
-player-adjudicated until Phase 3. Acceptance cases cover empty, general-only,
-combat-only, general-plus-one-combat, and full destinations for both mover types.
+Variable terrain cost, route obstruction, ZOC, stream, road, and other advanced
+stacking legality remain player-adjudicated until Phase 3. Acceptance cases
+cover empty, general-only, combat-only, general-plus-one-combat, and full
+destinations for both mover types.
 
 ### Phase 2 reinforcement-entry command contract
 
@@ -318,28 +338,36 @@ wrong-side, wrong-entry-hex, occupied, and already-entered cases.
 
 ### Phase 2 combat command contract
 
-Phase 2 provides an authoritative adjudication workflow without claiming Phase 3
-legality checks:
+Phase 2 provides an authoritative adjudication workflow with basic adjacency
+eligibility while leaving advanced combat legality for Phase 3:
 
 - `declareCombat` supplies a new combat ID plus nonempty attacker and defender
-  unit-ID lists. Only the active seat may call it during that side's combat phase.
-  The server rejects duplicate IDs within either list or across both lists. It
-  verifies every unit exists, every attacker belongs to the active seat and
-  `active_side`, every defender belongs to the opposing side, and no participant
-  is already committed. Every participant must have an authoritative on-board
-  deployed location. The server then creates the declared combat without adding
-  Phase 3 adjacency or grouping checks.
-- `rollCombat` supplies the combat ID. Only the active seat may call it for a
-  declared unresolved combat. The server generates/stores both dice and moves
-  the combat to `awaitingResultConfirmation`.
-- `confirmCombatResult` supplies the combat ID, attacker/defender modifiers,
-  result category, loss counts, whether each side must retreat, whether attacker
-  advance is offered, and an optional adjudication note. Only the active seat may
-  call it after the roll. The server validates the typed payload, records the
-  confirming actor and canonical input without claiming Phase 3 correctness.
-  Each loss count must be a non-negative integer no greater than the total
-  available steps of that side's combat participants; an invalid count creates no
-  pending choice. The server creates the first required loss or retreat choice.
+  unit-ID lists chosen from server-state-derived adjacent occupied-hex contacts;
+  the client does not require raw ID entry. Each visible contact shows both
+  stacks, their hexes, and each side's printed combat-factor modifier. Only the
+  active seat may declare it during that side's combat phase. The server rejects
+  duplicate IDs within either list or across both lists. It verifies every unit
+  exists, every attacker belongs to the active seat and `active_side`, every
+  defender belongs to the opposing side, and no participant has appeared in
+  another combat this phase. Every participant must have an authoritative
+  on-board deployed location. Every attacker must be adjacent to at least one
+  listed defender, every defender must be adjacent to at least one listed
+  attacker, all combat units sharing a participating hex must be included, and
+  at least one side must occupy a single hex. Phase 3 adds full ZOC-driven
+  multi-hex separation and grouping assistance. A successful declaration also
+  makes and stores one server d10 roll for each side, so there is no separate
+  player roll action in the normal workflow.
+- `confirmCombatResult` supplies only the combat ID. Only the active seat may
+  call it after the automatic roll. The server caps each side's printed
+  combat-factor modifier at +10, adds it to that side's roll, and derives the
+  complete result. The defender wins a tied modified total. A margin of 0-2
+  causes retreat, 3-5 causes retreat plus one step loss, and 6 or more causes
+  retreat plus two step losses. An attacker win offers advance after required
+  losses and retreats resolve. Losses are capped at the participant steps still
+  available. Per-hex hill, woods, and town modifiers remain excluded until the
+  terrain transcription is reviewed, so the interface identifies the result as
+  unit-factor-only rather than claiming complete Phase 3 terrain correctness.
+  The server creates the first required loss or retreat choice.
   Once losses are allocated, it advances through each confirmed retreat and then
   offers advance only when a server-derived eligible attacker exists. With zero
   losses, no retreat, and no eligible advance, it marks the combat `resolved`
@@ -351,26 +379,43 @@ legality checks:
   that seat and no other unit. Allocations cannot exceed available steps, and the
   total must exactly satisfy the pending loss count before advancing to retreat
   or advance.
-- `retreatUnit` supplies the combat ID, unit ID, and destination. Only the owner
-  of the pending retreat may call it. The unit must be a server-derived combat
-  participant with a pending retreat; Phase 2 verifies board bounds, occupancy,
-  and that the destination exists as a playable map hex, while Phase 3 adds full
-  retreat legality.
-- `advanceAfterCombat` supplies the combat ID and destination or an explicit
-  decline. The server derives eligible attackers from combat state rather than
-  accepting client-provided IDs. Only the active attacking seat may resolve the
-  choice, and Phase 2 validates board bounds, occupancy, and that the destination
-  exists as a playable map hex. Completion or decline marks the combat resolved.
+- `retreatUnit` handles a lone retreating counter. `retreatStack` supplies the
+  combat ID, every pending counter from one original hex, and its connected drag
+  path. The pending IDs include surviving combat units plus any friendly general
+  that shared their hex. Only the owner of the pending retreat may call either
+  command. Counters that began together cannot be split: they move atomically to
+  the same final hex. The path starts at their current hex, enters connected
+  adjacent hexes, cannot enter an enemy-occupied hex, and stops at the first
+  empty hex; a friendly-occupied hex therefore forces the retreat to continue.
+  Phase 3 adds enemy-ZOC priority, forced off-board retreat, and the remaining
+  complete retreat legality.
+- `advanceAfterCombat` supplies the combat ID, the eligible counters dragged
+  from one original stack, and either a server-recorded vacated defender hex or
+  an explicit decline. The board highlights eligible counters and authoritative
+  destinations. Normal drag keeps the eligible stack together; holding Ctrl
+  before dragging selects only the grabbed eligible counter. Dropping on a
+  highlighted vacated hex advances the submitted counters atomically, while
+  dropping into the visible Decline advance tray declines without coordinate
+  entry. The server verifies every submitted counter against the pending choice,
+  same-source location, seat, deployment, destination, and stacking capacity.
+  Only the active attacking seat may resolve the choice. Completion or decline
+  marks the combat resolved.
 - `endPhase` is rejected while any combat is not `resolved`, including
   `declared`, `awaitingResultConfirmation`, and pending-choice states. Phase 2
-  has no implicit combat-cancellation path.
+  has no implicit combat-cancellation path. Ending movement enters combat only
+  when the active side has at least one deployed non-general counter adjacent to
+  an opposing deployed non-general counter. Otherwise combat is skipped within
+  the same authoritative action and play advances to the next side or turn.
 
 Successful `endPhase` transitions are:
 
 | Current turn/phase/side | Resulting turn/phase/side |
 | --- | --- |
-| Any turn, movement, Confederate | Same turn, combat, Confederate |
-| Any turn, movement, Union | Same turn, combat, Union |
+| Any turn, movement, Confederate, adjacent enemies | Same turn, combat, Confederate |
+| Any turn, movement, Union, adjacent enemies | Same turn, combat, Union |
+| Any turn, movement, Confederate, no adjacent enemies | Same turn, movement, Union |
+| Turns 1-23, movement, Union, no adjacent enemies | Next turn, movement, Confederate |
+| Turn 24, movement, Union, no adjacent enemies | Turn 24, completed, no active side |
 | Turns 1-24, combat, Confederate | Same turn, movement, Union |
 | Turns 1-23, combat, Union | Next turn, movement, Confederate |
 | Turn 24, combat, Union | Turn 24, completed, no active side |
@@ -381,7 +426,8 @@ and broadcasts the resulting state. A rejected transition changes neither value.
 
 Each accepted command is one idempotent authoritative action/result, including
 server-generated rolls, and follows the atomic persistence and ordering rules.
-Phase 3 adds adjacency, grouping, modifiers, loss, retreat, and advance legality.
+Phase 3 adds complete ZOC grouping, authoritative terrain modifiers, and the
+remaining retreat and advance legality.
 
 ### Error and recovery behavior
 
@@ -658,7 +704,8 @@ accepted when:
   no secret; the fragment/code is redeemed once over HTTPS; and browser history
   is scrubbed synchronously before the redemption request.
 - Command tests cover every `endPhase` table row, Phase 2 stacking capacity,
-  zero-choice combat completion, seat surrender, and operator-audit sequencing.
+  atomic stack movement and retreat, combat loss thresholds, seat surrender,
+  and operator-audit sequencing.
   Audit actions increment sequence without changing `Game.version`; gameplay
   actions increment both according to their defined invariant.
 - HTTP/WebSocket integration tests verify invitation and command rate limits,

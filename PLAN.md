@@ -111,15 +111,16 @@ is in `docs/operations/VPS.md`.
 
 ## Decision gates before full content implementation
 
-- Obtain the Battle Manual referenced by the supplied rules.
 - Obtain complete counter fronts and reduced-strength backs.
-- Confirm initial setup, scenario victory conditions, and objective scoring.
+- Review the per-hex terrain transcription against the supplied board.
 - Decide whether optional rules are in scope.
 - Decide whether the supplied scans may be used beyond a private prototype or
   whether the release must use entirely original art and wording.
 
-Phase 1 may proceed using clearly labelled fixture data while these gates are
-open. Phase 2 cannot claim complete scenario fidelity until they are closed.
+The locally supplied Battle Manual now answers the Scenario Five setup, turn,
+night, objective, scoring, and victory questions for the rules-light Phase 2
+model. Phase 2 still cannot claim complete counter-state or terrain fidelity
+until the remaining gates are closed.
 
 ## Planning ranges
 

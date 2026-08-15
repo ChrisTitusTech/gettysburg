@@ -6,6 +6,7 @@ import {
   type EventCursor,
   type GameState,
   type GameplayEvent,
+  type GameplayCommandName,
   type HexCoordinate,
   type Side,
 } from "@gettysburg/game";
@@ -19,6 +20,7 @@ import {
 } from "./api";
 import { Board } from "./Board";
 import { invitationUrl, type InvitationFragment } from "./invitation";
+import { TabletopControls } from "./TabletopControls";
 
 interface AppProps {
   readonly initialInvitation?: InvitationFragment | null;
@@ -45,10 +47,7 @@ function actionEntries(events: readonly GameplayEvent[]): string[] {
   return [...events]
     .reverse()
     .slice(0, 8)
-    .map(
-      (event) =>
-        `v${event.state_version}: ${event.unit_id} moved to ${event.destination}`,
-    );
+    .map((event) => `v${event.state_version}: ${event.summary}`);
 }
 
 export function App({ initialInvitation = null }: AppProps) {
@@ -58,11 +57,12 @@ export function App({ initialInvitation = null }: AppProps) {
     useState<ConnectionStatus>("disconnected");
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
-  const [pendingMove, setPendingMove] = useState(false);
+  const [pendingCommand, setPendingCommand] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const roomReference = useRef<Room | null>(null);
   const eventCursorReference = useRef<EventCursor | null>(null);
+  const requestedGameId = gameIdFromLocation();
 
   const enterGame = useCallback(
     (session: SessionResponse, shareUrl?: string) => {
@@ -158,10 +158,10 @@ export function App({ initialInvitation = null }: AppProps) {
         setActiveGame((current) =>
           current === null ? current : { ...current, state },
         );
-        setPendingMove(false);
+        setPendingCommand(false);
       });
       connectedRoom.onMessage<CommandResult>("commandResult", (result) => {
-        setPendingMove(false);
+        setPendingCommand(false);
         if (!result.ok) {
           setError(result.message);
           if (result.error === "stale_version") {
@@ -184,10 +184,7 @@ export function App({ initialInvitation = null }: AppProps) {
         }
         eventCursorReference.current = accepted.cursor;
         setActionLog((entries) =>
-          [
-            `v${event.state_version}: ${event.unit_id} moved to ${event.destination}`,
-            ...entries,
-          ].slice(0, 8),
+          [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
         );
       });
       connectedRoom.onError((_code, message) => {
@@ -293,20 +290,64 @@ export function App({ initialInvitation = null }: AppProps) {
     }
   }
 
-  function handleMove(unitId: string, destination: HexCoordinate) {
+  function sendCommand(
+    commandName: GameplayCommandName,
+    payload: Record<string, unknown>,
+  ) {
     if (activeGame === null || roomReference.current === null) {
-      setError("Reconnect before moving a counter.");
+      setError("Reconnect before sending a tabletop command.");
       return;
     }
-    setPendingMove(true);
+    setPendingCommand(true);
     setError(null);
-    roomReference.current.send("moveUnit", {
+    roomReference.current.send(commandName, {
       command_id: crypto.randomUUID(),
-      command_name: "moveUnit",
+      command_name: commandName,
       expected_version: activeGame.state.version,
       game_id: activeGame.game_id,
-      payload: { destination, unit_id: unitId },
+      payload,
       schema: COMMAND_SCHEMA_VERSION,
+    });
+  }
+
+  function handleMove(unitIds: readonly string[], destination: HexCoordinate) {
+    if (unitIds.length === 1) {
+      sendCommand("moveUnit", { destination, unit_id: unitIds[0] });
+    } else {
+      sendCommand("moveStack", { destination, unit_ids: unitIds });
+    }
+  }
+
+  function handleRetreat(
+    combatId: string,
+    unitIds: readonly string[],
+    path: readonly HexCoordinate[],
+  ) {
+    if (unitIds.length === 1) {
+      sendCommand("retreatUnit", {
+        combat_id: combatId,
+        destination: path.at(-1),
+        unit_id: unitIds[0],
+      });
+    } else {
+      sendCommand("retreatStack", {
+        combat_id: combatId,
+        path,
+        unit_ids: unitIds,
+      });
+    }
+  }
+
+  function handleAdvance(
+    combatId: string,
+    unitIds: readonly string[],
+    destination: HexCoordinate | null,
+  ) {
+    sendCommand("advanceAfterCombat", {
+      combat_id: combatId,
+      decline: destination === null,
+      ...(destination === null ? {} : { destination }),
+      unit_ids: unitIds,
     });
   }
 
@@ -314,14 +355,15 @@ export function App({ initialInvitation = null }: AppProps) {
     return (
       <main className="lobby-shell">
         <section className="lobby-card" aria-labelledby="page-title">
-          <p className="eyebrow">Phase 1 multiplayer vertical slice</p>
+          <p className="eyebrow">Phase 2 digital tabletop</p>
           <h1 id="page-title">Gettysburg</h1>
           <p className="summary">
-            Create a private fixture game or claim the opposing seat. This slice
-            uses original web rendering and process-lifetime in-memory state.
+            Create a private 24-turn game or claim the opposing seat. The
+            server-authoritative state and action history are saved in
+            PostgreSQL.
           </p>
 
-          {initialInvitation === null ? (
+          {initialInvitation === null && requestedGameId === null ? (
             <div className="seat-actions" aria-label="Choose a host seat">
               <button
                 disabled={isBusy}
@@ -336,7 +378,7 @@ export function App({ initialInvitation = null }: AppProps) {
                 Host as Union
               </button>
             </div>
-          ) : (
+          ) : initialInvitation !== null ? (
             <div className="join-panel">
               <h2>Private invitation</h2>
               <p>
@@ -346,6 +388,16 @@ export function App({ initialInvitation = null }: AppProps) {
               <button disabled={isBusy} onClick={() => void handleClaim()}>
                 Claim seat
               </button>
+            </div>
+          ) : (
+            <div className="join-panel">
+              <h2>Seat invitation required</h2>
+              <p>
+                This browser does not own a seat in game{" "}
+                <code>{requestedGameId}</code>. Open the complete one-time
+                invitation copied from the host so both players join the same
+                game.
+              </p>
             </div>
           )}
           <p aria-live="polite" className="lobby-status">
@@ -360,7 +412,7 @@ export function App({ initialInvitation = null }: AppProps) {
     <main className="game-shell">
       <header className="game-header">
         <div>
-          <p className="eyebrow">Private fixture room</p>
+          <p className="eyebrow">Private Phase 2 room</p>
           <h1>Gettysburg</h1>
         </div>
         <dl className="game-facts">
@@ -371,6 +423,14 @@ export function App({ initialInvitation = null }: AppProps) {
           <div>
             <dt>State</dt>
             <dd>v{activeGame.state.version}</dd>
+          </div>
+          <div>
+            <dt>Turn</dt>
+            <dd>{activeGame.state.turn}</dd>
+          </div>
+          <div>
+            <dt>Phase</dt>
+            <dd>{activeGame.state.phase}</dd>
           </div>
           <div>
             <dt>Connection</dt>
@@ -391,6 +451,10 @@ export function App({ initialInvitation = null }: AppProps) {
           <div>
             <p className="eyebrow">Opposing seat</p>
             <h2 id="invite-heading">Share this one-time invitation</h2>
+            <p>
+              Open it in a private window or a separate browser. This browser
+              already owns the {humanSide(activeGame.seat)} seat.
+            </p>
           </div>
           <input
             aria-label="One-time invitation URL"
@@ -405,10 +469,19 @@ export function App({ initialInvitation = null }: AppProps) {
         </section>
       )}
 
+      <TabletopControls
+        disabled={connectionStatus !== "connected" || pendingCommand}
+        onCommand={sendCommand}
+        seat={activeGame.seat}
+        state={activeGame.state}
+      />
+
       <Board
-        disabled={connectionStatus !== "connected" || pendingMove}
+        disabled={connectionStatus !== "connected" || pendingCommand}
         error={error ?? undefined}
+        onAdvance={handleAdvance}
         onMove={handleMove}
+        onRetreat={handleRetreat}
         seat={activeGame.seat}
         state={activeGame.state}
       />
@@ -419,7 +492,7 @@ export function App({ initialInvitation = null }: AppProps) {
           <h2 id="log-heading">Recent actions</h2>
         </div>
         {actionLog.length === 0 ? (
-          <p>No accepted moves yet.</p>
+          <p>No accepted tabletop actions yet.</p>
         ) : (
           <ol>
             {actionLog.map((entry) => (
@@ -430,7 +503,8 @@ export function App({ initialInvitation = null }: AppProps) {
       </section>
       <footer>
         Game <code>{activeGame.game_id}</code> ·{" "}
-        {activeGame.state.content_revision} · process-lifetime persistence
+        {activeGame.state.content_revision} · restart-safe PostgreSQL
+        persistence
       </footer>
     </main>
   );

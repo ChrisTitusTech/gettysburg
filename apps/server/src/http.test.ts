@@ -39,14 +39,14 @@ describe("service health", () => {
     });
   });
 
-  it("describes the Phase 1 in-memory readiness boundary", async () => {
+  it("describes the Phase 2 restart-safe readiness boundary", async () => {
     await withServer(true, async (origin) => {
       const response = await fetch(`${origin}/readyz`);
 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
-        durability: "process-lifetime",
-        mode: "in-memory",
+        durability: "restart-safe",
+        mode: "postgresql",
         status: "ready",
       });
     });

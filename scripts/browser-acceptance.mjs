@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir } from "node:fs/promises";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
-import { resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { chromium } from "@playwright/test";
 
+import { startPostgres } from "./postgres-test-service.mjs";
+
 const evidenceDirectory = resolve(
-  process.env.GETTYSBURG_EVIDENCE_DIR ?? "test-results/phase-1",
+  process.env.GETTYSBURG_EVIDENCE_DIR ?? "test-results/phase-2",
 );
 
 async function reservePort() {
@@ -76,6 +79,8 @@ async function waitForVersion(page, version) {
 
 async function captureBoardViews(page, prefix) {
   const board = page.locator(".board-workspace");
+  await page.getByRole("button", { name: "Fit" }).click();
+  await page.getByText("100%", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Zoom out" }).click();
   await page.getByText("65%", { exact: true }).waitFor();
   await board.screenshot({
@@ -98,17 +103,51 @@ async function captureBoardViews(page, prefix) {
 
 async function selectAndMove(page, counterName, destination, inputMode) {
   const counter = page.getByRole("button", { name: counterName });
+  const target = page.locator(`[data-coordinate="${destination}"]`);
   if (inputMode === "touch") {
     await counter.tap();
-    await page.getByLabel("Destination coordinate").fill(destination);
-    await page.getByRole("button", { name: "Move" }).tap();
+    await target.tap();
     return;
   }
 
   await counter.focus();
   await page.keyboard.press("Enter");
-  await page.getByLabel("Destination coordinate").fill(destination);
-  await page.getByLabel("Destination coordinate").press("Enter");
+  await target.click();
+}
+
+async function dragWithinMovement(page, prefix) {
+  const counter = page.getByRole("button", {
+    name: /Wadsworth, F3, selectable/,
+  });
+  const target = page.locator('[data-coordinate="F8"]');
+  const startBox = await counter.boundingBox();
+  const targetBox = await target.boundingBox();
+  assert(startBox !== null);
+  assert(targetBox !== null);
+  await page.mouse.move(
+    startBox.x + startBox.width / 2,
+    startBox.y + startBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    targetBox.x + targetBox.width / 2,
+    targetBox.y + targetBox.height / 2,
+    { steps: 10 },
+  );
+  await page.locator(".movement-route").getByText("3 / 3").waitFor();
+  await page.locator(".board-workspace").screenshot({
+    path: resolve(evidenceDirectory, `${prefix}-movement-route.png`),
+  });
+  await page.mouse.up();
+}
+
+async function ctrlSelectSingleCounter(page) {
+  const counter = page.getByRole("button", {
+    name: /Reynolds, F6, selectable/,
+  });
+  await counter.focus();
+  await page.keyboard.press("Control+Enter");
+  await page.locator('[data-coordinate="G6"]').click();
 }
 
 async function runScenario(browser, origin, options) {
@@ -151,85 +190,111 @@ async function runScenario(browser, origin, options) {
     await replayPage.getByText(/already used/i).waitFor();
     await replayContext.close();
 
+    const confederatePage =
+      options.hostName === "Confederate" ? hostPage : opponentPage;
+    let unionPage = options.hostName === "Union" ? hostPage : opponentPage;
+
     await selectAndMove(
-      hostPage,
-      new RegExp(
-        `${options.hostName} fixture counter, ${options.hostStart}, selectable`,
-      ),
-      options.hostDestination,
+      unionPage,
+      /Wadsworth, D3, selectable/,
+      "E3",
       options.inputMode,
     );
     await waitForVersion(hostPage, 1);
     await waitForVersion(opponentPage, 1);
-    await opponentPage
+    await confederatePage
       .getByRole("button", {
-        name: new RegExp(
-          `${options.hostName} fixture counter, ${options.hostDestination}`,
-        ),
+        name: /Wadsworth, E3/,
       })
       .waitFor();
 
-    await opponentPage
+    await unionPage
       .getByRole("button", {
-        name: new RegExp(
-          `${options.opponentName} fixture counter, ${options.opponentStart}, selectable`,
-        ),
+        name: /Wadsworth, E3, selectable/,
       })
       .click();
-    await opponentPage
-      .getByLabel("Destination coordinate")
-      .fill(options.hostDestination);
-    await opponentPage.getByRole("button", { name: "Move" }).click();
-    await opponentPage.getByText(/occupied/i).waitFor();
-    await waitForVersion(opponentPage, 1);
+    await unionPage.locator('[data-coordinate="Q7"]').click();
+    await unionPage.getByText(/has 4 movement remaining/i).waitFor();
+    await waitForVersion(unionPage, 1);
 
-    const opponentGameUrl = opponentPage.url();
-    const restartState = await opponentContext.storageState();
-    await opponentContext.close();
-    opponentContext = await browser.newContext({
+    const unionGameUrl = unionPage.url();
+    const unionContext =
+      options.hostName === "Union" ? hostContext : opponentContext;
+    const restartState = await unionContext.storageState();
+    if (options.hostName === "Union") {
+      await hostContext.close();
+    } else {
+      await opponentContext.close();
+    }
+    const restartedUnionContext = await browser.newContext({
       ...contextOptions,
       storageState: restartState,
     });
-    opponentPage = await opponentContext.newPage();
-    watchPage(opponentPage, issues);
-    await opponentPage.goto(opponentGameUrl);
-    await opponentPage.getByText("connected", { exact: true }).waitFor();
-    await waitForVersion(opponentPage, 1);
-    await opponentPage.getByText(/moved to/).waitFor();
+    if (options.hostName !== "Union") opponentContext = restartedUnionContext;
+    unionPage = await restartedUnionContext.newPage();
+    watchPage(unionPage, issues);
+    await unionPage.goto(unionGameUrl);
+    await unionPage.getByText("connected", { exact: true }).waitFor();
+    await waitForVersion(unionPage, 1);
+    await unionPage.getByText(/2 stacked counters moved to E3/).waitFor();
 
     await selectAndMove(
-      opponentPage,
-      new RegExp(
-        `${options.opponentName} fixture counter, ${options.opponentStart}, selectable`,
-      ),
-      options.opponentDestination,
+      unionPage,
+      /Wadsworth, E3, selectable/,
+      "F3",
       options.inputMode,
     );
-    await waitForVersion(opponentPage, 2);
-    await waitForVersion(hostPage, 2);
-    await hostPage
+    await waitForVersion(unionPage, 2);
+    await waitForVersion(confederatePage, 2);
+    await confederatePage
       .getByRole("button", {
-        name: new RegExp(
-          `${options.opponentName} fixture counter, ${options.opponentDestination}`,
-        ),
+        name: /Wadsworth, F3/,
       })
       .waitFor();
 
-    await captureBoardViews(hostPage, options.label);
+    await dragWithinMovement(unionPage, options.label);
+    await waitForVersion(unionPage, 3);
+    await waitForVersion(confederatePage, 3);
+    await confederatePage
+      .getByRole("button", {
+        name: /Wadsworth, F6/,
+      })
+      .waitFor();
+
+    await captureBoardViews(confederatePage, options.label);
+    if (options.inputMode === "keyboard") {
+      await ctrlSelectSingleCounter(unionPage);
+      await waitForVersion(unionPage, 4);
+      await waitForVersion(confederatePage, 4);
+      await confederatePage
+        .getByRole("button", { name: /Wadsworth, F6/ })
+        .waitFor();
+      await confederatePage
+        .getByRole("button", { name: /Reynolds, G6/ })
+        .waitFor();
+    }
     assert.deepEqual(issues, []);
+    if (options.hostName === "Union") await restartedUnionContext.close();
   } finally {
-    await hostContext.close();
-    await opponentContext.close();
+    await hostContext.close().catch(() => {});
+    await opponentContext.close().catch(() => {});
   }
 }
 
 await mkdir(evidenceDirectory, { recursive: true });
 const port = await reservePort();
 const origin = `http://127.0.0.1:${port}`;
+const postgres = await startPostgres();
+const runtimeDirectory = await mkdtemp(join(tmpdir(), "gettysburg-browser-"));
 let output = "";
 const server = spawn(process.execPath, ["apps/server/dist/index.js"], {
   env: {
     ...process.env,
+    DATABASE_URL: postgres.connectionString,
+    GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+      runtimeDirectory,
+      "credential-pepper",
+    ),
     GETTYSBURG_SERVER_HOST: "127.0.0.1",
     GETTYSBURG_SERVER_PORT: String(port),
     GETTYSBURG_TRUSTED_ORIGIN: origin,
@@ -244,25 +309,17 @@ try {
   await waitForReadiness(origin, () => output);
   browser = await chromium.launch({ headless: true });
   await runScenario(browser, origin, {
-    hostDestination: "G5",
     hostName: "Confederate",
-    hostStart: "F5",
     inputMode: "keyboard",
     label: "desktop",
-    opponentDestination: "Q7",
     opponentName: "Union",
-    opponentStart: "P7",
     viewport: { height: 900, width: 1440 },
   });
   await runScenario(browser, origin, {
-    hostDestination: "Q7",
     hostName: "Union",
-    hostStart: "P7",
     inputMode: "touch",
     label: "tablet",
-    opponentDestination: "G5",
     opponentName: "Confederate",
-    opponentStart: "F5",
     viewport: { height: 768, width: 1024 },
   });
   console.log(
@@ -271,4 +328,6 @@ try {
 } finally {
   await browser?.close();
   await stopServer(server);
+  postgres.stop();
+  await rm(runtimeDirectory, { force: true, recursive: true });
 }

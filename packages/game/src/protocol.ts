@@ -2,59 +2,306 @@ import { z } from "zod";
 
 import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
-export const RULESET_VERSION = "phase-1-rules-v1";
+export const RULESET_VERSION = "phase-2-tabletop-v1";
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
 export type Side = "confederate" | "union";
+export type GamePhase = "combat" | "completed" | "movement";
+export type UnitKind = "artillery" | "cavalry" | "general" | "infantry";
+export type UnitStatus = "deployed" | "eliminated" | "reinforcement";
+export type StrengthState = "eliminated" | "full" | "reduced";
 
 export interface UnitState {
+  readonly combat: number | null;
+  readonly entry_hexes: readonly HexCoordinate[];
+  readonly entry_turn: number | null;
   readonly id: string;
+  readonly kind: UnitKind;
   readonly label: string;
-  readonly location: HexCoordinate;
+  readonly location: HexCoordinate | null;
+  readonly movement: number;
+  readonly movement_spent?: number;
+  readonly organization: string;
+  readonly side: Side;
+  readonly status: UnitStatus;
+  readonly steps_remaining: number;
+  readonly strength: StrengthState;
+}
+
+export interface PendingLossChoice {
+  readonly count: number;
+  readonly kind: "loss";
+  readonly side: Side;
+  readonly unit_ids: readonly string[];
+}
+
+export interface PendingRetreatChoice {
+  readonly kind: "retreat";
+  readonly side: Side;
+  readonly unit_ids: readonly string[];
+}
+
+export interface PendingAdvanceChoice {
+  readonly destination_hexes?: readonly HexCoordinate[];
+  readonly eligible_unit_ids: readonly string[];
+  readonly kind: "advance";
   readonly side: Side;
 }
 
+export type PendingCombatChoice =
+  PendingAdvanceChoice | PendingLossChoice | PendingRetreatChoice;
+
+export interface CombatConfirmation {
+  readonly adjudication_note?: string;
+  readonly advance_offered: boolean;
+  readonly attacker_losses: number;
+  readonly attacker_modifier: number;
+  readonly attacker_retreat: boolean;
+  readonly defender_losses: number;
+  readonly defender_modifier: number;
+  readonly defender_retreat: boolean;
+  readonly result: "attacker_win" | "defender_win" | "tie";
+}
+
+export interface CombatState {
+  readonly attacker_loss_allocated: boolean;
+  readonly attacker_retreated: boolean;
+  readonly attackers: readonly string[];
+  readonly confirmation: CombatConfirmation | null;
+  readonly defender_loss_allocated: boolean;
+  readonly defender_retreated: boolean;
+  readonly defenders: readonly string[];
+  readonly defender_hexes?: readonly HexCoordinate[];
+  readonly id: string;
+  readonly pending_choice: PendingCombatChoice | null;
+  readonly rolls: {
+    readonly attacker: number;
+    readonly defender: number;
+  } | null;
+  readonly status:
+    "awaiting_result_confirmation" | "declared" | "pending_choice" | "resolved";
+}
+
 export interface GameState {
-  readonly active_side: Side;
+  readonly active_side: Side | null;
+  readonly combats: Readonly<Record<string, CombatState>>;
   readonly content_revision: string;
   readonly event_sequence: number;
   readonly game_id: string;
+  readonly night: boolean;
+  readonly objectives: Readonly<
+    Record<string, { readonly controlled_by: Side; readonly value: number }>
+  >;
+  readonly phase: GamePhase;
   readonly ruleset_version: string;
   readonly turn: number;
   readonly units: Readonly<Record<string, UnitState>>;
   readonly version: number;
+  readonly victory: {
+    readonly confederate: number;
+    readonly status: "confederate" | "in-progress" | "tie" | "union";
+    readonly union: number;
+  };
 }
 
+const coordinateSchema = z
+  .string()
+  .refine(isHexCoordinate, "Invalid board coordinate");
+const unitIdSchema = z.string().min(1).max(100);
+const combatIdSchema = z.string().uuid();
+
 export const moveUnitPayloadSchema = z
+  .object({ destination: coordinateSchema, unit_id: unitIdSchema })
+  .strict();
+export const moveStackPayloadSchema = z
   .object({
-    destination: z.string().refine(isHexCoordinate, "Invalid board coordinate"),
-    unit_id: z.string().min(1).max(100),
+    destination: coordinateSchema,
+    unit_ids: z.array(unitIdSchema).min(2),
   })
   .strict();
+export const enterReinforcementPayloadSchema = moveUnitPayloadSchema;
+export const declareCombatPayloadSchema = z
+  .object({
+    attackers: z.array(unitIdSchema).min(1),
+    combat_id: combatIdSchema,
+    defenders: z.array(unitIdSchema).min(1),
+  })
+  .strict();
+export const rollCombatPayloadSchema = z
+  .object({ combat_id: combatIdSchema })
+  .strict();
+export const confirmCombatResultPayloadSchema = z
+  .object({ combat_id: combatIdSchema })
+  .strict();
+export const allocateLossPayloadSchema = z
+  .object({
+    allocations: z.record(unitIdSchema, z.number().int().nonnegative()),
+    combat_id: combatIdSchema,
+  })
+  .strict();
+export const retreatUnitPayloadSchema = z
+  .object({
+    combat_id: combatIdSchema,
+    destination: coordinateSchema,
+    unit_id: unitIdSchema,
+  })
+  .strict();
+export const retreatStackPayloadSchema = z
+  .object({
+    combat_id: combatIdSchema,
+    path: z.array(coordinateSchema).min(2),
+    unit_ids: z.array(unitIdSchema).min(2),
+  })
+  .strict();
+export const advanceAfterCombatPayloadSchema = z
+  .object({
+    combat_id: combatIdSchema,
+    decline: z.boolean(),
+    destination: coordinateSchema.optional(),
+    unit_ids: z.array(unitIdSchema).min(1).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.decline === (value.destination !== undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "Choose either a destination or decline",
+      });
+    }
+    if (!value.decline && value.unit_ids === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "Advancing requires at least one dragged counter",
+      });
+    }
+  });
+export const endPhasePayloadSchema = z.object({}).strict();
+
+export const commandPayloadSchemas = {
+  advanceAfterCombat: advanceAfterCombatPayloadSchema,
+  allocateLoss: allocateLossPayloadSchema,
+  confirmCombatResult: confirmCombatResultPayloadSchema,
+  declareCombat: declareCombatPayloadSchema,
+  endPhase: endPhasePayloadSchema,
+  enterReinforcement: enterReinforcementPayloadSchema,
+  moveStack: moveStackPayloadSchema,
+  moveUnit: moveUnitPayloadSchema,
+  retreatStack: retreatStackPayloadSchema,
+  retreatUnit: retreatUnitPayloadSchema,
+  rollCombat: rollCombatPayloadSchema,
+} as const;
+
+export type GameplayCommandName = keyof typeof commandPayloadSchemas;
+
+const baseEnvelope = {
+  command_id: z.string().uuid(),
+  expected_version: z.number().int().nonnegative(),
+  game_id: z.string().uuid(),
+  schema: z.literal(COMMAND_SCHEMA_VERSION),
+};
 
 export const moveUnitCommandSchema = z
   .object({
-    command_id: z.string().uuid(),
+    ...baseEnvelope,
     command_name: z.literal("moveUnit"),
-    expected_version: z.number().int().nonnegative(),
-    game_id: z.string().uuid(),
     payload: moveUnitPayloadSchema,
-    schema: z.literal(COMMAND_SCHEMA_VERSION),
   })
   .strict();
 
+export const gameplayCommandSchema = z.discriminatedUnion("command_name", [
+  moveUnitCommandSchema,
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("moveStack"),
+      payload: moveStackPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("enterReinforcement"),
+      payload: enterReinforcementPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("declareCombat"),
+      payload: declareCombatPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("rollCombat"),
+      payload: rollCombatPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("confirmCombatResult"),
+      payload: confirmCombatResultPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("allocateLoss"),
+      payload: allocateLossPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("retreatStack"),
+      payload: retreatStackPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("retreatUnit"),
+      payload: retreatUnitPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("advanceAfterCombat"),
+      payload: advanceAfterCombatPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("endPhase"),
+      payload: endPhasePayloadSchema,
+    })
+    .strict(),
+]);
+
+export type GameplayCommand = z.infer<typeof gameplayCommandSchema>;
 export type MoveUnitPayload = z.infer<typeof moveUnitPayloadSchema> & {
   readonly destination: HexCoordinate;
 };
-export type MoveUnitCommand = z.infer<typeof moveUnitCommandSchema> & {
-  readonly payload: MoveUnitPayload;
-};
+export type MoveUnitCommand = Extract<
+  GameplayCommand,
+  { command_name: "moveUnit" }
+>;
 
 export type CommandErrorCode =
+  | "already_entered"
   | "command_id_conflict"
+  | "combat_invalid"
   | "invalid_hex"
   | "invalid_payload"
+  | "movement_exceeded"
   | "occupied"
+  | "pending_choice"
+  | "phase_invalid"
+  | "reinforcement_early"
   | "stale_version"
   | "unauthorized"
   | "unit_not_found"
@@ -69,11 +316,11 @@ export interface CommandFailure {
 
 export interface GameplayEvent {
   readonly command_id: string;
-  readonly destination: HexCoordinate;
+  readonly command_name: GameplayCommandName;
   readonly event_sequence: number;
   readonly kind: "gameplay";
   readonly state_version: number;
-  readonly unit_id: string;
+  readonly summary: string;
 }
 
 export interface CommandSuccess {
@@ -103,11 +350,9 @@ export function acceptGameplayEvent(
   if (event.event_sequence !== cursor.event_sequence + 1) {
     return { error: "event_sequence_gap", ok: false };
   }
-
   if (event.state_version !== cursor.state_version + 1) {
     return { error: "state_version_gap", ok: false };
   }
-
   return {
     cursor: {
       event_sequence: event.event_sequence,

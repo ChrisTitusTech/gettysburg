@@ -1,12 +1,16 @@
 import { fileURLToPath } from "node:url";
 
-import { InMemoryGameService } from "./game-service.js";
+import { PostgresGameService } from "./postgres-store.js";
+import { loadCredentialPepper } from "./runtime-config.js";
 import { createGettysburgServer } from "./server.js";
 
 const host = process.env.GETTYSBURG_SERVER_HOST ?? "127.0.0.1";
 const port = Number(process.env.GETTYSBURG_SERVER_PORT ?? "2567");
 const trustedWebSocketOrigin =
   process.env.GETTYSBURG_TRUSTED_ORIGIN ?? "http://127.0.0.1:5173";
+const databaseUrl =
+  process.env.DATABASE_URL ??
+  "postgresql://gettysburg@127.0.0.1:5432/gettysburg";
 const staticDirectory = fileURLToPath(
   new URL("../../web/dist", import.meta.url),
 );
@@ -24,10 +28,24 @@ try {
   throw new Error("GETTYSBURG_TRUSTED_ORIGIN must be an exact URL origin");
 }
 
+const pepper = await loadCredentialPepper({
+  ...(process.env.GETTYSBURG_CREDENTIAL_PEPPER === undefined
+    ? {}
+    : { encoded: process.env.GETTYSBURG_CREDENTIAL_PEPPER }),
+  ...(process.env.GETTYSBURG_CREDENTIAL_PEPPER_FILE === undefined
+    ? {}
+    : { file: process.env.GETTYSBURG_CREDENTIAL_PEPPER_FILE }),
+});
+const gameService = new PostgresGameService({
+  connectionString: databaseUrl,
+  pepper,
+});
+await gameService.migrate();
 const readiness = {
-  isReady: () => process.env.GETTYSBURG_REQUIRED_DEPENDENCY !== "unavailable",
+  isReady: async () =>
+    process.env.GETTYSBURG_REQUIRED_DEPENDENCY !== "unavailable" &&
+    (await gameService.isReady()),
 };
-const gameService = new InMemoryGameService();
 const gameServer = createGettysburgServer({
   gameService,
   readiness,
@@ -45,6 +63,7 @@ async function shutdown(signal: NodeJS.Signals) {
   isShuttingDown = true;
   console.log(`Received ${signal}; stopping Gettysburg server`);
   await gameServer.gracefullyShutdown(false);
+  await gameService.close();
 }
 
 process.once("SIGINT", () => {

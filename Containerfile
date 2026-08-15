@@ -13,11 +13,14 @@ ENV GETTYSBURG_SERVER_HOST=0.0.0.0 \
     GETTYSBURG_TRUSTED_ORIGIN=http://127.0.0.1:3000 \
     NODE_ENV=production
 WORKDIR /workspace
+RUN mkdir -p /var/lib/gettysburg && chown node:node /var/lib/gettysburg
 
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/apps/server ./apps/server
 COPY --from=build --chown=node:node /workspace/apps/web/dist ./apps/web/dist
 COPY --from=build --chown=node:node /workspace/packages ./packages
+
+VOLUME ["/var/lib/gettysburg"]
 
 USER node
 EXPOSE 3000
