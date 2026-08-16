@@ -275,7 +275,7 @@ caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null
 systemctl reload caddy
 curl --fail --silent --show-error --max-time 15 \
 	"${public_origin}/readyz" >/dev/null
-run_user podman exec gettysburg-app node scripts/public-smoke.mjs \
+run_user podman exec gettysburg-app node apps/server/public-smoke.mjs \
 	"${public_origin}"
 
 run_user podman image inspect \

@@ -19,7 +19,7 @@ COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/apps/server ./apps/server
 COPY --from=build --chown=node:node /workspace/apps/web/dist ./apps/web/dist
 COPY --from=build --chown=node:node /workspace/packages ./packages
-COPY --from=build --chown=node:node /workspace/scripts/public-smoke.mjs ./scripts/public-smoke.mjs
+COPY --from=build --chown=node:node /workspace/scripts/public-smoke.mjs ./apps/server/public-smoke.mjs
 
 VOLUME ["/var/lib/gettysburg"]
 
