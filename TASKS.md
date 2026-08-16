@@ -6,8 +6,9 @@ Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
 at `https://gettysburg.christitus.com` as of 2026-08-15. The local
 PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. PR #2 is
 ready for review. The full local, browser, PostgreSQL, container, deployment,
-encrypted backup/restore, independent-review, and exact-head CI gates pass; the
-remaining publication action is owner-controlled merge of the ready PR.
+encrypted backup/restore, and independent-review gates pass. Exact-head CI must
+pass on the final documentation commit before the owner-controlled merge of the
+ready PR.
 
 ## Phase 1 open gates
 
@@ -222,18 +223,18 @@ recorded below; no implementation or local-validation failure remains.
     backup cannot restore access; `/readyz` fails closed until the mounted
     off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
-  - Status: Rootless Quadlet services run revision
-    `ff32de1eae5c500fe9630db9133854e672283fdf`, recorded
+  - Status: Rootless Quadlet services run code revision
+    `425fb04c2c9478cc04d6a6bc661853b171a19ae0`, recorded
     by the image label and deployment rollback record behind host Caddy at
     `https://gettysburg.christitus.com`. Local/public health and readiness,
-    non-root application UID/GID, internal-only application network,
+    HSTS, non-root application UID/GID, internal-only application network,
     image-revision label, public WebSocket origin, an automatic public
     two-client state-synchronization transaction, two independent browser
     sessions, application restart/resume, PostgreSQL
     restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
     pass. The post-deployment encrypted backup
-    `20260816T054357Z` includes the encrypted credential pepper and passed strict
-    checksums, remote isolated restore (`12:48:47:11`), off-host copy validation,
+    `20260816T060614Z` includes the encrypted credential pepper and passed strict
+    checksums, remote isolated restore (`13:48:47:11`), off-host copy validation,
     and the deletion-ledger watermark gate. The original Caddy
     placeholder and failed candidate units were restored after each
     pre-acceptance deployment failure.

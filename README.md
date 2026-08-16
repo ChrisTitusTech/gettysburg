@@ -83,8 +83,10 @@ For an interactive same-origin proxy path, run:
 
 ```bash
 install -d -m 0700 .secrets
-umask 077
-openssl rand -hex 32 >.secrets/postgres-password
+if [[ ! -s .secrets/postgres-password ]]; then
+  umask 077
+  openssl rand -hex 32 >.secrets/postgres-password
+fi
 chmod 0444 .secrets/postgres-password
 podman compose up --build
 ```
