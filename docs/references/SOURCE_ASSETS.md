@@ -50,9 +50,9 @@ opinion about the underlying historical subject, place names, or game rules.
 
 ## Verified inventory
 
-The metadata and hashes below were verified on 2026-08-15 (America/Chicago).
-The inventory intentionally records only metadata and interpretation, not the
-binary files.
+The source-scan metadata and hashes below were verified on 2026-08-15
+(America/Chicago); `mock.png` was verified on 2026-08-16. The inventory
+intentionally records only metadata and interpretation, not the binary files.
 
 | File | Kind | Dimensions/pages | Bytes | SHA-256 |
 | --- | --- | --- | ---: | --- |
