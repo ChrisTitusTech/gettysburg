@@ -2,6 +2,7 @@ import { Server } from "@colyseus/core";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 
 import { configureHttpApplication, type ReadinessState } from "./http.js";
+import { GameEventBus } from "./event-bus.js";
 import type { GameService } from "./postgres-store.js";
 import { createGettysburgRoom } from "./room.js";
 
@@ -22,9 +23,10 @@ export function isTrustedWebSocketOrigin(
 export function createGettysburgServer(
   options: GettysburgServerOptions,
 ): Server {
+  const eventBus = new GameEventBus();
   const gameServer = new Server({
     express: (application) => {
-      configureHttpApplication(application, options);
+      configureHttpApplication(application, { ...options, eventBus });
     },
     gracefullyShutdown: false,
     greet: false,
@@ -34,7 +36,7 @@ export function createGettysburgServer(
     }),
   });
   gameServer
-    .define("game", createGettysburgRoom(options.gameService))
+    .define("game", createGettysburgRoom(options.gameService, eventBus))
     .filterBy(["gameId"]);
   return gameServer;
 }

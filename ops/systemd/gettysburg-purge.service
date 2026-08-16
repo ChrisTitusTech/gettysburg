@@ -1,0 +1,6 @@
+[Unit]
+Description=Purge expired Gettysburg soft-deleted games
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/podman exec gettysburg-app node apps/server/dist/operator.js purge-deleted

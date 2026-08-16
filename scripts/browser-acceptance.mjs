@@ -74,7 +74,15 @@ function watchPage(page, issues) {
 }
 
 async function waitForVersion(page, version) {
-  await page.getByText(`v${version}`, { exact: true }).first().waitFor();
+  try {
+    await page.getByText(`v${version}`, { exact: true }).first().waitFor();
+  } catch (error) {
+    const pageText = (await page.locator("body").innerText()).slice(0, 4_000);
+    throw new Error(
+      `Timed out waiting for v${version}; visible page text:\n${pageText}`,
+      { cause: error },
+    );
+  }
 }
 
 async function captureBoardViews(page, prefix) {
@@ -200,8 +208,8 @@ async function runScenario(browser, origin, options) {
       "E3",
       options.inputMode,
     );
-    await waitForVersion(hostPage, 1);
-    await waitForVersion(opponentPage, 1);
+    await waitForVersion(unionPage, 1);
+    await waitForVersion(confederatePage, 1);
     await confederatePage
       .getByRole("button", {
         name: /Wadsworth, E3/,
@@ -213,7 +221,7 @@ async function runScenario(browser, origin, options) {
         name: /Wadsworth, E3, selectable/,
       })
       .click();
-    await unionPage.locator('[data-coordinate="Q7"]').click();
+    await unionPage.locator('[data-coordinate="U11"]').click();
     await unionPage.getByText(/has 4 movement remaining/i).waitFor();
     await waitForVersion(unionPage, 1);
 
@@ -275,6 +283,11 @@ async function runScenario(browser, origin, options) {
     }
     assert.deepEqual(issues, []);
     if (options.hostName === "Union") await restartedUnionContext.close();
+  } catch (error) {
+    throw new Error(
+      `${options.label} browser scenario failed${issues.length === 0 ? "" : `; browser issues: ${issues.join(" | ")}`}`,
+      { cause: error },
+    );
   } finally {
     await hostContext.close().catch(() => {});
     await opponentContext.close().catch(() => {});
@@ -325,6 +338,10 @@ try {
   console.log(
     `Browser acceptance passed at desktop and tablet widths; evidence: ${evidenceDirectory}`,
   );
+} catch (error) {
+  throw new Error(`Browser acceptance failed; server output:\n${output}`, {
+    cause: error,
+  });
 } finally {
   await browser?.close();
   await stopServer(server);

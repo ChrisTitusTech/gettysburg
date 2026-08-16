@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { GameState, Side, UnitState } from "./protocol";
-import { combatFactorModifier, combatOpportunities } from "./combat";
+import {
+  combatFactorModifier,
+  combatOpportunities,
+  combatSkirmishes,
+} from "./combat";
 
 function unit(
   id: string,
@@ -90,6 +94,60 @@ describe("combat discovery", () => {
         defenders: ["devin", "gamble"],
         id: "L8+N8-M9",
         requires_separation: false,
+      },
+    ]);
+  });
+
+  it("separates a dense contact network into independent mandatory battles", () => {
+    const current = state({
+      k6: unit("k6", "confederate", "K6", 2),
+      l6: unit("l6", "confederate", "L6", 1),
+      l8: unit("l8", "confederate", "L8", 7),
+      m6: unit("m6", "confederate", "M6", 9),
+      m8: unit("m8", "confederate", "M8", 6),
+      n6: unit("n6", "confederate", "N6", 1),
+      n7: unit("n7", "confederate", "N7", 10),
+      k7: unit("k7", "union", "K7", 3),
+      k8: unit("k8", "union", "K8", 6),
+      l7: unit("l7", "union", "L7", 6),
+      m7: unit("m7", "union", "M7", 4),
+    });
+
+    const skirmishes = combatSkirmishes(current, "confederate");
+    expect(skirmishes.map((skirmish) => skirmish.id)).toEqual([
+      "K6+L6-K7",
+      "L8-K8+L7",
+      "M6+M8+N6+N7-M7",
+    ]);
+    expect(skirmishes.flatMap((skirmish) => skirmish.attackers).sort()).toEqual(
+      ["k6", "l6", "l8", "m6", "m8", "n6", "n7"],
+    );
+    expect(skirmishes.flatMap((skirmish) => skirmish.defenders).sort()).toEqual(
+      ["k7", "k8", "l7", "m7"],
+    );
+    expect(
+      skirmishes.every(
+        (skirmish) =>
+          skirmish.attacker_hexes.length === 1 ||
+          skirmish.defender_hexes.length === 1,
+      ),
+    ).toBe(true);
+  });
+
+  it("keeps one attacker in one battle with every touching defender", () => {
+    const current = state({
+      attacker: unit("attacker", "confederate", "L7", 4),
+      first: unit("first", "union", "K7", 2),
+      second: unit("second", "union", "L8", 2),
+      third: unit("third", "union", "M7", 2),
+    });
+
+    expect(combatSkirmishes(current, "confederate")).toMatchObject([
+      {
+        attacker_hexes: ["L7"],
+        attackers: ["attacker"],
+        defender_hexes: ["K7", "L8", "M7"],
+        defenders: ["first", "second", "third"],
       },
     ]);
   });

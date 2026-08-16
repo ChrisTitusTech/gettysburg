@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { acceptGameplayEvent, moveUnitCommandSchema } from "./protocol";
+import {
+  acceptGameplayEvent,
+  acceptManagementEvent,
+  moveUnitCommandSchema,
+} from "./protocol";
 
 describe("moveUnitCommandSchema", () => {
   it("normalizes only the documented command shape", () => {
@@ -58,6 +62,35 @@ describe("acceptGameplayEvent", () => {
       acceptGameplayEvent(
         { event_sequence: 4, state_version: 3 },
         { event_sequence: 5, state_version: 5 },
+      ),
+    ).toEqual({ error: "state_version_gap", ok: false });
+  });
+});
+
+describe("acceptManagementEvent", () => {
+  it("advances only the shared event sequence", () => {
+    expect(
+      acceptManagementEvent(
+        { event_sequence: 4, state_version: 3 },
+        { event_sequence: 5, state_version: 3 },
+      ),
+    ).toEqual({
+      cursor: { event_sequence: 5, state_version: 3 },
+      ok: true,
+    });
+  });
+
+  it("rejects an event gap or gameplay-version change", () => {
+    expect(
+      acceptManagementEvent(
+        { event_sequence: 4, state_version: 3 },
+        { event_sequence: 6, state_version: 3 },
+      ),
+    ).toEqual({ error: "event_sequence_gap", ok: false });
+    expect(
+      acceptManagementEvent(
+        { event_sequence: 4, state_version: 3 },
+        { event_sequence: 5, state_version: 4 },
       ),
     ).toEqual({ error: "state_version_gap", ok: false });
   });

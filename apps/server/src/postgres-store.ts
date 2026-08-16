@@ -8,12 +8,21 @@ import {
   InMemoryGameService,
   type ClaimResult,
   type CreateGameResult,
+  type DeletionReceipt,
   type GameAuthorization,
   type GameServiceSnapshot,
+  type HostAuthorization,
+  type HostManagementResult,
+  type HostRecoveryClaimResult,
   type RecoveryIssueResult,
   type StoredAction,
 } from "./game-service.js";
-import type { CommandResult, GameState, Side } from "@gettysburg/game";
+import type {
+  CommandResult,
+  GameState,
+  ManagementEvent,
+  Side,
+} from "@gettysburg/game";
 
 const migrationsDirectory = fileURLToPath(
   new URL("../migrations", import.meta.url),
@@ -24,6 +33,11 @@ export interface GameService {
     credential: string | undefined,
     gameId: string,
   ): Promise<GameAuthorization>;
+  authenticateHost(
+    credential: string | undefined,
+    gameId: string,
+    options?: { terminalCommandId?: string },
+  ): Promise<HostAuthorization>;
   claimInvitation(input: {
     credential?: string;
     lookupId: string;
@@ -36,6 +50,11 @@ export interface GameService {
     lookupId: string;
     secret: string;
   }): Promise<ClaimResult>;
+  claimHostRecovery(input: {
+    credential?: string;
+    lookupId: string;
+    secret: string;
+  }): Promise<HostRecoveryClaimResult>;
   createGame(
     side: Side,
     existingCredential?: string,
@@ -45,7 +64,13 @@ export interface GameService {
     input: unknown,
     options?: { afterCommit?: () => void },
   ): Promise<CommandResult>;
+  executeHostCommand(
+    authorization: HostAuthorization,
+    input: unknown,
+    options?: { afterCommit?: (event: ManagementEvent) => void },
+  ): Promise<HostManagementResult>;
   getActions(gameId: string): Promise<readonly StoredAction[]>;
+  getDeletionLedger(): Promise<readonly DeletionReceipt[]>;
   getAuthorizedState(authorization: GameAuthorization): Promise<GameState>;
   getGameState(gameId: string): Promise<GameState>;
   issueSeatRecovery(
@@ -53,6 +78,11 @@ export interface GameService {
     side: Side,
     operatorIdentity: string,
   ): Promise<RecoveryIssueResult>;
+  issueHostRecovery(
+    gameId: string,
+    operatorIdentity: string,
+  ): Promise<RecoveryIssueResult>;
+  purgeDeletedGames(): Promise<readonly DeletionReceipt[]>;
 }
 
 export class InMemoryAsyncGameService implements GameService {
@@ -60,6 +90,18 @@ export class InMemoryAsyncGameService implements GameService {
 
   async authenticate(credential: string | undefined, gameId: string) {
     return this.service.authenticate(credential, gameId);
+  }
+  async authenticateHost(
+    credential: string | undefined,
+    gameId: string,
+    options: { terminalCommandId?: string } = {},
+  ) {
+    return this.service.authenticateHost(credential, gameId, options);
+  }
+  async claimHostRecovery(
+    input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
+  ) {
+    return this.service.claimHostRecovery(input);
   }
   async claimInvitation(
     input: Parameters<InMemoryGameService["claimInvitation"]>[0],
@@ -81,8 +123,18 @@ export class InMemoryAsyncGameService implements GameService {
   ) {
     return this.service.executeCommand(authorization, input, options);
   }
+  async executeHostCommand(
+    authorization: HostAuthorization,
+    input: unknown,
+    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+  ) {
+    return this.service.executeHostCommand(authorization, input, options);
+  }
   async getActions(gameId: string) {
     return this.service.getActions(gameId);
+  }
+  async getDeletionLedger() {
+    return this.service.getDeletionLedger();
   }
   async getAuthorizedState(authorization: GameAuthorization) {
     return this.service.getAuthorizedState(authorization);
@@ -96,6 +148,12 @@ export class InMemoryAsyncGameService implements GameService {
     operatorIdentity: string,
   ) {
     return this.service.issueSeatRecovery(gameId, side, operatorIdentity);
+  }
+  async issueHostRecovery(gameId: string, operatorIdentity: string) {
+    return this.service.issueHostRecovery(gameId, operatorIdentity);
+  }
+  async purgeDeletedGames() {
+    return this.service.purgeDeletedGames();
   }
 }
 
@@ -146,10 +204,23 @@ export class PostgresGameService implements GameService {
 
   async isReady(): Promise<boolean> {
     try {
-      const result = await this.#pool.query<{ count: string }>(
-        "SELECT count(*)::text AS count FROM schema_migrations WHERE version = 1",
+      const result = await this.#pool.query<{
+        count: string;
+        snapshot: GameServiceSnapshot;
+      }>(
+        `SELECT
+           (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2)) AS count,
+           snapshot
+         FROM service_state WHERE singleton = true`,
       );
-      return result.rows[0]?.count === "1";
+      const row = result.rows[0];
+      return (
+        row?.count === "2" &&
+        new InMemoryGameService({
+          pepper: this.#pepper,
+          snapshot: row.snapshot,
+        }).isVersionRegistryReady()
+      );
     } catch {
       return false;
     }
@@ -157,6 +228,21 @@ export class PostgresGameService implements GameService {
 
   async authenticate(credential: string | undefined, gameId: string) {
     return this.#read((service) => service.authenticate(credential, gameId));
+  }
+  async authenticateHost(
+    credential: string | undefined,
+    gameId: string,
+    options: { terminalCommandId?: string } = {},
+  ) {
+    return this.#read((service) =>
+      service.authenticateHost(credential, gameId, options),
+    );
+  }
+
+  async claimHostRecovery(
+    input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
+  ) {
+    return this.#mutate((service) => service.claimHostRecovery(input));
   }
 
   async claimInvitation(
@@ -189,8 +275,32 @@ export class PostgresGameService implements GameService {
     return result;
   }
 
+  async executeHostCommand(
+    authorization: HostAuthorization,
+    input: unknown,
+    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+  ) {
+    const execution = await this.#mutate((service) => {
+      let committedEvent: ManagementEvent | undefined;
+      const result = service.executeHostCommand(authorization, input, {
+        afterCommit: (event) => {
+          committedEvent = event;
+        },
+      });
+      return { committedEvent, result };
+    });
+    if (execution.committedEvent !== undefined) {
+      options.afterCommit?.(execution.committedEvent);
+    }
+    return execution.result;
+  }
+
   async getActions(gameId: string) {
     return this.#read((service) => service.getActions(gameId));
+  }
+
+  async getDeletionLedger() {
+    return this.#read((service) => service.getDeletionLedger());
   }
 
   async getAuthorizedState(authorization: GameAuthorization) {
@@ -209,6 +319,16 @@ export class PostgresGameService implements GameService {
     return this.#mutate((service) =>
       service.issueSeatRecovery(gameId, side, operatorIdentity),
     );
+  }
+
+  async issueHostRecovery(gameId: string, operatorIdentity: string) {
+    return this.#mutate((service) =>
+      service.issueHostRecovery(gameId, operatorIdentity),
+    );
+  }
+
+  async purgeDeletedGames() {
+    return this.#mutate((service) => service.purgeDeletedGames());
   }
 
   async #read<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
@@ -255,23 +375,76 @@ export class PostgresGameService implements GameService {
   }
 
   async #mirrorSnapshot(client: PoolClient, snapshot: GameServiceSnapshot) {
+    for (const receipt of snapshot.deletionLedger ?? []) {
+      await client.query(
+        `INSERT INTO deletion_ledger
+          (position, game_id, deleted_at, purged_at, actor)
+         VALUES ($1, $2::uuid, $3, $4, $5)
+         ON CONFLICT (position) DO NOTHING`,
+        [
+          receipt.position,
+          receipt.gameId,
+          new Date(receipt.deletedAt),
+          new Date(receipt.purgedAt),
+          receipt.actor,
+        ],
+      );
+      await client.query("DELETE FROM actions WHERE game_id = $1::uuid", [
+        receipt.gameId,
+      ]);
+      await client.query("DELETE FROM snapshots WHERE game_id = $1::uuid", [
+        receipt.gameId,
+      ]);
+      await client.query(
+        "DELETE FROM recovery_grants WHERE game_id = $1::uuid",
+        [receipt.gameId],
+      );
+      await client.query("DELETE FROM invitations WHERE game_id = $1::uuid", [
+        receipt.gameId,
+      ]);
+      await client.query("DELETE FROM seat_bindings WHERE game_id = $1::uuid", [
+        receipt.gameId,
+      ]);
+      await client.query("DELETE FROM host_bindings WHERE game_id = $1::uuid", [
+        receipt.gameId,
+      ]);
+      await client.query("DELETE FROM games WHERE id = $1::uuid", [
+        receipt.gameId,
+      ]);
+    }
+    if ((snapshot.deletionLedger?.length ?? 0) > 0) {
+      await client.query(
+        `DELETE FROM browser_sessions AS session
+         WHERE NOT EXISTS (
+           SELECT 1 FROM host_bindings WHERE browser_session_id = session.id
+         ) AND NOT EXISTS (
+           SELECT 1 FROM seat_bindings WHERE browser_session_id = session.id
+         )`,
+      );
+    }
+
     for (const [gameId, game] of snapshot.games) {
       const state = game.state;
       await client.query(
         `INSERT INTO games
           (id, status, turn, phase, active_side, state_version, event_sequence,
-           ruleset_version, content_revision, state)
-         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb)
+           ruleset_version, content_revision, state, deleted_at)
+         VALUES ($1::uuid, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11)
          ON CONFLICT (id) DO UPDATE SET
            status = EXCLUDED.status, turn = EXCLUDED.turn, phase = EXCLUDED.phase,
            active_side = EXCLUDED.active_side, state_version = EXCLUDED.state_version,
            event_sequence = EXCLUDED.event_sequence,
            ruleset_version = EXCLUDED.ruleset_version,
            content_revision = EXCLUDED.content_revision, state = EXCLUDED.state,
+           deleted_at = EXCLUDED.deleted_at,
            updated_at = now()`,
         [
           gameId,
-          state.phase === "completed" ? "completed" : "active",
+          game.deletedAt !== null
+            ? "deleted"
+            : state.phase === "completed"
+              ? "completed"
+              : "active",
           state.turn,
           state.phase,
           state.active_side,
@@ -280,6 +453,7 @@ export class PostgresGameService implements GameService {
           state.ruleset_version,
           state.content_revision,
           JSON.stringify(state),
+          game.deletedAt == null ? null : new Date(game.deletedAt),
         ],
       );
       await client.query(
@@ -369,12 +543,13 @@ export class PostgresGameService implements GameService {
           (lookup_id, game_id, target_binding_type, side, target_binding_id,
            target_binding_version, token_hash, operator_identity, expires_at,
            consumed_at, revoked_at)
-         VALUES ($1::uuid, $2::uuid, 'seat', $3, $4::uuid, $5, $6, $7, $8, $9, $10)
+         VALUES ($1::uuid, $2::uuid, $3, $4, $5::uuid, $6, $7, $8, $9, $10, $11)
          ON CONFLICT (lookup_id) DO UPDATE SET
            consumed_at = EXCLUDED.consumed_at, revoked_at = EXCLUDED.revoked_at`,
         [
           grant.lookupId,
           grant.gameId,
+          grant.targetBindingType,
           grant.side,
           grant.oldBindingId,
           grant.oldBindingVersion,

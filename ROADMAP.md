@@ -178,6 +178,10 @@ from a connection or persistence failure.
   defender tie, loss thresholds, allocation, retreat, and advance.
 - Implement reinforcement entry, night-turn behavior, objective control, and
   final victory evaluation.
+  - Core night withdrawal, prohibition on entering enemy ZOC, and combat for
+    trapped units only were pulled forward as a Phase 2 correctness fix.
+    Remaining work includes nighttime reorganization and complete advanced ZOC
+    interactions.
 - Add rules explanations, previews, warnings, and deterministic replay tests.
 - Add explicit rule-version metadata so existing games remain interpretable.
 

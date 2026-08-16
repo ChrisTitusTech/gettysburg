@@ -111,6 +111,198 @@ function unitsByHex(
   return grouped;
 }
 
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+function nonemptySubsets<T>(values: readonly T[]): readonly (readonly T[])[] {
+  const subsets: T[][] = [];
+  for (let mask = 1; mask < 1 << values.length; mask += 1) {
+    const subset: T[] = [];
+    for (let index = 0; index < values.length; index += 1) {
+      if ((mask & (1 << index)) !== 0) subset.push(values[index]!);
+    }
+    subsets.push(subset);
+  }
+  return subsets;
+}
+
+interface SkirmishCandidate {
+  readonly opportunity: CombatOpportunity;
+  readonly vertices: ReadonlySet<string>;
+}
+
+function candidateForHexes(
+  state: GameState,
+  attackersByHex: ReadonlyMap<HexCoordinate, readonly string[]>,
+  defendersByHex: ReadonlyMap<HexCoordinate, readonly string[]>,
+  attackerHexes: readonly HexCoordinate[],
+  defenderHexes: readonly HexCoordinate[],
+): SkirmishCandidate {
+  const sortedAttackerHexes = [...attackerHexes].sort(compareText);
+  const sortedDefenderHexes = [...defenderHexes].sort(compareText);
+  const attackers = sortedAttackerHexes.flatMap(
+    (hex) => attackersByHex.get(hex) ?? [],
+  );
+  const defenders = sortedDefenderHexes.flatMap(
+    (hex) => defendersByHex.get(hex) ?? [],
+  );
+  const id = `${sortedAttackerHexes.join("+")}-${sortedDefenderHexes.join("+")}`;
+  return {
+    opportunity: {
+      attacker_hexes: sortedAttackerHexes,
+      attacker_modifier: combatFactorModifier(state, attackers),
+      attackers,
+      defender_hexes: sortedDefenderHexes,
+      defender_modifier: combatFactorModifier(state, defenders),
+      defenders,
+      id,
+      requires_separation: false,
+    },
+    vertices: new Set([
+      ...sortedAttackerHexes.map((hex) => `attacker:${hex}`),
+      ...sortedDefenderHexes.map((hex) => `defender:${hex}`),
+    ]),
+  };
+}
+
+function separateOpportunity(
+  state: GameState,
+  opportunity: CombatOpportunity,
+): readonly CombatOpportunity[] {
+  if (!opportunity.requires_separation) return [opportunity];
+
+  const attackersByHex = new Map<HexCoordinate, readonly string[]>();
+  const defendersByHex = new Map<HexCoordinate, readonly string[]>();
+  for (const hex of opportunity.attacker_hexes) {
+    attackersByHex.set(
+      hex,
+      opportunity.attackers.filter((id) => state.units[id]?.location === hex),
+    );
+  }
+  for (const hex of opportunity.defender_hexes) {
+    defendersByHex.set(
+      hex,
+      opportunity.defenders.filter((id) => state.units[id]?.location === hex),
+    );
+  }
+
+  const candidates = new Map<string, SkirmishCandidate>();
+  for (const defenderHex of opportunity.defender_hexes) {
+    const adjacentAttackers = opportunity.attacker_hexes.filter((attackerHex) =>
+      adjacentHexes(defenderHex).includes(attackerHex),
+    );
+    for (const attackerHexes of nonemptySubsets(adjacentAttackers)) {
+      const candidate = candidateForHexes(
+        state,
+        attackersByHex,
+        defendersByHex,
+        attackerHexes,
+        [defenderHex],
+      );
+      candidates.set(candidate.opportunity.id, candidate);
+    }
+  }
+  for (const attackerHex of opportunity.attacker_hexes) {
+    const adjacentDefenders = opportunity.defender_hexes.filter((defenderHex) =>
+      adjacentHexes(attackerHex).includes(defenderHex),
+    );
+    for (const defenderHexes of nonemptySubsets(adjacentDefenders)) {
+      const candidate = candidateForHexes(
+        state,
+        attackersByHex,
+        defendersByHex,
+        [attackerHex],
+        defenderHexes,
+      );
+      candidates.set(candidate.opportunity.id, candidate);
+    }
+  }
+
+  const vertices = [
+    ...opportunity.attacker_hexes.map((hex) => `attacker:${hex}`),
+    ...opportunity.defender_hexes.map((hex) => `defender:${hex}`),
+  ].sort(compareText);
+  const vertexIndex = new Map(vertices.map((vertex, index) => [vertex, index]));
+  const indexedCandidates = [...candidates.values()]
+    .map((candidate) => ({
+      ...candidate,
+      mask: [...candidate.vertices].reduce(
+        (mask, vertex) => mask | (1n << BigInt(vertexIndex.get(vertex)!)),
+        0n,
+      ),
+    }))
+    .sort((left, right) =>
+      compareText(left.opportunity.id, right.opportunity.id),
+    );
+  const candidatesByVertex = new Map<number, typeof indexedCandidates>();
+  for (let index = 0; index < vertices.length; index += 1) {
+    candidatesByVertex.set(
+      index,
+      indexedCandidates.filter(
+        (candidate) => (candidate.mask & (1n << BigInt(index))) !== 0n,
+      ),
+    );
+  }
+
+  const memo = new Map<
+    bigint,
+    readonly (typeof indexedCandidates)[number][] | null
+  >();
+  const better = (
+    left: readonly (typeof indexedCandidates)[number][],
+    right: readonly (typeof indexedCandidates)[number][] | null,
+  ) => {
+    if (right === null || left.length < right.length) return true;
+    if (left.length > right.length) return false;
+    const leftKey = left
+      .map((candidate) => candidate.opportunity.id)
+      .sort(compareText)
+      .join("|");
+    const rightKey = right
+      .map((candidate) => candidate.opportunity.id)
+      .sort(compareText)
+      .join("|");
+    return compareText(leftKey, rightKey) < 0;
+  };
+  const solve = (
+    remaining: bigint,
+  ): readonly (typeof indexedCandidates)[number][] | null => {
+    if (remaining === 0n) return [];
+    const cached = memo.get(remaining);
+    if (cached !== undefined) return cached;
+
+    let options: typeof indexedCandidates | null = null;
+    for (let index = 0; index < vertices.length; index += 1) {
+      if ((remaining & (1n << BigInt(index))) === 0n) continue;
+      const compatible = (candidatesByVertex.get(index) ?? []).filter(
+        (candidate) => (candidate.mask & remaining) === candidate.mask,
+      );
+      if (options === null || compatible.length < options.length) {
+        options = compatible;
+      }
+      if (options.length === 0) break;
+    }
+
+    let best: readonly (typeof indexedCandidates)[number][] | null = null;
+    for (const candidate of options ?? []) {
+      const rest = solve(remaining ^ candidate.mask);
+      if (rest === null) continue;
+      const proposal = [candidate, ...rest];
+      if (better(proposal, best)) best = proposal;
+    }
+    memo.set(remaining, best);
+    return best;
+  };
+
+  const allVertices = (1n << BigInt(vertices.length)) - 1n;
+  return (
+    solve(allVertices)
+      ?.map((candidate) => candidate.opportunity)
+      .sort((left, right) => compareText(left.id, right.id)) ?? []
+  );
+}
+
 export function combatOpportunities(
   state: GameState,
   attackerSide: Side,
@@ -180,4 +372,19 @@ export function combatOpportunities(
   }
 
   return opportunities.sort((left, right) => left.id.localeCompare(right.id));
+}
+
+/**
+ * Deterministically partition every mandatory adjacent combat unit into legal
+ * independent battles. Every combat hex is covered exactly once, same-hex
+ * counters remain together, and each battle has only one side spanning more
+ * than one hex.
+ */
+export function combatSkirmishes(
+  state: GameState,
+  attackerSide: Side,
+): readonly CombatOpportunity[] {
+  return combatOpportunities(state, attackerSide).flatMap((opportunity) =>
+    separateOpportunity(state, opportunity),
+  );
 }

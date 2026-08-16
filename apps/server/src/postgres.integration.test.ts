@@ -153,4 +153,261 @@ postgres("PostgreSQL durability", () => {
     });
     await service.close();
   });
+
+  it("persists host invitation retry and seat surrender across restart", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await first.migrate();
+    const created = await first.createGame("union");
+    const hostAuthorization = await first.authenticateHost(
+      created.credential,
+      created.gameId,
+    );
+    const issueCommand = {
+      command_id: "44444444-4444-4444-8444-444444444444",
+      command_name: "issueInvitation",
+      expected_version: 0,
+      game_id: created.gameId,
+      payload: { seat: "confederate" },
+      schema: COMMAND_SCHEMA_VERSION,
+    };
+    const issued = await first.executeHostCommand(
+      hostAuthorization,
+      issueCommand,
+    );
+    expect(issued).toMatchObject({
+      invitation: { secret: expect.any(String) },
+      ok: true,
+    });
+    await first.close();
+
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await restarted.migrate();
+    const resumedHost = await restarted.authenticateHost(
+      created.credential,
+      created.gameId,
+    );
+    const retried = await restarted.executeHostCommand(
+      resumedHost,
+      issueCommand,
+    );
+    expect(retried).toEqual(issued);
+    if (!retried.ok || retried.invitation === undefined)
+      throw new Error("Persisted invitation secret was not recoverable");
+    const guest = await restarted.claimInvitation({
+      lookupId: retried.invitation.lookup_id,
+      secret: retried.invitation.secret,
+    });
+    const guestAuthorization = await restarted.authenticate(
+      guest.credential,
+      created.gameId,
+    );
+    expect(
+      await restarted.executeCommand(guestAuthorization, {
+        command_id: "55555555-5555-4555-8555-555555555555",
+        command_name: "surrenderSeat",
+        expected_version: 0,
+        game_id: created.gameId,
+        payload: {},
+        schema: COMMAND_SCHEMA_VERSION,
+      }),
+    ).toMatchObject({ ok: true, state: { version: 1 } });
+    await restarted.close();
+
+    const resumedAgain = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await resumedAgain.migrate();
+    await expect(
+      resumedAgain.authenticate(guest.credential, created.gameId),
+    ).rejects.toMatchObject({ code: "unauthorized" });
+    expect(await resumedAgain.getActions(created.gameId)).toMatchObject([
+      { kind: "host_management", sequence: 1 },
+      { kind: "gameplay", sequence: 2 },
+    ]);
+    await resumedAgain.close();
+  });
+
+  it("persists soft deletion and terminal host retry across restart", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await first.migrate();
+    const created = await first.createGame("union");
+    const authorization = await first.authenticateHost(
+      created.credential,
+      created.gameId,
+    );
+    const command = {
+      command_id: "66666666-6666-4666-8666-666666666666",
+      command_name: "deleteGame",
+      expected_version: 0,
+      game_id: created.gameId,
+      payload: { confirm: true },
+      schema: COMMAND_SCHEMA_VERSION,
+    };
+    const publishedEvents: number[] = [];
+    const deleted = await first.executeHostCommand(authorization, command, {
+      afterCommit: (event) => publishedEvents.push(event.event_sequence),
+    });
+    await first.close();
+
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await restarted.migrate();
+    await expect(restarted.getGameState(created.gameId)).rejects.toMatchObject({
+      code: "game_deleted",
+    });
+    const retryAuthorization = await restarted.authenticateHost(
+      created.credential,
+      created.gameId,
+      { terminalCommandId: command.command_id },
+    );
+    expect(
+      await restarted.executeHostCommand(retryAuthorization, command, {
+        afterCommit: (event) => publishedEvents.push(event.event_sequence),
+      }),
+    ).toEqual(deleted);
+    expect(publishedEvents).toEqual([1]);
+    const persisted = await administration.query<{
+      deleted_at: Date | null;
+      status: string;
+    }>("SELECT status, deleted_at FROM games WHERE id = $1", [created.gameId]);
+    expect(persisted.rows[0]).toMatchObject({
+      deleted_at: expect.any(Date),
+      status: "deleted",
+    });
+    await restarted.close();
+  });
+
+  it("hard-purges expired game rows and preserves an append-only receipt", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await first.migrate();
+    const deletedGame = await first.createGame("union");
+    const retainedGame = await first.createGame(
+      "confederate",
+      deletedGame.credential,
+    );
+    const authorization = await first.authenticateHost(
+      deletedGame.credential,
+      deletedGame.gameId,
+    );
+    await first.executeHostCommand(authorization, {
+      command_id: "77777777-7777-4777-8777-777777777777",
+      command_name: "deleteGame",
+      expected_version: 0,
+      game_id: deletedGame.gameId,
+      payload: { confirm: true },
+      schema: COMMAND_SCHEMA_VERSION,
+    });
+    await first.close();
+
+    const stored = await administration.query<{
+      snapshot: {
+        games: [string, { deletedAt: number | null }][];
+      };
+    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    const expired = structuredClone(stored.rows[0]!.snapshot);
+    const record = expired.games.find(
+      ([gameId]) => gameId === deletedGame.gameId,
+    );
+    if (record === undefined) throw new Error("Deleted game was not persisted");
+    record[1].deletedAt = Date.now() - 31 * 24 * 60 * 60 * 1_000;
+    await administration.query(
+      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+      [JSON.stringify(expired)],
+    );
+
+    const purger = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    expect(await purger.purgeDeletedGames()).toMatchObject([
+      {
+        actor: authorization.bindingId,
+        gameId: deletedGame.gameId,
+        position: 1,
+      },
+    ]);
+    await expect(purger.getActions(deletedGame.gameId)).rejects.toMatchObject({
+      code: "game_purged",
+    });
+    await expect(
+      purger.authenticateHost(deletedGame.credential, retainedGame.gameId),
+    ).resolves.toMatchObject({ gameId: retainedGame.gameId });
+    expect(await purger.getDeletionLedger()).toHaveLength(1);
+    await purger.close();
+
+    const persisted = await administration.query<{
+      game_count: string;
+      ledger_count: string;
+      related_count: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM games WHERE id = $1) AS game_count,
+         (SELECT count(*)::text FROM deletion_ledger WHERE game_id = $1) AS ledger_count,
+         ((SELECT count(*) FROM actions WHERE game_id = $1) +
+          (SELECT count(*) FROM snapshots WHERE game_id = $1) +
+          (SELECT count(*) FROM host_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM seat_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM invitations WHERE game_id = $1) +
+          (SELECT count(*) FROM recovery_grants WHERE game_id = $1))::text AS related_count`,
+      [deletedGame.gameId],
+    );
+    expect(persisted.rows[0]).toEqual({
+      game_count: "0",
+      ledger_count: "1",
+      related_count: "0",
+    });
+  });
+
+  it("fails PostgreSQL readiness for an unavailable saved version pair", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const created = await service.createGame("union");
+    await service.close();
+
+    const stored = await administration.query<{
+      snapshot: Record<string, unknown>;
+    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    const original = structuredClone(stored.rows[0]!.snapshot) as {
+      games: [string, { state: { ruleset_version: string } }][];
+    };
+    const unavailable = structuredClone(original);
+    const record = unavailable.games.find(
+      ([gameId]) => gameId === created.gameId,
+    );
+    if (record === undefined) throw new Error("Created game was not persisted");
+    record[1].state.ruleset_version = "missing-v99";
+    await administration.query(
+      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+      [JSON.stringify(unavailable)],
+    );
+
+    const unavailableService = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    expect(await unavailableService.isReady()).toBe(false);
+    await unavailableService.close();
+    await administration.query(
+      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+      [JSON.stringify(original)],
+    );
+  });
 });

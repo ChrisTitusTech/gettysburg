@@ -201,6 +201,35 @@ unrecorded shell history:
    two-client smoke flow.
 7. Retain the last compatible image and backup until the release is accepted.
 
+The reviewed repository entry points are:
+
+```bash
+# Root: refuse a dirty checkout, build the exact HEAD, back up an existing
+# database, install rootless Quadlets, validate Caddy, and verify readiness.
+scripts/vps-deploy.sh
+
+# Gettysburg service account: create and verify a PostgreSQL custom-format dump.
+scripts/vps-backup.sh
+scripts/vps-restore-test.sh /srv/gettysburg/backups/TIMESTAMP/gettysburg.dump
+
+# Gettysburg service account: issue a short-lived, one-use recovery grant.
+scripts/vps-recovery.sh issue-seat-recovery GAME_ID SIDE OPERATOR_IDENTITY
+scripts/vps-recovery.sh issue-host-recovery GAME_ID OPERATOR_IDENTITY
+scripts/vps-recovery.sh purge-deleted
+```
+
+The Quadlets are under `ops/quadlet/`; they run both containers rootlessly with
+all capabilities dropped, read-only root filesystems, private named volumes,
+and an internal network. The PostgreSQL and Node base images are pinned by
+digest. Secrets are created outside Git under
+`/srv/gettysburg/.config/gettysburg/` with mode 0600. The deployment script
+records the exact Git revision and application image ID beside the pre-change
+rollback material.
+The user timer in `ops/systemd/` runs the 30-day hard-purge job daily. Each dump
+records and verifies the database deletion-ledger watermark. Off-host encrypted
+backup and deletion-ledger replication still require an owner-selected remote
+destination before the restore fail-closed contract is complete.
+
 Use the real lingering user manager for service actions. From a root SSH shell,
 an explicit non-interactive invocation is:
 

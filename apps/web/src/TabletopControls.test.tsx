@@ -54,6 +54,27 @@ describe("TabletopControls phase action", () => {
     ).toBeEnabled();
   });
 
+  it("explains mandatory withdrawal during a night movement phase", () => {
+    render(
+      <TabletopControls
+        disabled={false}
+        onCommand={vi.fn()}
+        seat="confederate"
+        state={gameState({
+          active_side: "confederate",
+          night: true,
+          turn: 8,
+        })}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        /Night movement: withdraw every counter from enemy zones of control/i,
+      ),
+    ).toBeVisible();
+  });
+
   it("names the opposing combat choice that blocks ending the phase", () => {
     const combatId = "22222222-2222-4222-8222-222222222222";
     render(
@@ -143,6 +164,7 @@ describe("TabletopControls phase action", () => {
   });
 
   it("shows detected adjacent stacks with verified combat-factor totals", () => {
+    const combatId = "33333333-3333-4333-8333-333333333333";
     const combatUnit = (
       id: string,
       label: string,
@@ -171,6 +193,21 @@ describe("TabletopControls phase action", () => {
         seat="confederate"
         state={gameState({
           active_side: "confederate",
+          combats: {
+            [combatId]: {
+              attacker_loss_allocated: false,
+              attacker_retreated: false,
+              attackers: ["heth", "pegram", "mcintosh", "pender"],
+              confirmation: null,
+              defender_loss_allocated: false,
+              defender_retreated: false,
+              defenders: ["devin", "gamble"],
+              id: combatId,
+              pending_choice: null,
+              rolls: { attacker: 5, defender: 5 },
+              status: "awaiting_result_confirmation",
+            },
+          },
           phase: "combat",
           turn: 4,
           units: {
@@ -192,19 +229,17 @@ describe("TabletopControls phase action", () => {
     );
 
     expect(
-      screen.getByRole("heading", { name: "Detected adjacent combats" }),
+      screen.getByRole("heading", { name: "Automatic skirmishes" }),
     ).toBeVisible();
-    expect(
-      screen.getByText(/Heth \+ Pegram \+ McIntosh \+ Pender.*L8, N8/),
-    ).toBeVisible();
-    expect(screen.getByText(/Devin \+ Gamble.*M9/)).toBeVisible();
     expect(
       screen.getByText(
-        "Verified unit modifiers: attacker +10 · defender +2 before terrain",
+        /Heth \(L8\) \+ Pegram \(L8\) \+ McIntosh \(N8\) \+ Pender \(N8\)/,
       ),
     ).toBeVisible();
+    expect(screen.getByText(/Devin \(M9\) \+ Gamble \(M9\)/)).toBeVisible();
+    expect(screen.getByText(/Attacker: die 5 \+ units \+10 =/)).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "Declare this combat" }),
+      screen.getByRole("button", { name: "Confirm skirmish result" }),
     ).toBeEnabled();
   });
 
@@ -281,7 +316,7 @@ describe("TabletopControls phase action", () => {
     expect(screen.queryByRole("combobox", { name: "Result" })).toBeNull();
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Confirm battle result" }),
+      screen.getByRole("button", { name: "Confirm skirmish result" }),
     );
     expect(onCommand).toHaveBeenCalledWith("confirmCombatResult", {
       combat_id: combatId,

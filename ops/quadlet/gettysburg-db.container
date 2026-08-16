@@ -1,0 +1,29 @@
+[Unit]
+Description=Gettysburg PostgreSQL
+Requires=gettysburg-network.service gettysburg-db-volume.service
+After=gettysburg-network.service gettysburg-db-volume.service
+
+[Container]
+Image=docker.io/library/postgres@sha256:d326bec58d3de8d239df60475941522342723934a2598ae59a0281f077681462
+ContainerName=gettysburg-db
+EnvironmentFile=/srv/gettysburg/.config/gettysburg/postgres.env
+Network=gettysburg.network
+Volume=gettysburg-db.volume:/var/lib/postgresql/data
+ReadOnly=true
+Tmpfs=/run/postgresql
+Tmpfs=/tmp
+NoNewPrivileges=true
+DropCapability=all
+HealthCmd=pg_isready -U gettysburg -d gettysburg
+HealthInterval=5s
+HealthTimeout=3s
+HealthRetries=10
+
+[Service]
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=180
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

@@ -34,6 +34,10 @@ The implementation must preserve these facts visible in the supplied material:
 - A turn has a Confederate move/combat sequence followed by a Union move/combat
   sequence. Completing the Union sequence advances the turn.
 - Turns 8, 16, and 24 are night turns.
+- During a night turn, units in an enemy zone of control must withdraw when a
+  legal withdrawal is available, no unit may move or enter as a reinforcement
+  into an enemy zone of control, and combat occurs only for active-side combat
+  units that cannot withdraw.
 - Movement is affected by roads, woods, rough hills, streams, enemy zones of
   control, and generals as described in the source rules.
 - Normal stacking is one combat unit, or two combat units when a general is
@@ -283,10 +287,11 @@ state or event versions. Turn 2 starts with Confederate movement normally once
 its scheduled reinforcements are available.
 
 Phase 2 enforces the printed movement allowance as a simple one-point-per-hex
-budget. Phase 3 adds automated validation for variable movement costs, roads,
-terrain, streams, zones of control, generals, stacking, combat grouping,
-modifiers, losses, retreats, advances, reinforcement entry, night turns,
-objectives, and victory.
+budget and enforces the core night withdrawal, no-entry, and trapped-combat ZOC
+rules. Phase 3 adds automated validation for variable movement costs, roads,
+terrain, streams, remaining zones of control, generals, stacking, combat
+grouping, modifiers, losses, retreats, advances, remaining reinforcement entry,
+nighttime reorganization, objectives, and victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
 
@@ -318,8 +323,13 @@ destination accepts either unit type; a general-only destination accepts up to
 two combat units; and a one-combat-unit destination rejects another combat unit
 but accepts one general. A general-plus-one-combat destination accepts one more
 combat unit. A second general and any move beyond those capacities are rejected.
-Variable terrain cost, route obstruction, ZOC, stream, road, and other advanced
-stacking legality remain player-adjudicated until Phase 3. Acceptance cases
+On Turns 8, 16, and 24, the server derives enemy zones of control from deployed
+enemy combat counters. The authoritative shortest route may not enter any such
+hex. Before ending movement, every friendly deployed counter currently in an
+enemy ZOC must withdraw when it has movement remaining and at least one adjacent
+non-ZOC destination that satisfies ownership and stacking. Variable terrain
+cost, other route obstruction, daytime ZOC cost, stream, road, and other
+advanced stacking legality remain player-adjudicated until Phase 3. Acceptance cases
 cover empty, general-only, combat-only, general-plus-one-combat, and full
 destinations for both mover types.
 
@@ -332,31 +342,33 @@ an available reinforcement state, satisfies its approved scheduled entry window,
 and has not already entered or been eliminated. The destination must exist, be
 one of that unit's typed entry hexes, and satisfy the Phase 2 stacking invariant.
 The state transition, action, and result persist atomically and idempotently.
-Phase 3 adds any further rule-derived entry restrictions; `moveUnit` remains
-limited to already deployed units. Tests cover early, on-schedule, duplicate,
-wrong-side, wrong-entry-hex, occupied, and already-entered cases.
+Night reinforcement entry into an enemy ZOC is rejected. Phase 3 adds any
+further rule-derived entry restrictions; `moveUnit` remains limited to already
+deployed units. Tests cover early, on-schedule, duplicate, wrong-side,
+wrong-entry-hex, occupied, already-entered, and night-ZOC cases.
 
 ### Phase 2 combat command contract
 
-Phase 2 provides an authoritative adjudication workflow with basic adjacency
-eligibility while leaving advanced combat legality for Phase 3:
+Phase 2 provides an authoritative, mandatory adjacent-combat workflow while
+leaving terrain and the remaining advanced modifiers for Phase 3:
 
-- `declareCombat` supplies a new combat ID plus nonempty attacker and defender
-  unit-ID lists chosen from server-state-derived adjacent occupied-hex contacts;
-  the client does not require raw ID entry. Each visible contact shows both
-  stacks, their hexes, and each side's printed combat-factor modifier. Only the
-  active seat may declare it during that side's combat phase. The server rejects
-  duplicate IDs within either list or across both lists. It verifies every unit
-  exists, every attacker belongs to the active seat and `active_side`, every
-  defender belongs to the opposing side, and no participant has appeared in
-  another combat this phase. Every participant must have an authoritative
-  on-board deployed location. Every attacker must be adjacent to at least one
-  listed defender, every defender must be adjacent to at least one listed
-  attacker, all combat units sharing a participating hex must be included, and
-  at least one side must occupy a single hex. Phase 3 adds full ZOC-driven
-  multi-hex separation and grouping assistance. A successful declaration also
-  makes and stores one server d10 roll for each side, so there is no separate
-  player roll action in the normal workflow.
+- Ending movement discovers every deployed non-general stack adjacent to an
+  opposing combat stack. The server deterministically partitions each connected
+  contact network into the fewest legal independent skirmishes: every eligible
+  combat counter is assigned exactly once, every combat counter sharing a hex
+  stays in the same skirmish, and one side of each skirmish occupies exactly one
+  hex. This permits many attacking hexes against one defending hex or one
+  attacking hex against many defending hexes, but never a multi-hex-versus-
+  multi-hex battle. Players cannot omit a touching combat stack or choose a
+  different grouping.
+- The same authoritative `endPhase` action creates a unique combat ID and one
+  cryptographically secure d10 roll per side for every skirmish. Each skirmish
+  stores and resolves its own dice and capped unit-factor modifiers; rolls and
+  factors are never accumulated across separate skirmishes. The complete
+  generated combat state and every roll are retained in the durable action
+  result. `declareCombat` and `rollCombat` remain accepted only for compatibility
+  with an already-saved legacy combat workflow; the normal client exposes no
+  manual declaration or roll action.
 - `confirmCombatResult` supplies only the combat ID. Only the active seat may
   call it after the automatic roll. The server caps each side's printed
   combat-factor modifier at +10, adds it to that side's roll, and derives the
@@ -402,10 +414,14 @@ eligibility while leaving advanced combat legality for Phase 3:
   marks the combat resolved.
 - `endPhase` is rejected while any combat is not `resolved`, including
   `declared`, `awaitingResultConfirmation`, and pending-choice states. Phase 2
-  has no implicit combat-cancellation path. Ending movement enters combat only
-  when the active side has at least one deployed non-general counter adjacent to
-  an opposing deployed non-general counter. Otherwise combat is skipped within
-  the same authoritative action and play advances to the next side or turn.
+  has no implicit combat-cancellation path. Ending movement atomically creates
+  and rolls all mandatory skirmishes when the active side has at least one
+  deployed non-general counter adjacent to an opposing deployed non-general
+  counter. On a night turn, ending movement is first rejected while any counter
+  in enemy ZOC still has a legal withdrawal; therefore only combat counters that
+  cannot withdraw can enter an automatic night skirmish. Otherwise combat is
+  skipped within the same authoritative action and play advances to the next
+  side or turn.
 
 Successful `endPhase` transitions are:
 

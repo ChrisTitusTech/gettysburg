@@ -1,6 +1,7 @@
 import { adjacentHexes, hexDistance, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
-import { automaticCombatResolution } from "./combat.js";
+import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
+import { enemyZoneOfControl, nightMovementIsLegal } from "./zoc.js";
 import type {
   CombatState,
   CommandFailure,
@@ -124,6 +125,7 @@ function destinationCanAcceptUnits(
       unit.status === "deployed" &&
       unit.location === destination,
   );
+  if (occupants.some((unit) => unit.side !== movers[0]?.side)) return false;
   const finalUnits = [...occupants, ...movers];
   const generals = finalUnits.filter((unit) => unit.kind === "general").length;
   const combatUnits = finalUnits.length - generals;
@@ -156,6 +158,13 @@ function moveUnit(
       state,
       "movement_exceeded",
       `${unit.label} has ${movementRemaining} movement point${movementRemaining === 1 ? "" : "s"} remaining; ${destination} is ${distance} hexes away.`,
+    );
+  }
+  if (!nightMovementIsLegal(state, actorSide, unit.location, destination)) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Night movement must withdraw from and may not enter an enemy zone of control.",
     );
   }
   if (!destinationCanAccept(state, unit, destination)) {
@@ -231,6 +240,13 @@ function moveStack(
       `${limitingUnit.label} limits this stack to ${remaining} remaining movement point${remaining === 1 ? "" : "s"}.`,
     );
   }
+  if (!nightMovementIsLegal(state, actorSide, source, destination)) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Night movement must withdraw from and may not enter an enemy zone of control.",
+    );
+  }
   if (!destinationCanAcceptUnits(state, movers, destination)) {
     return failure(
       state,
@@ -294,6 +310,30 @@ function hasAdjacentEnemy(state: GameState, side: Side): boolean {
   );
 }
 
+function nightUnitsAbleToWithdraw(
+  state: GameState,
+  side: Side,
+): readonly UnitState[] {
+  if (!state.night) return [];
+  const enemyZoc = enemyZoneOfControl(state, side);
+  return Object.values(state.units).filter((unit) => {
+    if (
+      unit.side !== side ||
+      unit.status !== "deployed" ||
+      unit.location === null ||
+      !enemyZoc.has(unit.location) ||
+      unit.movement - (unit.movement_spent ?? 0) < 1
+    ) {
+      return false;
+    }
+    return adjacentHexes(unit.location).some(
+      (destination) =>
+        !enemyZoc.has(destination) &&
+        destinationCanAccept(state, unit, destination),
+    );
+  });
+}
+
 function enterReinforcement(
   state: GameState,
   actorSide: Side,
@@ -330,6 +370,13 @@ function enterReinforcement(
       state,
       "invalid_hex",
       "Choose one of the counter's approved entry hexes.",
+    );
+  }
+  if (state.night && enemyZoneOfControl(state, actorSide).has(destination)) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Reinforcements may not enter an enemy zone of control at night.",
     );
   }
   if (!destinationCanAccept(state, unit, destination)) {
@@ -1079,7 +1126,16 @@ function finishSideTurn(
   );
 }
 
-function endPhase(state: GameState, actorSide: Side): ReducerResult {
+interface AutomaticCombatRoll {
+  readonly combat_id: string;
+  readonly dice: { readonly attacker: number; readonly defender: number };
+}
+
+function endPhase(
+  state: GameState,
+  actorSide: Side,
+  automaticCombats: readonly AutomaticCombatRoll[] | undefined,
+): ReducerResult {
   if (state.active_side !== actorSide || state.phase === "completed") {
     return failure(state, "wrong_seat", "It is not this seat's phase to end.");
   }
@@ -1093,14 +1149,74 @@ function endPhase(state: GameState, actorSide: Side): ReducerResult {
       "Resolve every declared combat before ending the phase.",
     );
   }
-  if (state.phase === "movement") {
-    if (hasAdjacentEnemy(state, actorSide)) {
-      return accepted(
+  const needsAutomaticCombat =
+    (state.phase === "movement" ||
+      (state.phase === "combat" && Object.keys(state.combats).length === 0)) &&
+    hasAdjacentEnemy(state, actorSide);
+  if (state.phase === "movement" && state.night) {
+    const mustWithdraw = nightUnitsAbleToWithdraw(state, actorSide);
+    if (mustWithdraw.length > 0) {
+      const counters = mustWithdraw
+        .map((unit) => `${unit.label} (${unit.location})`)
+        .join(", ");
+      return failure(
         state,
-        { phase: "combat" },
-        `${actorSide} movement ended`,
+        "phase_invalid",
+        `Night movement cannot end while these counters can withdraw from enemy zones of control: ${counters}.`,
       );
     }
+  }
+  if (needsAutomaticCombat) {
+    const skirmishes = combatSkirmishes(state, actorSide);
+    if (
+      skirmishes.length === 0 ||
+      automaticCombats === undefined ||
+      automaticCombats.length !== skirmishes.length ||
+      new Set(automaticCombats.map((combat) => combat.combat_id)).size !==
+        automaticCombats.length ||
+      automaticCombats.some(
+        (combat) => combat.combat_id.length === 0 || !validDice(combat.dice),
+      )
+    ) {
+      return failure(
+        state,
+        "combat_invalid",
+        "Server rolls are required for every mandatory skirmish.",
+      );
+    }
+    const combats = Object.fromEntries(
+      skirmishes.map((skirmish, index) => {
+        const automatic = automaticCombats[index]!;
+        const combat: CombatState = {
+          attacker_loss_allocated: false,
+          attacker_retreated: false,
+          attackers: skirmish.attackers,
+          confirmation: null,
+          defender_loss_allocated: false,
+          defender_retreated: false,
+          defenders: skirmish.defenders,
+          defender_hexes: skirmish.defender_hexes,
+          id: automatic.combat_id,
+          pending_choice: null,
+          rolls: automatic.dice,
+          status: "awaiting_result_confirmation",
+        };
+        return [combat.id, combat];
+      }),
+    );
+    const rolls = Object.values(combats)
+      .map(
+        (combat) =>
+          `${combat.id.slice(0, 8)} ${combat.rolls!.attacker}-${combat.rolls!.defender}`,
+      )
+      .join(", ");
+    return accepted(
+      state,
+      { combats, phase: "combat" },
+      `${actorSide} ${state.phase === "movement" ? "movement ended; " : "legacy combat upgraded; "}${skirmishes.length} mandatory skirmish${skirmishes.length === 1 ? "" : "es"} rolled (${rolls})`,
+    );
+  }
+  if (state.phase === "movement") {
     return finishSideTurn(state, actorSide, true);
   }
   return finishSideTurn(state, actorSide, false);
@@ -1111,6 +1227,7 @@ export function reduceGameplayCommand(
   actorSide: Side,
   command: GameplayCommand,
   options: {
+    readonly automaticCombats?: readonly AutomaticCombatRoll[];
     readonly dice?: { readonly attacker: number; readonly defender: number };
   } = {},
 ): ReducerResult {
@@ -1136,7 +1253,13 @@ export function reduceGameplayCommand(
     case "advanceAfterCombat":
       return advanceAfterCombat(state, actorSide, command);
     case "endPhase":
-      return endPhase(state, actorSide);
+      return endPhase(state, actorSide, options.automaticCombats);
+    case "surrenderSeat":
+      return failure(
+        state,
+        "phase_invalid",
+        "Seat surrender is handled by the authoritative game service.",
+      );
   }
 }
 

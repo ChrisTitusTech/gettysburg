@@ -153,19 +153,33 @@ recorded below; no implementation or local-validation failure remains.
     a per-hex terrain/irregular-boundary transcription. The client now has an
     original vector terrain presentation based on the local board reference,
     including woods, hills, roads, streams, town, and landmark layers; these are
-    deliberately not used as rules data until that review. The typed terrain
-    fields therefore stay explicitly unavailable and this task remains open.
+    deliberately not used as rules data until that review. The artwork now uses
+    one continuous hand-drawn paper, ink, and watercolor landscape beneath the
+    transparent play grid, so woods and elevation cross hex edges naturally.
+    Streams join into board-spanning waterways, and every road, railroad, and
+    stream reaches the clipped outer board edge instead of stopping mid-map. The
+    owner confirmed that I5, J5, and J6 do not receive hill artwork. The typed
+    terrain fields therefore stay explicitly unavailable and this task remains
+    open.
 - [x] Implement the 24-turn rules-light tabletop workflow and server dice.
   - Status: Movement, stacking, reinforcement entry, phase progression,
     cryptographic d10 rolls, confirmation, loss, retreat, advance, objectives,
     casualty scoring, night checks, automatic victory, and completion are
-    server-authoritative. Combat entry now discovers every adjacent occupied-hex
-    contact, draws the contact on the board, presents both stacks without raw ID
-    entry, tallies the capped printed combat-factor modifiers, rolls one d10 for
-    each side on declaration, and automatically applies the margin table. The
-    server rechecks adjacency, same-hex participation, single-use participants,
-    and basic grouping shape. Defender terrain adjustments remain excluded until
-    the per-hex transcription is reviewed. Normal board drag now moves a whole
+    server-authoritative. Ending movement now discovers every adjacent occupied-
+    hex contact and deterministically exact-covers the whole contact network with
+    legal independent skirmishes. Every eligible combat counter is assigned once,
+    same-hex counters stay together, one side of each skirmish occupies one hex,
+    and players cannot omit a touching stack or manually choose a grouping. The
+    same authoritative action assigns separate cryptographic d10 rolls to both
+    sides of every skirmish; modifiers and results are calculated independently,
+    never cumulatively. The board draws each generated contact and presents
+    labels, hexes, rolls, and capped printed combat-factor totals without raw ID
+    or coordinate entry. Defender terrain adjustments remain excluded until the
+    per-hex transcription is reviewed. Core night rules are now authoritative:
+    the server and drag preview reject movement or reinforcement entry into an
+    enemy ZOC, require every counter with a legal withdrawal to leave before
+    movement ends, and create night combat only for combat counters unable to
+    withdraw. Normal board drag now moves a whole
     friendly stack atomically at its slowest allowance; Ctrl-drag selects one
     counter. Retreat is also board drag, and every surviving counter and general
     from one losing hex moves together along connected hexes to the first empty
@@ -174,7 +188,9 @@ recorded below; no implementation or local-validation failure remains.
     visible tray accepts a declined advance. No board action requires typed hex
     coordinates. The empty Confederate opening is skipped so turn 1 starts at Union
     movement without artificial actions. Tests cover every phase-table row,
-    adjacent-contact combat entry, nonadjacent combat skipping and declaration
+    automatic mandatory combat entry, dense-network legal separation,
+    independent server rolls, nonadjacent combat skipping, night ZOC entry and
+    withdrawal boundaries, trapped-only night combat, legacy declaration
     rejection, stacking shape, atomic movement and retreat, reinforcement gates,
     defender-wins-ties and every loss threshold, multi-choice combat, and a
     gap-free 47-action two-seat game through turn 24.
@@ -186,17 +202,29 @@ recorded below; no implementation or local-validation failure remains.
     restore reproduced the game ID, versions, and state hash exactly.
 - [ ] Add secure invitations and operator recovery.
   - Status: One-use fragment invitations, hashed credentials, replay/mismatch
-    rejection, binding-scoped authorization, and audited one-use operator seat
-    recovery persist across restart and pass tests. The fuller SPEC lifecycle -
-    host-issued/revoked replacement invitations, seat surrender, and deletion -
-    is not yet implemented, so this task remains open.
+    rejection, binding-scoped authorization, audited one-use seat and host
+    recovery, host-issued/revoked replacement invitations, seat surrender, and
+    30-day soft deletion, daily hard purge, and the minimal append-only deletion
+    receipt now persist across restart and pass in-memory, HTTP, and real
+    PostgreSQL tests. Invitation secrets returned by an idempotent
+    issue retry are encrypted with the server-held key outside the database and
+    destroyed on claim or revocation. Gameplay, management, and audit actions
+    share the gap-free event sequence while management/audit events preserve the
+    gameplay version. Backups record and verify the database ledger watermark.
+    Redacted host-management events now broadcast through the live room and
+    advance only the shared event cursor. Remaining work is off-host ledger
+    replication and fail-closed restore synchronization; this task stays open
+    until those SPEC contracts pass their integration tests.
 - [ ] Deploy and restore-test the private staging service on the VPS.
   - Status: The local rootless-shaped compose path, migration readiness,
-    application restart, backup, and restore pass. No VPS state was changed from
-    this uncommitted branch. Owner: ChrisTitusTech authorizes publication and the
-    private staging deployment of an exact reviewed commit; then retain the prior
-    image/backup and verify the public domain, WebSocket, two-client, restart, and
-    restore gates.
+    application restart, backup, and restore pass. Rootless Quadlet, Caddy,
+    fail-closed deploy/rollback, backup, isolated restore-test, and local recovery
+    scripts are implemented. Their Bash/static checks pass, and the actual VPS
+    Caddy and Quadlet generators accept the candidate files. The live host remains
+    on its healthy placeholder because the deployment script correctly refuses
+    this unpublished dirty checkout. Follow-up: publish an exact reviewed commit,
+    then deploy it and verify the public domain, WebSocket, two-client,
+    restart/resume, and backup/restore gates.
 - [ ] Complete a full two-player Phase 2 acceptance game.
   - Status: Automated two-seat turn-24 completion passes, and real two-browser
     create/join/reject/reconnect workflows pass at 1440 x 900 and 1024 x 768 with
@@ -204,18 +232,27 @@ recorded below; no implementation or local-validation failure remains.
     independent review, and exact-head CI remain unobserved. CodeRabbit is skipped
     if slow or rate-limited per owner direction and cannot block progress.
 
+- [x] Add the immutable ruleset/content version registry gate.
+  - Status: Saved games resolve through the exact ruleset/content pair. Unknown
+    pairs remain stored but fail mutation/resume with `version_unavailable`, and
+    PostgreSQL readiness fails closed until the matching handler/content bundle
+    is restored. Unit and readiness paths cover the unsupported-version case.
+
 ### Phase 3
 
 - [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
   preview are complete in Phase 2.
-- [ ] Implement and test complete ZOC combat grouping, terrain modifiers,
+- [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
   loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
-  automatic two-die unit-factor result interpretation, and printed-factor
-  modifier totals are complete in Phase 2. Phase 3 retains ZOC grouping and
-  verified per-hex terrain modifiers.
-- [ ] Implement and test reinforcement, night, objective, and victory rules.
+  mandatory legal skirmish separation, independent automatic two-die unit-factor
+  result interpretation, and printed-factor modifier totals are complete in
+  Phase 2. Phase 3 retains verified per-hex terrain modifiers and any remaining
+  rule-derived ZOC effects.
+- [ ] Implement and test remaining reinforcement, night, objective, and victory
+  rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
+  trapped-only combat are complete; nighttime reorganization remains.
 - [ ] Add rule versions, explanations, previews, and deterministic replay.
 - [ ] Complete a full rules-enforced acceptance game.
 

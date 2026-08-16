@@ -11,6 +11,7 @@ import express, {
 } from "express";
 
 import { ServiceError, type ServiceErrorCode } from "./game-service.js";
+import type { GameEventBus } from "./event-bus.js";
 import {
   InMemoryAsyncGameService,
   type GameService,
@@ -24,6 +25,7 @@ export interface ReadinessState {
 }
 
 export interface HttpApplicationOptions {
+  readonly eventBus?: GameEventBus;
   readonly gameService: GameService;
   readonly readiness: ReadinessState;
   readonly staticDirectory?: string;
@@ -60,7 +62,7 @@ async function gameplayActionLog(
   gameId: string,
 ): Promise<GameplayEvent[]> {
   return (await gameService.getActions(gameId)).flatMap((action) =>
-    action.kind === "gameplay" && action.result?.ok
+    action.kind === "gameplay" && action.result?.ok && "state" in action.result
       ? [action.result.event]
       : [],
   );
@@ -73,9 +75,13 @@ function errorStatus(code: ServiceErrorCode): number {
       return 400;
     case "game_not_found":
       return 404;
+    case "game_deleted":
+    case "game_purged":
+      return 410;
     case "invitation_unavailable":
     case "recovery_unavailable":
     case "seat_unavailable":
+    case "version_unavailable":
       return 409;
     case "unauthorized":
       return 401;
@@ -137,6 +143,7 @@ export function configureHttpApplication(
         action_log: await gameplayActionLog(gameService, result.gameId),
         game_id: result.gameId,
         invitation: result.invitation,
+        is_host: true,
         seat: result.seat,
         state: result.state,
       });
@@ -175,6 +182,7 @@ export function configureHttpApplication(
         response.status(200).json({
           action_log: await gameplayActionLog(gameService, result.gameId),
           game_id: result.gameId,
+          is_host: false,
           seat: result.seat,
           state: result.state,
         });
@@ -213,6 +221,56 @@ export function configureHttpApplication(
     },
   );
 
+  application.post(
+    "/api/host-recovery/:lookupId/claim",
+    async (request, response, next) => {
+      try {
+        const secret = request.body?.secret;
+        if (typeof secret !== "string") {
+          response.status(400).json({ error: "invalid_recovery" });
+          return;
+        }
+        const credential = readSessionCredential(request);
+        const result = await gameService.claimHostRecovery({
+          ...(credential === undefined ? {} : { credential }),
+          lookupId: request.params.lookupId ?? "",
+          secret,
+        });
+        setSessionCookie(response, result.credential);
+        response.status(200).json({ game_id: result.gameId, is_host: true });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.post(
+    "/api/games/:gameId/host-commands",
+    async (request, response, next) => {
+      try {
+        const gameId = request.params.gameId ?? "";
+        const authorization = await gameService.authenticateHost(
+          readSessionCredential(request),
+          gameId,
+          typeof request.body?.command_id === "string"
+            ? { terminalCommandId: request.body.command_id }
+            : {},
+        );
+        const result = await gameService.executeHostCommand(
+          authorization,
+          request.body,
+          {
+            afterCommit: (event) =>
+              options.eventBus?.publishManagement(gameId, event),
+          },
+        );
+        response.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
   application.get("/api/games/:gameId", async (request, response, next) => {
     try {
       const gameId = request.params.gameId ?? "";
@@ -220,9 +278,22 @@ export function configureHttpApplication(
         readSessionCredential(request),
         gameId,
       );
+      let isHost = false;
+      try {
+        await gameService.authenticateHost(
+          readSessionCredential(request),
+          gameId,
+        );
+        isHost = true;
+      } catch (error) {
+        if (!(error instanceof ServiceError) || error.code !== "unauthorized") {
+          throw error;
+        }
+      }
       response.status(200).json({
         action_log: await gameplayActionLog(gameService, gameId),
         game_id: gameId,
+        is_host: isHost,
         seat: authorization.side,
         state: await gameService.getAuthorizedState(authorization),
       });

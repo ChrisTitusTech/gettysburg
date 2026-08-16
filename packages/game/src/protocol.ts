@@ -176,6 +176,7 @@ export const advanceAfterCombatPayloadSchema = z
     }
   });
 export const endPhasePayloadSchema = z.object({}).strict();
+export const surrenderSeatPayloadSchema = z.object({}).strict();
 
 export const commandPayloadSchemas = {
   advanceAfterCombat: advanceAfterCombatPayloadSchema,
@@ -189,6 +190,7 @@ export const commandPayloadSchemas = {
   retreatStack: retreatStackPayloadSchema,
   retreatUnit: retreatUnitPayloadSchema,
   rollCombat: rollCombatPayloadSchema,
+  surrenderSeat: surrenderSeatPayloadSchema,
 } as const;
 
 export type GameplayCommandName = keyof typeof commandPayloadSchemas;
@@ -280,6 +282,13 @@ export const gameplayCommandSchema = z.discriminatedUnion("command_name", [
       payload: endPhasePayloadSchema,
     })
     .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("surrenderSeat"),
+      payload: surrenderSeatPayloadSchema,
+    })
+    .strict(),
 ]);
 
 export type GameplayCommand = z.infer<typeof gameplayCommandSchema>;
@@ -290,6 +299,44 @@ export type MoveUnitCommand = Extract<
   GameplayCommand,
   { command_name: "moveUnit" }
 >;
+
+const hostManagementPayloadSchemas = {
+  deleteGame: z.object({ confirm: z.literal(true) }).strict(),
+  issueInvitation: z
+    .object({ seat: z.enum(["confederate", "union"]) })
+    .strict(),
+  revokeInvitation: z.object({ lookup_id: z.string().uuid() }).strict(),
+} as const;
+
+export const hostManagementCommandSchema = z.discriminatedUnion(
+  "command_name",
+  [
+    z
+      .object({
+        ...baseEnvelope,
+        command_name: z.literal("issueInvitation"),
+        payload: hostManagementPayloadSchemas.issueInvitation,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseEnvelope,
+        command_name: z.literal("revokeInvitation"),
+        payload: hostManagementPayloadSchemas.revokeInvitation,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseEnvelope,
+        command_name: z.literal("deleteGame"),
+        payload: hostManagementPayloadSchemas.deleteGame,
+      })
+      .strict(),
+  ],
+);
+
+export type HostManagementCommand = z.infer<typeof hostManagementCommandSchema>;
+export type HostManagementCommandName = HostManagementCommand["command_name"];
 
 export type CommandErrorCode =
   | "already_entered"
@@ -323,6 +370,15 @@ export interface GameplayEvent {
   readonly summary: string;
 }
 
+export interface ManagementEvent {
+  readonly command_id: string;
+  readonly command_name: HostManagementCommandName;
+  readonly event_sequence: number;
+  readonly kind: "host_management";
+  readonly state_version: number;
+  readonly summary: string;
+}
+
 export interface CommandSuccess {
   readonly event: GameplayEvent;
   readonly ok: true;
@@ -351,6 +407,25 @@ export function acceptGameplayEvent(
     return { error: "event_sequence_gap", ok: false };
   }
   if (event.state_version !== cursor.state_version + 1) {
+    return { error: "state_version_gap", ok: false };
+  }
+  return {
+    cursor: {
+      event_sequence: event.event_sequence,
+      state_version: event.state_version,
+    },
+    ok: true,
+  };
+}
+
+export function acceptManagementEvent(
+  cursor: EventCursor,
+  event: Pick<ManagementEvent, "event_sequence" | "state_version">,
+): EventCursorResult {
+  if (event.event_sequence !== cursor.event_sequence + 1) {
+    return { error: "event_sequence_gap", ok: false };
+  }
+  if (event.state_version !== cursor.state_version) {
     return { error: "state_version_gap", ok: false };
   }
   return {

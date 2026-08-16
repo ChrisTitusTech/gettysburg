@@ -1,6 +1,7 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
 import {
   acceptGameplayEvent,
+  acceptManagementEvent,
   COMMAND_SCHEMA_VERSION,
   type CommandResult,
   type EventCursor,
@@ -8,6 +9,7 @@ import {
   type GameplayEvent,
   type GameplayCommandName,
   type HexCoordinate,
+  type ManagementEvent,
   type Side,
 } from "@gettysburg/game";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -16,6 +18,7 @@ import {
   claimInvitation,
   createGame,
   resumeGame,
+  sendHostCommand,
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
@@ -59,6 +62,9 @@ export function App({ initialInvitation = null }: AppProps) {
   const [isBusy, setIsBusy] = useState(false);
   const [pendingCommand, setPendingCommand] = useState(false);
   const [copyStatus, setCopyStatus] = useState<string | null>(null);
+  const [activeInvitationLookupId, setActiveInvitationLookupId] = useState<
+    string | null
+  >(null);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const roomReference = useRef<Room | null>(null);
   const eventCursorReference = useRef<EventCursor | null>(null);
@@ -169,12 +175,34 @@ export function App({ initialInvitation = null }: AppProps) {
           }
           return;
         }
+        if (result.event.command_name === "surrenderSeat") {
+          window.localStorage.removeItem(LAST_GAME_KEY);
+          window.history.replaceState(null, "", "/");
+          setActiveGame(null);
+          void connectedRoom?.leave(true);
+        }
         setError(null);
       });
       connectedRoom.onMessage<GameplayEvent>("gameplayEvent", (event) => {
         const cursor = eventCursorReference.current;
         if (cursor === null) return;
         const accepted = acceptGameplayEvent(cursor, event);
+        if (!accepted.ok) {
+          setError(
+            "An event delivery gap was detected; restoring current state.",
+          );
+          void refreshAuthoritativeState();
+          return;
+        }
+        eventCursorReference.current = accepted.cursor;
+        setActionLog((entries) =>
+          [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
+        );
+      });
+      connectedRoom.onMessage<ManagementEvent>("managementEvent", (event) => {
+        const cursor = eventCursorReference.current;
+        if (cursor === null) return;
+        const accepted = acceptManagementEvent(cursor, event);
         if (!accepted.ok) {
           setError(
             "An event delivery gap was detected; restoring current state.",
@@ -234,6 +262,7 @@ export function App({ initialInvitation = null }: AppProps) {
     setError(null);
     try {
       const created = await createGame(seat);
+      setActiveInvitationLookupId(created.invitation.lookup_id);
       enterGame(
         created,
         invitationUrl(
@@ -265,6 +294,121 @@ export function App({ initialInvitation = null }: AppProps) {
       setError(
         "Clipboard access failed; the invitation URL is still available.",
       );
+    }
+  }
+
+  async function handleIssueInvitation() {
+    if (activeGame === null) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      const result = await sendHostCommand(
+        activeGame.game_id,
+        activeGame.state.version,
+        "issueInvitation",
+        { seat: activeGame.seat === "union" ? "confederate" : "union" },
+      );
+      if (result.invitation === undefined) {
+        throw new Error("The server did not return the new invitation secret.");
+      }
+      setActiveInvitationLookupId(result.invitation.lookup_id);
+      setActiveGame((current) =>
+        current === null
+          ? current
+          : {
+              ...current,
+              invitationUrl: invitationUrl(
+                window.location.origin,
+                result.invitation!.lookup_id,
+                result.invitation!.secret,
+              ),
+            },
+      );
+      setCopyStatus("Replacement invitation ready.");
+    } catch (issueError) {
+      setError(
+        issueError instanceof Error
+          ? issueError.message
+          : "Invitation creation failed.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRevokeInvitation() {
+    if (activeGame === null || activeInvitationLookupId === null) return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      await sendHostCommand(
+        activeGame.game_id,
+        activeGame.state.version,
+        "revokeInvitation",
+        { lookup_id: activeInvitationLookupId },
+      );
+      setActiveInvitationLookupId(null);
+      setActiveGame((current) => {
+        if (current === null) return current;
+        return {
+          action_log: current.action_log,
+          game_id: current.game_id,
+          is_host: current.is_host,
+          seat: current.seat,
+          state: current.state,
+        };
+      });
+      setCopyStatus("Invitation revoked.");
+    } catch (revokeError) {
+      setError(
+        revokeError instanceof Error
+          ? revokeError.message
+          : "Invitation revocation failed.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleDeleteGame() {
+    if (
+      activeGame === null ||
+      !window.confirm(
+        "Delete this game? Both seats will be disconnected and the game will enter its recovery window.",
+      )
+    )
+      return;
+    setIsBusy(true);
+    setError(null);
+    try {
+      await sendHostCommand(
+        activeGame.game_id,
+        activeGame.state.version,
+        "deleteGame",
+        { confirm: true },
+      );
+      window.localStorage.removeItem(LAST_GAME_KEY);
+      window.history.replaceState(null, "", "/");
+      setActiveGame(null);
+      void roomReference.current?.leave(true);
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Game deletion failed.",
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handleSurrenderSeat() {
+    if (
+      window.confirm(
+        "Surrender this seat? Rejoining will require a new invitation or operator recovery.",
+      )
+    ) {
+      sendCommand("surrenderSeat", {});
     }
   }
 
@@ -463,11 +607,38 @@ export function App({ initialInvitation = null }: AppProps) {
             value={activeGame.invitationUrl}
           />
           <button onClick={() => void handleCopyInvitation()}>Copy</button>
+          {activeGame.is_host && activeInvitationLookupId !== null ? (
+            <button
+              disabled={isBusy}
+              onClick={() => void handleRevokeInvitation()}
+            >
+              Revoke
+            </button>
+          ) : null}
           <p aria-live="polite" className="copy-status">
             {copyStatus}
           </p>
         </section>
       )}
+
+      <section className="game-lifecycle" aria-label="Game lifecycle">
+        {activeGame.is_host ? (
+          <>
+            <button
+              disabled={isBusy}
+              onClick={() => void handleIssueInvitation()}
+            >
+              Issue opposing-seat invitation
+            </button>
+            <button disabled={isBusy} onClick={() => void handleDeleteGame()}>
+              Delete game
+            </button>
+          </>
+        ) : null}
+        <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
+          Surrender seat
+        </button>
+      </section>
 
       <TabletopControls
         disabled={connectionStatus !== "connected" || pendingCommand}

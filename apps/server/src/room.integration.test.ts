@@ -9,6 +9,7 @@ import {
   COMMAND_SCHEMA_VERSION,
   type CommandResult,
   type GameState,
+  type ManagementEvent,
 } from "@gettysburg/game";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -217,5 +218,63 @@ describe("Colyseus authoritative room", () => {
         headers: { cookie: guestCookie, origin: "https://evil.example" },
       }).joinOrCreate("game", { gameId: created.game_id }),
     ).rejects.toThrow();
+  });
+
+  it("broadcasts redacted host-management events without advancing gameplay version", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const hostCookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const hostRoom = await new ColyseusClient(origin, {
+      headers: { cookie: hostCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(hostRoom);
+
+    const event = nextMessage<ManagementEvent>(hostRoom, "managementEvent");
+    const response = await fetch(
+      `${origin}/api/games/${created.game_id}/host-commands`,
+      {
+        body: JSON.stringify({
+          command_id: randomUUID(),
+          command_name: "revokeInvitation",
+          expected_version: 0,
+          game_id: created.game_id,
+          payload: { lookup_id: created.invitation.lookup_id },
+          schema: COMMAND_SCHEMA_VERSION,
+        }),
+        headers: {
+          "content-type": "application/json",
+          cookie: hostCookie,
+        },
+        method: "POST",
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(event).resolves.toEqual({
+      command_id: expect.any(String),
+      command_name: "revokeInvitation",
+      event_sequence: 1,
+      kind: "host_management",
+      state_version: 0,
+      summary: "confederate invitation revoked",
+    });
+    expect(service.getGameState(created.game_id)).toMatchObject({
+      event_sequence: 1,
+      version: 0,
+    });
   });
 });

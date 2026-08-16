@@ -1,4 +1,4 @@
-FROM docker.io/library/node:24.13.1-bookworm-slim AS build
+FROM docker.io/library/node@sha256:85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e AS build
 
 WORKDIR /workspace
 RUN npm install --global pnpm@11.21.0
@@ -6,7 +6,7 @@ RUN npm install --global pnpm@11.21.0
 COPY --chown=node:node . .
 RUN pnpm install --frozen-lockfile && pnpm build
 
-FROM docker.io/library/node:24.13.1-bookworm-slim AS runtime
+FROM docker.io/library/node@sha256:85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e AS runtime
 
 ENV GETTYSBURG_SERVER_HOST=0.0.0.0 \
     GETTYSBURG_SERVER_PORT=3000 \

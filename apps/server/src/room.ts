@@ -2,8 +2,10 @@ import { Room, type AuthContext, type Client } from "@colyseus/core";
 import {
   type CommandFailure,
   type GameplayCommandName,
+  type ManagementEvent,
 } from "@gettysburg/game";
 
+import type { GameEventBus } from "./event-bus.js";
 import { ServiceError, type GameAuthorization } from "./game-service.js";
 import { readSessionCredentialFromCookieHeader } from "./http.js";
 import type { GameService } from "./postgres-store.js";
@@ -25,16 +27,22 @@ function failure(error: ServiceError): CommandFailure {
 
 export function createGettysburgRoom(
   gameService: GameService,
+  eventBus?: GameEventBus,
 ): GameRoomConstructor {
   return class GettysburgRoom extends Room {
     override autoDispose = false;
     override maxClients = 2;
     #gameId = "";
+    #unsubscribeManagement: (() => void) | undefined;
 
     override async onCreate(options: GameRoomOptions): Promise<void> {
       this.#gameId = options.gameId;
       await gameService.getGameState(this.#gameId);
       this.setMetadata({ gameId: this.#gameId });
+      this.#unsubscribeManagement = eventBus?.subscribeManagement(
+        this.#gameId,
+        (event: ManagementEvent) => this.broadcast("managementEvent", event),
+      );
 
       const commandNames: readonly GameplayCommandName[] = [
         "advanceAfterCombat",
@@ -48,6 +56,7 @@ export function createGettysburgRoom(
         "retreatStack",
         "retreatUnit",
         "rollCombat",
+        "surrenderSeat",
       ];
       for (const commandName of commandNames) {
         this.onMessage(commandName, async (client, message: unknown) => {
@@ -71,6 +80,10 @@ export function createGettysburgRoom(
           }
         });
       }
+    }
+
+    override onDispose(): void {
+      this.#unsubscribeManagement?.();
     }
 
     override async onAuth(

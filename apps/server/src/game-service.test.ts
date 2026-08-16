@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import {
   COMMAND_SCHEMA_VERSION,
   type GameplayCommand,
+  type HexCoordinate,
+  type HostManagementCommand,
   type MoveUnitCommand,
 } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
@@ -48,6 +50,38 @@ function endPhaseCommand(
   };
 }
 
+function surrenderSeatCommand(
+  gameId: string,
+  expectedVersion: number,
+  commandId = randomUUID(),
+): GameplayCommand {
+  return {
+    command_id: commandId,
+    command_name: "surrenderSeat",
+    expected_version: expectedVersion,
+    game_id: gameId,
+    payload: {},
+    schema: COMMAND_SCHEMA_VERSION,
+  };
+}
+
+function hostCommand(
+  gameId: string,
+  expectedVersion: number,
+  commandName: HostManagementCommand["command_name"],
+  payload: HostManagementCommand["payload"],
+  commandId = randomUUID(),
+): HostManagementCommand {
+  return {
+    command_id: commandId,
+    command_name: commandName,
+    expected_version: expectedVersion,
+    game_id: gameId,
+    payload,
+    schema: COMMAND_SCHEMA_VERSION,
+  } as HostManagementCommand;
+}
+
 function expectServiceError(action: () => unknown, code: string) {
   expect(action).toThrowError(ServiceError);
   try {
@@ -84,6 +118,33 @@ describe("canonical command input", () => {
 });
 
 describe("in-memory game lifecycle", () => {
+  it("fails closed when a saved game references an unavailable version pair", () => {
+    const original = new InMemoryGameService();
+    const game = original.createGame("union");
+    const snapshot = original.exportSnapshot();
+    const unavailable = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === game.gameId
+            ? {
+                ...record,
+                state: { ...record.state, ruleset_version: "missing-v99" },
+              }
+            : record,
+        ],
+      ),
+    };
+    const restored = new InMemoryGameService({ snapshot: unavailable });
+
+    expect(restored.isVersionRegistryReady()).toBe(false);
+    expectServiceError(
+      () => restored.getGameState(game.gameId),
+      "version_unavailable",
+    );
+  });
+
   it("starts turn 1 with Union because Confederate has no available units", () => {
     const service = new InMemoryGameService();
     const game = service.createGame("confederate");
@@ -409,6 +470,150 @@ describe("in-memory game lifecycle", () => {
 });
 
 describe("authoritative gameplay commands", () => {
+  it("rejects Nelson entering a Union zone of control on a night turn", () => {
+    const pepper = new Uint8Array(32).fill(8);
+    const original = new InMemoryGameService({ pepper });
+    const host = original.createGame("confederate");
+    const snapshot = original.exportSnapshot();
+    const arrangedSnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === host.gameId
+            ? {
+                ...record,
+                state: {
+                  ...record.state,
+                  active_side: "confederate",
+                  night: true,
+                  phase: "movement",
+                  turn: 8,
+                  units: Object.fromEntries(
+                    Object.entries(record.state.units).map(([id, unit]) => [
+                      id,
+                      id === "c-nelson"
+                        ? { ...unit, location: "L6", status: "deployed" }
+                        : id === "u-geary"
+                          ? { ...unit, location: "J5", status: "deployed" }
+                          : {
+                              ...unit,
+                              location: null,
+                              status: "reinforcement",
+                            },
+                    ]),
+                  ),
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+    const service = new InMemoryGameService({
+      pepper,
+      snapshot: arrangedSnapshot,
+    });
+    const authorization = service.authenticate(host.credential, host.gameId);
+
+    expect(
+      service.executeCommand(
+        authorization,
+        moveCommand(host.gameId, 0, "c-nelson", "K6"),
+      ),
+    ).toMatchObject({
+      current_version: 0,
+      error: "phase_invalid",
+      message:
+        "Night movement must withdraw from and may not enter an enemy zone of control.",
+      ok: false,
+    });
+    expect(service.getGameState(host.gameId).units["c-nelson"]).toMatchObject({
+      location: "L6",
+    });
+    expect(service.getActions(host.gameId)).toHaveLength(0);
+  });
+
+  it("creates and rolls every mandatory skirmish in one authoritative action", () => {
+    const pepper = new Uint8Array(32).fill(7);
+    const original = new InMemoryGameService({ pepper });
+    const host = original.createGame("confederate");
+    const snapshot = original.exportSnapshot();
+    const arrangedSnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === host.gameId
+            ? {
+                ...record,
+                state: {
+                  ...record.state,
+                  active_side: "confederate",
+                  phase: "movement",
+                  turn: 4,
+                  units: Object.fromEntries(
+                    Object.entries(record.state.units).map(([id, unit]) => {
+                      const locations: Record<string, HexCoordinate> = {
+                        "c-heth": "A1",
+                        "c-pegram": "D1",
+                        "u-devin": "B1",
+                        "u-gamble": "E1",
+                      };
+                      return [
+                        id,
+                        locations[id] === undefined
+                          ? { ...unit, location: null, status: "reinforcement" }
+                          : {
+                              ...unit,
+                              location: locations[id],
+                              status: "deployed",
+                            },
+                      ];
+                    }),
+                  ),
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+    const service = new InMemoryGameService({
+      pepper,
+      snapshot: arrangedSnapshot,
+    });
+    const authorization = service.authenticate(host.credential, host.gameId);
+
+    expect(
+      service.executeCommand(authorization, endPhaseCommand(host.gameId, 0)),
+    ).toMatchObject({ ok: true });
+    const combats = Object.values(service.getGameState(host.gameId).combats);
+    expect(combats).toHaveLength(2);
+    expect(combats.map((combat) => combat.attackers).sort()).toEqual([
+      ["c-heth"],
+      ["c-pegram"],
+    ]);
+    expect(combats.map((combat) => combat.defenders).sort()).toEqual([
+      ["u-devin"],
+      ["u-gamble"],
+    ]);
+    expect(
+      combats.every(
+        (combat) =>
+          combat.status === "awaiting_result_confirmation" &&
+          combat.rolls !== null &&
+          combat.rolls.attacker >= 1 &&
+          combat.rolls.attacker <= 10 &&
+          combat.rolls.defender >= 1 &&
+          combat.rolls.defender <= 10,
+      ),
+    ).toBe(true);
+    expect(service.getActions(host.gameId)).toHaveLength(1);
+    expect(service.getActions(host.gameId)[0]?.result).toMatchObject({
+      ok: true,
+      state: { combats: service.getGameState(host.gameId).combats },
+    });
+  });
+
   it("completes a gap-free two-seat 24-turn game without server-data edits", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("confederate");
@@ -611,5 +816,199 @@ describe("operator seat recovery", () => {
         }),
       "recovery_unavailable",
     );
+  });
+});
+
+describe("Phase 2 seat and host lifecycle", () => {
+  it("surrenders one seat, revokes old invitations, and permits a host replacement", () => {
+    const service = new InMemoryGameService();
+    const host = service.createGame("union");
+    const guest = service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    const guestAuthorization = service.authenticate(
+      guest.credential,
+      host.gameId,
+    );
+    const surrender = surrenderSeatCommand(host.gameId, 0);
+
+    const surrendered = service.executeCommand(guestAuthorization, surrender);
+    expect(surrendered).toMatchObject({
+      event: { command_name: "surrenderSeat", event_sequence: 1 },
+      ok: true,
+      state: { version: 1 },
+    });
+    expect(service.executeCommand(guestAuthorization, surrender)).toEqual(
+      surrendered,
+    );
+    expectServiceError(
+      () => service.authenticate(guest.credential, host.gameId),
+      "unauthorized",
+    );
+
+    const hostAuthorization = service.authenticateHost(
+      host.credential,
+      host.gameId,
+    );
+    const issueCommand = hostCommand(host.gameId, 1, "issueInvitation", {
+      seat: "confederate",
+    });
+    const issued = service.executeHostCommand(hostAuthorization, issueCommand);
+    expect(issued).toMatchObject({
+      event: { event_sequence: 2, state_version: 1 },
+      invitation: { secret: expect.any(String) },
+      ok: true,
+    });
+    if (!issued.ok || issued.invitation === undefined)
+      throw new Error("Replacement invitation was not returned");
+    expect(service.executeHostCommand(hostAuthorization, issueCommand)).toEqual(
+      issued,
+    );
+    expect(
+      service.claimInvitation({
+        lookupId: issued.invitation.lookup_id,
+        secret: issued.invitation.secret,
+      }).seat,
+    ).toBe("confederate");
+  });
+
+  it("revokes an invitation and soft-deletes every game binding", () => {
+    const service = new InMemoryGameService();
+    const host = service.createGame("union");
+    const authorization = service.authenticateHost(
+      host.credential,
+      host.gameId,
+    );
+    const publishedEvents: number[] = [];
+    const revocation = hostCommand(
+      host.gameId,
+      0,
+      "revokeInvitation",
+      { lookup_id: host.invitation.lookup_id },
+      "88888888-8888-4888-8888-888888888888",
+    );
+    expect(
+      service.executeHostCommand(authorization, revocation, {
+        afterCommit: (event) => publishedEvents.push(event.event_sequence),
+      }),
+    ).toMatchObject({ event: { event_sequence: 1 }, ok: true });
+    expect(
+      service.executeHostCommand(authorization, revocation, {
+        afterCommit: (event) => publishedEvents.push(event.event_sequence),
+      }),
+    ).toMatchObject({ event: { event_sequence: 1 }, ok: true });
+    expect(publishedEvents).toEqual([1]);
+    expectServiceError(
+      () =>
+        service.claimInvitation({
+          lookupId: host.invitation.lookup_id,
+          secret: host.invitation.secret,
+        }),
+      "invitation_unavailable",
+    );
+    const deletion = hostCommand(host.gameId, 0, "deleteGame", {
+      confirm: true,
+    });
+    const deleted = service.executeHostCommand(authorization, deletion);
+    expect(deleted).toMatchObject({
+      event: { event_sequence: 2, state_version: 0 },
+      ok: true,
+    });
+    const retryAuthorization = service.authenticateHost(
+      host.credential,
+      host.gameId,
+      { terminalCommandId: deletion.command_id },
+    );
+    expect(service.executeHostCommand(retryAuthorization, deletion)).toEqual(
+      deleted,
+    );
+    expectServiceError(() => service.getGameState(host.gameId), "game_deleted");
+    expectServiceError(
+      () => service.authenticate(host.credential, host.gameId),
+      "game_deleted",
+    );
+    expect(service.getActions(host.gameId)).toHaveLength(2);
+  });
+
+  it("hard-purges expired deletions and retains only a stable receipt", () => {
+    let now = Date.UTC(2026, 7, 15);
+    const service = new InMemoryGameService({ now: () => now });
+    const deletedGame = service.createGame("union");
+    const retainedGame = service.createGame(
+      "confederate",
+      deletedGame.credential,
+    );
+    const authorization = service.authenticateHost(
+      deletedGame.credential,
+      deletedGame.gameId,
+    );
+    service.executeHostCommand(
+      authorization,
+      hostCommand(deletedGame.gameId, 0, "deleteGame", { confirm: true }),
+    );
+
+    expect(service.purgeDeletedGames()).toEqual([]);
+    now += 30 * 24 * 60 * 60 * 1_000;
+    expect(service.purgeDeletedGames()).toEqual([
+      {
+        actor: authorization.bindingId,
+        deletedAt: Date.UTC(2026, 7, 15),
+        gameId: deletedGame.gameId,
+        position: 1,
+        purgedAt: now,
+      },
+    ]);
+    expect(service.purgeDeletedGames()).toEqual([]);
+    expect(service.getDeletionLedger()).toHaveLength(1);
+    expectServiceError(
+      () => service.getActions(deletedGame.gameId),
+      "game_purged",
+    );
+    expectServiceError(
+      () =>
+        service.authenticateHost(deletedGame.credential, deletedGame.gameId),
+      "game_purged",
+    );
+    expect(service.getGameState(retainedGame.gameId).game_id).toBe(
+      retainedGame.gameId,
+    );
+    expect(
+      service
+        .exportSnapshot()
+        .hostBindings.some((binding) => binding.gameId === retainedGame.gameId),
+    ).toBe(true);
+  });
+
+  it("rotates only one host binding through operator recovery", () => {
+    const service = new InMemoryGameService();
+    const first = service.createGame("union");
+    const second = service.createGame("confederate", first.credential);
+    const grant = service.issueHostRecovery(
+      first.gameId,
+      "local-operator:test",
+    );
+    const recovered = service.claimHostRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    });
+
+    expectServiceError(
+      () => service.authenticateHost(first.credential, first.gameId),
+      "unauthorized",
+    );
+    expect(
+      service.authenticateHost(first.credential, second.gameId),
+    ).toMatchObject({ bindingVersion: 1 });
+    expect(
+      service.authenticateHost(recovered.credential, first.gameId),
+    ).toMatchObject({ bindingVersion: 2 });
+    expect(service.authenticate(first.credential, first.gameId).side).toBe(
+      "union",
+    );
+    expect(service.getGameState(first.gameId)).toMatchObject({
+      event_sequence: 1,
+      version: 0,
+    });
   });
 });

@@ -1,0 +1,10 @@
+gettysburg.christitus.com {
+	encode zstd gzip
+	header {
+		Referrer-Policy "no-referrer"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:3000
+}

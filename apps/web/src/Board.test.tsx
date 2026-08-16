@@ -180,6 +180,47 @@ describe("Board", () => {
     expect(screen.getByText(/movement remaining/)).toBeVisible();
   });
 
+  it("stops a night drag before entering an enemy zone of control", () => {
+    const onMove = vi.fn();
+    const { container } = render(
+      <Board
+        onMove={onMove}
+        seat="confederate"
+        state={{
+          ...state,
+          night: true,
+          turn: 8,
+          units: {
+            ...state.units,
+            "fixture-union-1": {
+              ...state.units["fixture-union-1"]!,
+              location: "H5",
+            },
+          },
+        }}
+      />,
+    );
+    const counter = container.querySelector(
+      '[data-unit-id="fixture-confederate-1"]',
+    )!;
+    const pointer = prepareBoardPointer(container, "G5");
+
+    fireEvent.pointerDown(counter, { button: 0, pointerId: 9 });
+    fireEvent.pointerMove(pointer.svg, {
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+      pointerId: 9,
+    });
+
+    expect(
+      screen.getByText(
+        "Night movement stops before an enemy zone of control. Withdraw away from enemy counters.",
+      ),
+    ).toBeVisible();
+    fireEvent.pointerUp(pointer.svg, { pointerId: 9 });
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
   it("zooms and returns to its calibrated fit", async () => {
     const user = userEvent.setup();
     render(<Board onMove={vi.fn()} seat="union" state={state} />);
@@ -604,11 +645,32 @@ describe("Board", () => {
     expect(container.querySelector('[data-coordinate="F6"]')).toHaveClass(
       "terrain-rough-hill",
     );
+    for (const coordinate of ["I5", "J5", "J6"]) {
+      expect(
+        container.querySelector(`[data-coordinate="${coordinate}"]`),
+      ).toHaveClass("terrain-clear");
+    }
     expect(container.querySelector('[data-coordinate="O7"]')).toHaveClass(
       "terrain-town",
     );
-    expect(container.querySelectorAll(".stream-water")).toHaveLength(3);
-    expect(container.querySelectorAll(".road-center")).toHaveLength(8);
+    const streams = [...container.querySelectorAll(".stream-water")];
+    expect(streams).toHaveLength(2);
+    expect(
+      streams.every(
+        (stream) => stream.getAttribute("data-crosses-board") === "true",
+      ),
+    ).toBe(true);
+    const roads = [...container.querySelectorAll(".road-center")];
+    expect(roads).toHaveLength(8);
+    expect(
+      roads.every(
+        (road) => road.getAttribute("data-reaches-board-edge") === "true",
+      ),
+    ).toBe(true);
+    expect(container.querySelector("#board-play-field")).toBeInTheDocument();
+    expect(
+      container.querySelectorAll(".woodland-cluster").length,
+    ).toBeGreaterThan(40);
     expect(container.querySelector(".board-landmarks")).toHaveTextContent(
       "GETTYSBURG",
     );

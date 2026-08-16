@@ -211,6 +211,18 @@ h2 {
   padding: 1rem 1.25rem;
 }
 
+.game-lifecycle {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  padding: 0 1.25rem;
+}
+
+.game-lifecycle button:last-child {
+  margin-left: auto;
+}
+
 .invitation-panel input,
 .counter-inspector input {
   min-height: 44px;
@@ -485,38 +497,23 @@ summary {
 }
 
 .board-ground {
-  fill: #aaa381;
+  fill: #aaa78d;
 }
 
 .hex {
-  stroke: #514c35;
-  stroke-width: 1.2;
+  fill: transparent;
+  stroke: #5b5736;
+  stroke-width: 1.05;
   cursor: crosshair;
   transition: filter 100ms ease;
 }
 
 .hex:hover {
-  filter: brightness(1.14);
+  fill: rgb(244 224 129 / 24%);
 }
 
-.terrain-clear {
-  fill: url("#terrain-clear-pattern");
-}
-
-.terrain-woods {
-  fill: url("#terrain-woods-pattern");
-}
-
-.terrain-hill {
-  fill: url("#terrain-hill-pattern");
-}
-
-.terrain-rough-hill {
-  fill: url("#terrain-rough-pattern");
-}
-
-.terrain-town {
-  fill: url("#terrain-town-pattern");
+.board-paper {
+  fill: url("#board-paper-pattern");
 }
 
 .board-feature-layer {
@@ -529,62 +526,169 @@ summary {
   stroke-linejoin: round;
 }
 
+.hill-wash ellipse {
+  fill: #b66c4b;
+  opacity: 0.2;
+}
+
+.hill-wash path {
+  stroke: #8d5b40;
+  stroke-width: 1.45;
+  opacity: 0.42;
+}
+
+.rough-hill-wash ellipse {
+  fill: #8e5d63;
+  opacity: 0.27;
+}
+
+.rough-hill-wash path {
+  stroke: #68464b;
+  stroke-width: 1.6;
+  opacity: 0.5;
+}
+
+.cultivated-fields path {
+  stroke: #687247;
+  stroke-dasharray: 1 3.5;
+  stroke-width: 2.4;
+  opacity: 0.48;
+}
+
+.woodland-underpainting {
+  fill: #536c3d;
+  opacity: 0.18;
+}
+
+.woodland-underpainting-secondary {
+  fill: #334f32;
+  opacity: 0.14;
+}
+
+.map-tree-crown {
+  stroke: #263e29;
+  stroke-width: 0.8;
+}
+
+.map-tree-conifer {
+  stroke-linejoin: round;
+}
+
+.tree-tone-0 .map-tree-crown {
+  fill: #314e31;
+}
+
+.tree-tone-1 .map-tree-crown {
+  fill: #46603a;
+}
+
+.tree-tone-2 .map-tree-crown {
+  fill: #586c3d;
+}
+
+.map-tree-shadow {
+  stroke: #233a29;
+  stroke-width: 1.1;
+  opacity: 0.58;
+}
+
+.map-tree-trunk {
+  stroke: #765c34;
+  stroke-width: 1.4;
+  opacity: 0.72;
+}
+
+.town-landscape ellipse {
+  fill: #b26d51;
+  opacity: 0.24;
+}
+
+.town-street {
+  stroke: #d3b071;
+  stroke-width: 4.5;
+  opacity: 0.9;
+}
+
+.town-building {
+  stroke: #4f3a32;
+  stroke-width: 0.8;
+}
+
+.building-tone-0 {
+  fill: #6a493d;
+}
+
+.building-tone-1 {
+  fill: #d3b27a;
+}
+
+.building-tone-2 {
+  fill: #8c5946;
+}
+
 .road-edge {
-  stroke: #8f5d42;
-  stroke-width: 5;
-  opacity: 0.66;
+  stroke: #914e40;
+  stroke-width: 4.2;
+  opacity: 0.32;
 }
 
 .road-center {
-  stroke: #ddb472;
-  stroke-width: 2;
-  opacity: 0.96;
+  stroke: #c66f53;
+  stroke-width: 1.7;
+  opacity: 0.78;
 }
 
 .railroad-edge {
-  stroke: #493c32;
-  stroke-width: 4.5;
-  opacity: 0.78;
+  stroke: #4e3b35;
+  stroke-width: 3.7;
+  opacity: 0.72;
 }
 
 .railroad-ties {
-  stroke: #ba8a5f;
-  stroke-dasharray: 2 6;
-  stroke-width: 2;
+  stroke: #9b684d;
+  stroke-dasharray: 1 5;
+  stroke-width: 1.8;
 }
 
 .stream-bank {
-  stroke: #304e68;
-  stroke-width: 9;
-  opacity: 0.78;
+  stroke: #315b73;
+  stroke-width: 7.5;
+  opacity: 0.82;
 }
 
 .stream-water {
-  stroke: #5aa5c5;
-  stroke-width: 5;
+  stroke: #5ca5c1;
+  stroke-width: 4.2;
+}
+
+.stream-highlight {
+  stroke: #9bc7d2;
+  stroke-width: 1.1;
+  opacity: 0.7;
 }
 
 .terrain-label {
-  fill: #302d1e;
+  fill: #393321;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 7px;
   font-style: italic;
   font-weight: 800;
   letter-spacing: 0.35px;
   paint-order: stroke;
-  stroke: rgb(224 207 143 / 82%);
-  stroke-width: 2.2px;
+  stroke: rgb(218 201 126 / 72%);
+  stroke-width: 1.9px;
   text-anchor: middle;
 }
 
 .hex-label {
-  fill: #332f22;
-  font-size: 9px;
-  font-weight: 800;
+  fill: #403b28;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 8.5px;
+  font-weight: 700;
   paint-order: stroke;
   pointer-events: none;
-  stroke: rgb(224 211 151 / 78%);
-  stroke-width: 2.6px;
+  stroke: rgb(220 207 139 / 68%);
+  stroke-width: 2.2px;
   text-anchor: middle;
 }
 

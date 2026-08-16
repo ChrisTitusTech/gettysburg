@@ -6,8 +6,10 @@ import {
   pointToCoordinate,
 } from "@gettysburg/content";
 import {
+  combatFactorModifier,
   combatOpportunities,
   hexDistance,
+  nightMovementPath,
   shortestHexPath,
   type GameState,
   type HexCoordinate,
@@ -122,6 +124,40 @@ export function Board({
     state.phase === "combat" && state.active_side !== null
       ? combatOpportunities(state, state.active_side)
       : [];
+  const visibleDeclaredCombats =
+    state.phase === "combat"
+      ? Object.values(state.combats)
+          .filter((combat) => combat.status !== "resolved")
+          .map((combat) => ({
+            attacker_hexes: [
+              ...new Set(
+                combat.attackers.flatMap((id) => {
+                  const location = state.units[id]?.location;
+                  return location === null || location === undefined
+                    ? []
+                    : [location];
+                }),
+              ),
+            ].sort(),
+            attacker_modifier: combatFactorModifier(state, combat.attackers),
+            defender_hexes: [
+              ...new Set(
+                combat.defenders.flatMap((id) => {
+                  const location = state.units[id]?.location;
+                  return location === null || location === undefined
+                    ? []
+                    : [location];
+                }),
+              ),
+            ].sort(),
+            defender_modifier: combatFactorModifier(state, combat.defenders),
+            id: combat.id,
+          }))
+      : [];
+  const visibleCombats = [
+    ...visibleCombatOpportunities,
+    ...visibleDeclaredCombats,
+  ];
   const pendingAdvance = Object.values(state.combats).find(
     (combat) =>
       combat.pending_choice?.kind === "advance" &&
@@ -278,6 +314,16 @@ export function Board({
       );
       return;
     }
+    if (
+      state.night &&
+      nightMovementPath(state, seat, selectedUnit.location, target).at(-1) !==
+        target
+    ) {
+      setMovementNotice(
+        "Night movement must withdraw from and cannot enter an enemy zone of control.",
+      );
+      return;
+    }
     setMovementNotice(`Submitting ${distance} movement to ${target}.`);
     onMove(unitIds, target);
   }
@@ -409,7 +455,9 @@ export function Board({
 
   function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
     if (event.button !== 0) return;
-    if ((event.target as Element).closest(".counter") !== null) return;
+    const target = event.target as Element;
+    if (target.closest(".counter") !== null) return;
+    if (selectedUnitId !== null && target.closest(".hex") !== null) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = {
       clientX: event.clientX,
@@ -446,7 +494,7 @@ export function Board({
             ? unitMove.destinationHexes.includes(target)
               ? shortestHexPath(unit.location, target)
               : [unit.location]
-            : shortestHexPath(unit.location, target).slice(
+            : nightMovementPath(state, seat, unit.location, target).slice(
                 0,
                 movementAllowance(unitMove.unitIds) + 1,
               );
@@ -461,7 +509,11 @@ export function Board({
             ? path.length > 1
               ? `${unitMove.unitIds.length} counter${unitMove.unitIds.length === 1 ? "" : "s"}: release to advance to ${endpoint}.`
               : "Drag to a highlighted vacated hex or the Decline advance tray."
-            : `${unitMove.unitIds.length === 1 ? unit.label : `${unitMove.unitIds.length}-counter stack`}: ${path.length - 1} of ${movementAllowance(unitMove.unitIds)} movement to ${endpoint}.`,
+            : state.night &&
+                nightMovementPath(state, seat, unit.location, target).at(-1) !==
+                  target
+              ? "Night movement stops before an enemy zone of control. Withdraw away from enemy counters."
+              : `${unitMove.unitIds.length === 1 ? unit.label : `${unitMove.unitIds.length}-counter stack`}: ${path.length - 1} of ${movementAllowance(unitMove.unitIds)} movement to ${endpoint}.`,
       );
       return;
     }
@@ -555,6 +607,7 @@ export function Board({
             width={BOARD_VIEW_BOX.width}
           />
           <g aria-hidden="true">
+            <BoardTerrain />
             {FIXTURE_HEXES.map((hex) => (
               <polygon
                 className={`hex terrain-${presentationTerrain(hex.coordinate)}`}
@@ -564,7 +617,6 @@ export function Board({
                 points={hexPolygonPoints(hex.point)}
               />
             ))}
-            <BoardTerrain />
             {FIXTURE_HEXES.map((hex) => (
               <text
                 className="hex-label"
@@ -624,9 +676,9 @@ export function Board({
               </text>
             </g>
           )}
-          {visibleCombatOpportunities.length === 0 ? null : (
+          {visibleCombats.length === 0 ? null : (
             <g aria-label="Detected adjacent combats" className="combat-links">
-              {visibleCombatOpportunities.flatMap((opportunity) =>
+              {visibleCombats.flatMap((opportunity) =>
                 opportunity.attacker_hexes.flatMap((attackerHex) =>
                   opportunity.defender_hexes
                     .filter(

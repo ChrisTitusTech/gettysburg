@@ -1,0 +1,29 @@
+[Unit]
+Description=Gettysburg browser game
+Requires=gettysburg-network.service gettysburg-app-volume.service gettysburg-db.service
+After=gettysburg-network.service gettysburg-app-volume.service gettysburg-db.service
+
+[Container]
+Image=@IMAGE_ID@
+ContainerName=gettysburg-app
+EnvironmentFile=/srv/gettysburg/.config/gettysburg/app.env
+Network=gettysburg.network
+PublishPort=127.0.0.1:3000:3000
+Volume=gettysburg-app.volume:/var/lib/gettysburg
+ReadOnly=true
+Tmpfs=/tmp
+NoNewPrivileges=true
+DropCapability=all
+HealthCmd=node -e "fetch('http://127.0.0.1:3000/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+HealthInterval=10s
+HealthTimeout=3s
+HealthRetries=6
+
+[Service]
+Restart=on-failure
+RestartSec=3
+TimeoutStartSec=180
+TimeoutStopSec=30
+
+[Install]
+WantedBy=default.target

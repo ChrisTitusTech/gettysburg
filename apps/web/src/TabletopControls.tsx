@@ -5,10 +5,7 @@ import type {
   GameplayCommandName,
   Side,
 } from "@gettysburg/game";
-import {
-  automaticCombatResolution,
-  combatOpportunities,
-} from "@gettysburg/game";
+import { automaticCombatResolution } from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
 
 interface TabletopControlsProps {
@@ -34,6 +31,20 @@ function outcomeSummary(
   const marginText =
     margin === 0 ? " wins the tied total" : ` wins by ${margin}`;
   return `${winner}${marginText}. ${loser} retreats and takes ${losses} step loss${losses === 1 ? "" : "es"}.`;
+}
+
+function participantSummary(
+  state: GameState,
+  unitIds: readonly string[],
+): string {
+  return unitIds
+    .map((id) => {
+      const unit = state.units[id];
+      if (unit === undefined) return id;
+      const location = unit.location === null ? "" : " (" + unit.location + ")";
+      return unit.label + location;
+    })
+    .join(" + ");
 }
 
 function CombatCard({
@@ -62,11 +73,11 @@ function CombatCard({
   const choice = combat.pending_choice;
   return (
     <article className="combat-card">
-      <h3>Combat {combat.id.slice(0, 8)}</h3>
+      <h3>Skirmish {combat.id.slice(0, 8)}</h3>
       <p>
-        Attackers: <code>{combat.attackers.join(", ")}</code>
+        Attackers: {participantSummary(state, combat.attackers)}
         <br />
-        Defenders: <code>{combat.defenders.join(", ")}</code>
+        Defenders: {participantSummary(state, combat.defenders)}
       </p>
       {combat.rolls === null ? null : (
         <p className="dice-result">
@@ -113,7 +124,7 @@ function CombatCard({
             }
             type="submit"
           >
-            Confirm battle result
+            Confirm skirmish result
           </button>
         </form>
       ) : null}
@@ -206,10 +217,7 @@ export function TabletopControls({
   const deployed = Object.values(state.units).filter(
     (unit) => unit.status === "deployed",
   );
-  const opportunities = useMemo(
-    () => combatOpportunities(state, seat),
-    [seat, state],
-  );
+  const combats = Object.values(state.combats);
   const unresolvedCombat = Object.values(state.combats).find(
     (combat) => combat.status !== "resolved",
   );
@@ -222,17 +230,19 @@ export function TabletopControls({
         ? "retreat"
         : "advance decision";
   const combatBlockerLabel =
-    state.phase !== "combat" || unresolvedCombat === undefined
-      ? null
-      : pendingChoice === null || pendingChoice === undefined
-        ? "Resolve the declared battle below"
-        : pendingChoice.side === seat
-          ? pendingChoice.kind === "retreat"
-            ? "Complete your retreat on the board"
-            : pendingChoice.kind === "advance"
-              ? "Complete your advance decision on the board"
-              : `Complete your ${choiceName} below`
-          : `Waiting for ${choiceOwner} ${choiceName}`;
+    state.phase === "combat" && combats.length === 0
+      ? "Generate automatic skirmishes"
+      : state.phase !== "combat" || unresolvedCombat === undefined
+        ? null
+        : pendingChoice === null || pendingChoice === undefined
+          ? "Confirm each automatic skirmish below"
+          : pendingChoice.side === seat
+            ? pendingChoice.kind === "retreat"
+              ? "Complete your retreat on the board"
+              : pendingChoice.kind === "advance"
+                ? "Complete your advance decision on the board"
+                : `Complete your ${choiceName} below`
+            : `Waiting for ${choiceOwner} ${choiceName}`;
   const phaseButtonLabel =
     combatBlockerLabel ??
     (active
@@ -251,9 +261,17 @@ export function TabletopControls({
             {state.night ? " · night" : ""}
           </h2>
           <p>
-            Active seat: {state.active_side ?? "game complete"}. Advanced
-            terrain and combat legality remain player-adjudicated in Phase 2.
+            Active seat: {state.active_side ?? "game complete"}. Adjacent combat
+            units are automatically separated into mandatory legal skirmishes
+            and rolled independently by the server.
           </p>
+          {state.night && state.phase === "movement" ? (
+            <p className="night-guidance">
+              Night movement: withdraw every counter from enemy zones of control
+              when possible. Counters cannot enter enemy zones, and only
+              counters unable to withdraw will fight.
+            </p>
+          ) : null}
           <p>
             Victory points: Confederate {state.victory.confederate} · Union{" "}
             {state.victory.union}
@@ -325,60 +343,16 @@ export function TabletopControls({
           aria-labelledby="detected-combats-heading"
           className="combat-opportunities"
         >
-          <h3 id="detected-combats-heading">Detected adjacent combats</h3>
-          {opportunities.length === 0 ? (
-            <p>No undeclared adjacent enemy combat units remain.</p>
-          ) : (
-            opportunities.map((opportunity) => (
-              <article className="combat-opportunity" key={opportunity.id}>
-                <div>
-                  <strong>
-                    {opportunity.attackers
-                      .map((id) => state.units[id]?.label ?? id)
-                      .join(" + ")}{" "}
-                    ({opportunity.attacker_hexes.join(", ")})
-                  </strong>
-                  <span aria-hidden="true" className="combat-edge-symbol">
-                    →
-                  </span>
-                  <strong>
-                    {opportunity.defenders
-                      .map((id) => state.units[id]?.label ?? id)
-                      .join(" + ")}{" "}
-                    ({opportunity.defender_hexes.join(", ")})
-                  </strong>
-                </div>
-                <p className="combat-tally">
-                  Verified unit modifiers: attacker +
-                  {opportunity.attacker_modifier} · defender +
-                  {opportunity.defender_modifier} before terrain
-                </p>
-                {opportunity.requires_separation ? (
-                  <p className="combat-separation">
-                    This contact network spans multiple hexes on both sides and
-                    must be separated into legal individual combats.
-                  </p>
-                ) : (
-                  <button
-                    disabled={disabled}
-                    onClick={() =>
-                      onCommand("declareCombat", {
-                        attackers: opportunity.attackers,
-                        combat_id: crypto.randomUUID(),
-                        defenders: opportunity.defenders,
-                      })
-                    }
-                  >
-                    Declare this combat
-                  </button>
-                )}
-              </article>
-            ))
-          )}
+          <h3 id="detected-combats-heading">Automatic skirmishes</h3>
+          <p>
+            {combats.length === 0
+              ? "This saved combat predates automatic separation. Generate its mandatory skirmishes to continue."
+              : `${combats.length} independent skirmish${combats.length === 1 ? " was" : "es were"} created from every adjacent combat stack. No touching combat unit can be omitted, and each skirmish has its own server dice and result.`}
+          </p>
         </section>
       ) : null}
 
-      {Object.values(state.combats).map((combat) => (
+      {combats.map((combat) => (
         <CombatCard
           combat={combat}
           disabled={disabled}

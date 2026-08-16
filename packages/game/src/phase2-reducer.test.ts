@@ -9,6 +9,8 @@ import {
   type Side,
   type UnitState,
 } from "./protocol";
+import { combatSkirmishes } from "./combat";
+import { adjacentHexes } from "./coordinates";
 import { reduceGameplayCommand } from "./reducer";
 
 const gameId = "11111111-1111-4111-8111-111111111111";
@@ -82,7 +84,15 @@ function accept(
   nextCommand: GameplayCommand,
   dice?: { attacker: number; defender: number },
 ) {
+  const automaticCombats =
+    nextCommand.command_name === "endPhase" && current.phase === "movement"
+      ? combatSkirmishes(current, side).map(() => ({
+          combat_id: randomUUID(),
+          dice: { attacker: 5, defender: 5 },
+        }))
+      : undefined;
   const result = reduceGameplayCommand(current, side, nextCommand, {
+    ...(automaticCombats === undefined ? {} : { automaticCombats }),
     ...(dice === undefined ? {} : { dice }),
   });
   expect(result.ok).toBe(true);
@@ -123,14 +133,78 @@ describe("24-turn phase table", () => {
           defender: unit("defender", enemySide, "infantry", "B1"),
         },
       });
-      expect(accept(current, side, command("endPhase", {}))).toMatchObject({
+      const next = accept(current, side, command("endPhase", {}));
+      expect(next).toMatchObject({
         active_side: side,
         phase: "combat",
         turn,
         version: 1,
       });
+      expect(Object.values(next.combats)).toMatchObject([
+        {
+          attackers: ["attacker"],
+          defenders: ["defender"],
+          rolls: { attacker: 5, defender: 5 },
+          status: "awaiting_result_confirmation",
+        },
+      ]);
     },
   );
+
+  it("rejects ending movement without a server roll for every skirmish", () => {
+    const current = state({
+      units: {
+        attacker: unit("attacker", "confederate", "infantry", "A1"),
+        defender: unit("defender", "union", "infantry", "B1"),
+      },
+    });
+    expect(
+      reduceGameplayCommand(current, "confederate", command("endPhase", {})),
+    ).toMatchObject({
+      failure: {
+        error: "combat_invalid",
+        message: "Server rolls are required for every mandatory skirmish.",
+      },
+      ok: false,
+    });
+  });
+
+  it("upgrades an existing empty combat phase without skipping its battle", () => {
+    const current = state({
+      phase: "combat",
+      units: {
+        attacker: unit("attacker", "confederate", "infantry", "A1"),
+        defender: unit("defender", "union", "infantry", "B1"),
+      },
+    });
+    const result = reduceGameplayCommand(
+      current,
+      "confederate",
+      command("endPhase", {}),
+      {
+        automaticCombats: [
+          {
+            combat_id: "44444444-4444-4444-8444-444444444444",
+            dice: { attacker: 6, defender: 2 },
+          },
+        ],
+      },
+    );
+    expect(result).toMatchObject({
+      ok: true,
+      state: {
+        active_side: "confederate",
+        combats: {
+          "44444444-4444-4444-8444-444444444444": {
+            rolls: { attacker: 6, defender: 2 },
+            status: "awaiting_result_confirmation",
+          },
+        },
+        phase: "combat",
+        turn: 1,
+      },
+    });
+  });
 
   it.each([
     [2, "confederate", 2, "union"],
@@ -276,6 +350,150 @@ describe("Phase 2 stacking capacity", () => {
     if (!rejected.ok) {
       expect(rejected.failure.current_version).toBe(0);
     }
+  });
+
+  it("never permits friendly movement into an enemy-occupied hex", () => {
+    const current = state({
+      units: {
+        mover: unit("mover", "confederate", "infantry", "A1"),
+        enemyGeneral: unit("enemyGeneral", "union", "general", "B1"),
+      },
+    });
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command("moveUnit", { destination: "B1", unit_id: "mover" }),
+      ),
+    ).toMatchObject({ failure: { error: "occupied" }, ok: false });
+  });
+});
+
+describe("night movement and combat", () => {
+  const nightState = (units: Record<string, UnitState>) =>
+    state({ active_side: "confederate", night: true, turn: 8, units });
+
+  it.each([
+    ["moveUnit", { destination: "K6", unit_id: "nelson" }],
+    [
+      "moveStack",
+      {
+        destination: "K6",
+        unit_ids: ["nelson", "leader"],
+      },
+    ],
+  ] as const)("rejects %s into an enemy zone of control", (name, payload) => {
+    const units = {
+      leader: unit("leader", "confederate", "general", "L6"),
+      nelson: unit("nelson", "confederate", "artillery", "L6"),
+      union: unit("union", "union", "infantry", "J5"),
+    };
+    expect(
+      reduceGameplayCommand(
+        nightState(units),
+        "confederate",
+        command(name, payload),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "phase_invalid",
+        message:
+          "Night movement must withdraw from and may not enter an enemy zone of control.",
+      },
+      ok: false,
+    });
+  });
+
+  it("allows a counter to withdraw from an enemy zone of control", () => {
+    const current = nightState({
+      nelson: unit("nelson", "confederate", "artillery", "K6"),
+      union: unit("union", "union", "infantry", "J5"),
+    });
+    expect(
+      accept(
+        current,
+        "confederate",
+        command("moveUnit", { destination: "L6", unit_id: "nelson" }),
+      ).units.nelson,
+    ).toMatchObject({ location: "L6", movement_spent: 1 });
+  });
+
+  it("rejects reinforcement entry into an enemy night zone of control", () => {
+    const current = nightState({
+      reinforcement: unit("reinforcement", "confederate", "infantry", null, {
+        entry_hexes: ["K6"],
+        entry_turn: 8,
+      }),
+      union: unit("union", "union", "infantry", "J5"),
+    });
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command("enterReinforcement", {
+          destination: "K6",
+          unit_id: "reinforcement",
+        }),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "phase_invalid",
+        message:
+          "Reinforcements may not enter an enemy zone of control at night.",
+      },
+      ok: false,
+    });
+  });
+
+  it("requires every counter that can withdraw to move before combat", () => {
+    const current = nightState({
+      nelson: unit("nelson", "confederate", "artillery", "K6"),
+      union: unit("union", "union", "infantry", "J5"),
+    });
+    expect(
+      reduceGameplayCommand(current, "confederate", command("endPhase", {})),
+    ).toMatchObject({
+      failure: {
+        error: "phase_invalid",
+        message:
+          "Night movement cannot end while these counters can withdraw from enemy zones of control: nelson (K6).",
+      },
+      ok: false,
+    });
+  });
+
+  it("creates combat only when the active counter cannot withdraw", () => {
+    const trappedHex = "K6";
+    const units: Record<string, UnitState> = {
+      trapped: unit("trapped", "confederate", "infantry", trappedHex),
+    };
+    adjacentHexes(trappedHex).forEach((location, index) => {
+      units[`enemy-${index}`] = unit(
+        `enemy-${index}`,
+        "union",
+        "infantry",
+        location,
+      );
+    });
+    const next = accept(
+      nightState(units),
+      "confederate",
+      command("endPhase", {}),
+    );
+    expect(next.phase).toBe("combat");
+    const combat = Object.values(next.combats)[0];
+    expect(combat).toMatchObject({
+      attackers: ["trapped"],
+      status: "awaiting_result_confirmation",
+    });
+    expect([...combat!.defenders].sort()).toEqual([
+      "enemy-0",
+      "enemy-1",
+      "enemy-2",
+      "enemy-3",
+      "enemy-4",
+      "enemy-5",
+    ]);
   });
 });
 

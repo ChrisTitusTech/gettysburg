@@ -1,5 +1,7 @@
 import { type AddressInfo } from "node:net";
+import { randomUUID } from "node:crypto";
 
+import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
 
 import { createHttpApplication } from "./http.js";
@@ -138,6 +140,90 @@ describe("HTTP game lifecycle", () => {
       expect(replayResponse.status).toBe(409);
       expect(await replayResponse.json()).toMatchObject({
         error: "invitation_unavailable",
+      });
+    });
+  });
+
+  it("authorizes host invitation management and deletion with the session cookie", async () => {
+    await withServer(true, async (origin) => {
+      const createResponse = await fetch(`${origin}/api/games`, {
+        body: JSON.stringify({ seat: "union" }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      const created = (await createResponse.json()) as {
+        game_id: string;
+        invitation: { lookup_id: string; secret: string };
+        is_host: boolean;
+      };
+      expect(created.is_host).toBe(true);
+      const hostCookie = (createResponse.headers.get("set-cookie") ?? "").split(
+        ";",
+        1,
+      )[0]!;
+      const command = (
+        commandName: "deleteGame" | "issueInvitation" | "revokeInvitation",
+        payload: Record<string, unknown>,
+      ) => ({
+        command_id: randomUUID(),
+        command_name: commandName,
+        expected_version: 0,
+        game_id: created.game_id,
+        payload,
+        schema: COMMAND_SCHEMA_VERSION,
+      });
+
+      const revokeResponse = await fetch(
+        `${origin}/api/games/${created.game_id}/host-commands`,
+        {
+          body: JSON.stringify(
+            command("revokeInvitation", {
+              lookup_id: created.invitation.lookup_id,
+            }),
+          ),
+          headers: {
+            "content-type": "application/json",
+            cookie: hostCookie,
+          },
+          method: "POST",
+        },
+      );
+      expect(revokeResponse.status).toBe(200);
+
+      const issueResponse = await fetch(
+        `${origin}/api/games/${created.game_id}/host-commands`,
+        {
+          body: JSON.stringify(
+            command("issueInvitation", { seat: "confederate" }),
+          ),
+          headers: {
+            "content-type": "application/json",
+            cookie: hostCookie,
+          },
+          method: "POST",
+        },
+      );
+      expect(issueResponse.status).toBe(200);
+      expect(await issueResponse.json()).toMatchObject({
+        invitation: { secret: expect.any(String) },
+        ok: true,
+      });
+
+      const deleteResponse = await fetch(
+        `${origin}/api/games/${created.game_id}/host-commands`,
+        {
+          body: JSON.stringify(command("deleteGame", { confirm: true })),
+          headers: {
+            "content-type": "application/json",
+            cookie: hostCookie,
+          },
+          method: "POST",
+        },
+      );
+      expect(deleteResponse.status).toBe(200);
+      expect(await deleteResponse.json()).toMatchObject({
+        event: { command_name: "deleteGame", state_version: 0 },
+        ok: true,
       });
     });
   });

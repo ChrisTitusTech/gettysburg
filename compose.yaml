@@ -1,6 +1,6 @@
 services:
   db:
-    image: docker.io/library/postgres:18.1-alpine
+    image: docker.io/library/postgres@sha256:d326bec58d3de8d239df60475941522342723934a2598ae59a0281f077681462
     environment:
       POSTGRES_DB: gettysburg
       POSTGRES_HOST_AUTH_METHOD: trust
