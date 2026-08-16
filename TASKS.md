@@ -206,7 +206,11 @@ recorded below; no implementation or local-validation failure remains.
     and purge receipts now persist across restart and pass in-memory, HTTP, and
     real PostgreSQL tests. Invitation secrets returned by an idempotent
     issue retry are encrypted with the server-held key outside the database and
-    destroyed on claim or revocation. Gameplay, management, and audit actions
+    destroyed on claim or revocation. Invitation and operator-recovery claims
+    retain client idempotency across lost responses, host-only controls and
+    active invitation lookup IDs survive reload and seat surrender, and browser
+    recovery paths scrub bearer fragments before redemption. Gameplay,
+    management, and audit actions
     share the gap-free event sequence while management/audit events preserve the
     gameplay version. Backups encrypt the PostgreSQL dump and exported deletion
     ledger with age, record and verify the database ledger watermark, and are
@@ -219,16 +223,18 @@ recorded below; no implementation or local-validation failure remains.
     off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
   - Status: Rootless Quadlet services run revision
-    `9fd3f78618b9ae75b45d7ff225b8c510e9dee817`, recorded
+    `ff32de1eae5c500fe9630db9133854e672283fdf`, recorded
     by the image label and deployment rollback record behind host Caddy at
     `https://gettysburg.christitus.com`. Local/public health and readiness,
     non-root application UID/GID, internal-only application network,
-    image-revision label, public WebSocket origin,
-    two independent browser sessions, application restart/resume, PostgreSQL
+    image-revision label, public WebSocket origin, an automatic public
+    two-client state-synchronization transaction, two independent browser
+    sessions, application restart/resume, PostgreSQL
     restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
     pass. The post-deployment encrypted backup
-    `20260816T044115Z` passed strict checksums, remote isolated restore, off-host
-    copy validation, and the deletion-ledger watermark gate. The original Caddy
+    `20260816T054357Z` includes the encrypted credential pepper and passed strict
+    checksums, remote isolated restore (`12:48:47:11`), off-host copy validation,
+    and the deletion-ledger watermark gate. The original Caddy
     placeholder and failed candidate units were restored after each
     pre-acceptance deployment failure.
 - [x] Complete a full two-player Phase 2 acceptance game.
@@ -242,8 +248,8 @@ recorded below; no implementation or local-validation failure remains.
     Phase 2 diff, every validated finding was addressed, and the final focused
     reviews returned zero findings. The built-in Codex review completed a direct
     multi-pass review with every validated durability, deployment, readiness,
-    and backup finding addressed. PR #2's exact-head Application and
-    Documentation CI pass.
+    and backup finding addressed. PR #2 requires exact-head Application and
+    Documentation CI before merge.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown
