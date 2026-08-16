@@ -15,8 +15,18 @@ readonly rollback_root="${service_root}/backups/deploy-${timestamp}"
 
 candidate_revision=""
 candidate_image_id=""
-previous_app_unit=""
 previous_caddy=""
+readonly -a quadlet_files=(
+	gettysburg.network
+	gettysburg-db.volume
+	gettysburg-app.volume
+	gettysburg-db.container
+	gettysburg-app.container
+)
+readonly -a systemd_files=(
+	gettysburg-purge.service
+	gettysburg-purge.timer
+)
 
 run_user() {
 	runuser -u "${service_user}" -- env \
@@ -27,29 +37,48 @@ run_user() {
 }
 
 restore_previous_files() {
-	if [[ -n "${previous_app_unit}" && -f "${previous_app_unit}" ]]; then
-		install -o "${service_user}" -g "${service_user}" -m 0600 \
-			"${previous_app_unit}" "${quadlet_root}/gettysburg-app.container"
-	else
-		rm -f "${quadlet_root}/gettysburg-app.container"
+	run_user systemctl --user disable --now gettysburg-purge.timer || true
+	run_user systemctl --user stop gettysburg-app.service gettysburg-db.service || true
+	for filename in "${quadlet_files[@]}"; do
+		if [[ -f "${rollback_root}/quadlet/${filename}" ]]; then
+			install -o "${service_user}" -g "${service_user}" -m 0600 \
+				"${rollback_root}/quadlet/${filename}" "${quadlet_root}/${filename}"
+		else
+			rm -f "${quadlet_root}/${filename}"
+		fi
+	done
+	for filename in "${systemd_files[@]}"; do
+		if [[ -f "${rollback_root}/systemd/${filename}" ]]; then
+			install -o "${service_user}" -g "${service_user}" -m 0600 \
+				"${rollback_root}/systemd/${filename}" "${systemd_root}/${filename}"
+		else
+			rm -f "${systemd_root}/${filename}"
+		fi
+	done
+	run_user systemctl --user daemon-reload || true
+	if [[ -f "${rollback_root}/quadlet/gettysburg-db.container" ]]; then
+		run_user systemctl --user start gettysburg-db.service || true
+	fi
+	if [[ -f "${rollback_root}/quadlet/gettysburg-app.container" ]]; then
+		run_user systemctl --user start gettysburg-app.service || true
+	fi
+	if [[ -f "${rollback_root}/systemd/gettysburg-purge.timer" ]]; then
+		run_user systemctl --user enable --now gettysburg-purge.timer || true
 	fi
 	if [[ -n "${previous_caddy}" && -f "${previous_caddy}" ]]; then
 		install -o root -g root -m 0644 "${previous_caddy}" "${caddy_file}"
 		caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null
 		systemctl reload caddy
 	fi
-	run_user systemctl --user daemon-reload || true
-	run_user systemctl --user restart gettysburg-app.service || true
 }
 
 fail() {
 	local status=$?
 	trap - ERR
-	printf 'Deployment failed; restoring the previous application unit and Caddy configuration.\n' >&2
+	printf 'Deployment failed; restoring the previous units and Caddy configuration.\n' >&2
 	restore_previous_files
 	exit "${status}"
 }
-trap fail ERR
 
 if [[ "$(id -u)" -ne 0 ]]; then
 	printf 'Run this deployment script as root.\n' >&2
@@ -71,15 +100,23 @@ fi
 candidate_revision="$(git -C "${source_root}" rev-parse --verify HEAD)"
 install -d -o "${service_user}" -g "${service_user}" -m 0700 \
 	"${quadlet_root}" "${systemd_root}" "${secret_root}" "${rollback_root}"
+install -d -m 0700 "${rollback_root}/quadlet" "${rollback_root}/systemd"
 
-if [[ -f "${quadlet_root}/gettysburg-app.container" ]]; then
-	previous_app_unit="${rollback_root}/gettysburg-app.container"
-	cp -a "${quadlet_root}/gettysburg-app.container" "${previous_app_unit}"
-fi
+for filename in "${quadlet_files[@]}"; do
+	if [[ -f "${quadlet_root}/${filename}" ]]; then
+		cp -a "${quadlet_root}/${filename}" "${rollback_root}/quadlet/${filename}"
+	fi
+done
+for filename in "${systemd_files[@]}"; do
+	if [[ -f "${systemd_root}/${filename}" ]]; then
+		cp -a "${systemd_root}/${filename}" "${rollback_root}/systemd/${filename}"
+	fi
+done
 if [[ -f "${caddy_file}" ]]; then
 	previous_caddy="${rollback_root}/Caddyfile"
 	cp -a "${caddy_file}" "${previous_caddy}"
 fi
+trap fail ERR
 
 if [[ ! -f "${secret_root}/postgres.env" ]]; then
 	database_password="$(openssl rand -hex 32)"
@@ -107,7 +144,7 @@ if run_user podman container exists gettysburg-db &&
 	run_user "${source_root}/scripts/vps-backup.sh" >/dev/null
 fi
 
-for filename in gettysburg.network gettysburg-db.volume gettysburg-app.volume gettysburg-db.container; do
+for filename in "${quadlet_files[@]:0:4}"; do
 	install -o "${service_user}" -g "${service_user}" -m 0600 \
 		"${source_root}/ops/quadlet/${filename}" "${quadlet_root}/${filename}"
 done
@@ -116,13 +153,13 @@ sed "s|@IMAGE_ID@|${candidate_image_id}|g" \
 	>"${quadlet_root}/gettysburg-app.container"
 chown "${service_user}:${service_user}" "${quadlet_root}/gettysburg-app.container"
 chmod 0600 "${quadlet_root}/gettysburg-app.container"
-for filename in gettysburg-purge.service gettysburg-purge.timer; do
+for filename in "${systemd_files[@]}"; do
 	install -o "${service_user}" -g "${service_user}" -m 0600 \
 		"${source_root}/ops/systemd/${filename}" "${systemd_root}/${filename}"
 done
 
 run_user systemctl --user daemon-reload
-run_user systemctl --user enable --now gettysburg-db.service
+run_user systemctl --user start gettysburg-db.service
 for _ in {1..60}; do
 	if run_user podman healthcheck run gettysburg-db >/dev/null 2>&1; then
 		break
@@ -130,7 +167,7 @@ for _ in {1..60}; do
 	sleep 1
 done
 run_user podman healthcheck run gettysburg-db >/dev/null
-run_user systemctl --user enable --now gettysburg-app.service
+run_user systemctl --user start gettysburg-app.service
 run_user systemctl --user enable --now gettysburg-purge.timer
 
 for _ in {1..60}; do
