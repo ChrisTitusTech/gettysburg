@@ -20,6 +20,7 @@ COPY --from=build --chown=node:node /workspace/apps/server ./apps/server
 COPY --from=build --chown=node:node /workspace/apps/web/dist ./apps/web/dist
 COPY --from=build --chown=node:node /workspace/packages ./packages
 COPY --from=build --chown=node:node /workspace/scripts/public-smoke.mjs ./apps/server/public-smoke.mjs
+COPY --from=build --chown=node:node /workspace/scripts/container-entrypoint.sh ./scripts/container-entrypoint.sh
 
 VOLUME ["/var/lib/gettysburg"]
 
@@ -28,4 +29,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=2s --start-period=5s --retries=3 \
   CMD ["node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
 
-CMD ["node", "apps/server/dist/index.js"]
+CMD ["sh", "scripts/container-entrypoint.sh"]

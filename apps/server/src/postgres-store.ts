@@ -490,7 +490,7 @@ export class PostgresGameService implements GameService {
         "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
         [JSON.stringify(nextSnapshot)],
       );
-      await this.#mirrorSnapshot(client, nextSnapshot);
+      await this.#mirrorSnapshot(client, nextSnapshot, snapshot);
       await client.query("COMMIT");
       return value;
     } catch (error) {
@@ -510,8 +510,18 @@ export class PostgresGameService implements GameService {
     }
   }
 
-  async #mirrorSnapshot(client: PoolClient, snapshot: GameServiceSnapshot) {
-    for (const receipt of snapshot.deletionLedger ?? []) {
+  async #mirrorSnapshot(
+    client: PoolClient,
+    snapshot: GameServiceSnapshot,
+    previous?: GameServiceSnapshot,
+  ) {
+    const previousGames = new Map(previous?.games ?? []);
+    const changed = (current: unknown, prior: unknown) =>
+      JSON.stringify(current) !== JSON.stringify(prior);
+    const newReceipts = (snapshot.deletionLedger ?? []).slice(
+      previous?.deletionLedger?.length ?? 0,
+    );
+    for (const receipt of newReceipts) {
       await client.query(
         `INSERT INTO deletion_ledger
           (position, game_id, deleted_at, purged_at, actor)
@@ -550,6 +560,7 @@ export class PostgresGameService implements GameService {
       ]);
     }
     for (const [gameId, game] of snapshot.games) {
+      if (!changed(game, previousGames.get(gameId))) continue;
       if (game.deletedAt === null || game.deletedAt === undefined) continue;
       await client.query(
         "DELETE FROM recovery_grants WHERE game_id = $1::uuid",
@@ -575,6 +586,8 @@ export class PostgresGameService implements GameService {
     );
 
     for (const [gameId, game] of snapshot.games) {
+      const previousGame = previousGames.get(gameId);
+      if (!changed(game, previousGame)) continue;
       const state = game.state;
       await client.query(
         `INSERT INTO games
@@ -621,11 +634,17 @@ export class PostgresGameService implements GameService {
           JSON.stringify(state),
         ],
       );
-      for (const action of game.actions)
+      for (const action of game.actions.slice(
+        previousGame?.actions.length ?? 0,
+      ))
         await this.#insertAction(client, gameId, action);
     }
 
+    const previousSessions = new Map(
+      (previous?.sessions ?? []).map((session) => [session.id, session]),
+    );
     for (const session of snapshot.sessions) {
+      if (!changed(session, previousSessions.get(session.id))) continue;
       await client.query(
         `INSERT INTO browser_sessions (id, credential_hash, expires_at, revoked_at)
          VALUES ($1::uuid, $2, $3, $4)
@@ -639,7 +658,11 @@ export class PostgresGameService implements GameService {
         ],
       );
     }
+    const previousHostBindings = new Map(
+      (previous?.hostBindings ?? []).map((binding) => [binding.id, binding]),
+    );
     for (const binding of snapshot.hostBindings) {
+      if (!changed(binding, previousHostBindings.get(binding.id))) continue;
       await client.query(
         `INSERT INTO host_bindings
           (id, game_id, browser_session_id, binding_version, revoked_at)
@@ -654,7 +677,11 @@ export class PostgresGameService implements GameService {
         ],
       );
     }
+    const previousSeatBindings = new Map(
+      (previous?.seatBindings ?? []).map((binding) => [binding.id, binding]),
+    );
     for (const binding of snapshot.seatBindings) {
+      if (!changed(binding, previousSeatBindings.get(binding.id))) continue;
       await client.query(
         `INSERT INTO seat_bindings
           (id, game_id, side, browser_session_id, binding_version, revoked_at)
@@ -670,7 +697,10 @@ export class PostgresGameService implements GameService {
         ],
       );
     }
+    const previousInvitations = new Map(previous?.invitations ?? []);
     for (const [, invitation] of snapshot.invitations) {
+      if (!changed(invitation, previousInvitations.get(invitation.lookupId)))
+        continue;
       await client.query(
         `INSERT INTO invitations
           (lookup_id, game_id, allowed_side, token_hash, expires_at, claimed_at, revoked_at)
@@ -688,7 +718,9 @@ export class PostgresGameService implements GameService {
         ],
       );
     }
+    const previousGrants = new Map(previous?.recoveryGrants ?? []);
     for (const [, grant] of snapshot.recoveryGrants) {
+      if (!changed(grant, previousGrants.get(grant.lookupId))) continue;
       await client.query(
         `INSERT INTO recovery_grants
           (lookup_id, game_id, target_binding_type, side, target_binding_id,

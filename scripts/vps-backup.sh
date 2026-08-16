@@ -5,17 +5,9 @@ readonly backup_root="${GETTYSBURG_BACKUP_ROOT:-/srv/gettysburg/backups}"
 readonly container_name="${GETTYSBURG_DB_CONTAINER:-gettysburg-db}"
 readonly app_volume_name="${GETTYSBURG_APP_VOLUME:-gettysburg-app-state}"
 readonly recipient_file="${GETTYSBURG_BACKUP_AGE_RECIPIENT_FILE:-/srv/gettysburg/.config/gettysburg/backup-age-recipient}"
-timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-readonly timestamp
-readonly backup_dir="${backup_root}/${timestamp}"
-readonly dump_encrypted="${backup_dir}/gettysburg.dump.age"
-readonly ledger_plaintext="${backup_dir}/deletion-ledger.json"
-readonly ledger_encrypted="${ledger_plaintext}.age"
-readonly ledger_watermark_file="${backup_dir}/deletion-ledger-watermark"
-readonly pepper_encrypted="${backup_dir}/credential-pepper.age"
 backup_complete=false
 
-for command in age find podman sha256sum; do
+for command in age find flock podman sha256sum; do
 	command -v "${command}" >/dev/null
 done
 
@@ -28,7 +20,18 @@ if [[ ! -s "${recipient_file}" ]]; then
 	exit 1
 fi
 
-install -d -m 0700 "${backup_root}" "${backup_dir}"
+install -d -m 0700 "${backup_root}"
+exec 9>"${backup_root}/.backup.lock"
+flock --exclusive --timeout 900 9
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+readonly timestamp
+readonly backup_dir="${backup_root}/${timestamp}"
+readonly dump_encrypted="${backup_dir}/gettysburg.dump.age"
+readonly ledger_plaintext="${backup_dir}/deletion-ledger.json"
+readonly ledger_encrypted="${ledger_plaintext}.age"
+readonly ledger_watermark_file="${backup_dir}/deletion-ledger-watermark"
+readonly pepper_encrypted="${backup_dir}/credential-pepper.age"
+install -d -m 0700 "${backup_dir}"
 cleanup_backup() {
 	rm -f -- "${ledger_plaintext}"
 	if [[ "${backup_complete}" != true ]]; then

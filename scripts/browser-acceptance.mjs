@@ -50,18 +50,24 @@ async function stopServer(server) {
     assert.equal(server.exitCode, 0);
     return;
   }
-  const exitCode = await new Promise((resolveExit, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Browser server did not stop")),
-      10_000,
-    );
+  let escalated = false;
+  const exitCode = await new Promise((resolveExit) => {
+    const timeout = setTimeout(() => {
+      escalated = true;
+      server.kill("SIGKILL");
+    }, 10_000);
     server.once("exit", (code) => {
       clearTimeout(timeout);
       resolveExit(code);
     });
     server.kill("SIGTERM");
   });
-  assert.equal(exitCode, 0);
+  if (escalated) {
+    console.error("Browser server required SIGKILL during cleanup");
+    process.exitCode = 1;
+  } else {
+    assert.equal(exitCode, 0);
+  }
 }
 
 function watchPage(page, issues) {
@@ -371,35 +377,33 @@ await mkdir(evidenceDirectory, { recursive: true });
 const configuredOrigin = process.env.GETTYSBURG_ACCEPTANCE_ORIGIN;
 const port = configuredOrigin === undefined ? await reservePort() : undefined;
 const origin = configuredOrigin ?? `http://127.0.0.1:${port}`;
-const postgres =
-  configuredOrigin === undefined ? await startPostgres() : undefined;
-const runtimeDirectory =
-  configuredOrigin === undefined
-    ? await mkdtemp(join(tmpdir(), "gettysburg-browser-"))
-    : undefined;
 let output = "";
-const server =
-  configuredOrigin === undefined
-    ? spawn(process.execPath, ["apps/server/dist/index.js"], {
-        env: {
-          ...process.env,
-          DATABASE_URL: postgres.connectionString,
-          GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
-            runtimeDirectory,
-            "credential-pepper",
-          ),
-          GETTYSBURG_SERVER_HOST: "127.0.0.1",
-          GETTYSBURG_SERVER_PORT: String(port),
-          GETTYSBURG_TRUSTED_ORIGIN: origin,
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      })
-    : undefined;
-server?.stdout.on("data", (chunk) => (output += String(chunk)));
-server?.stderr.on("data", (chunk) => (output += String(chunk)));
-
+let postgres;
+let runtimeDirectory;
+let server;
 let browser;
 try {
+  if (configuredOrigin === undefined) {
+    postgres = await startPostgres();
+    runtimeDirectory = await mkdtemp(join(tmpdir(), "gettysburg-browser-"));
+    server = spawn(process.execPath, ["apps/server/dist/index.js"], {
+      env: {
+        ...process.env,
+        DATABASE_URL: postgres.connectionString,
+        GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+          runtimeDirectory,
+          "credential-pepper",
+        ),
+        GETTYSBURG_SERVER_HOST: "127.0.0.1",
+        GETTYSBURG_SERVER_PORT: String(port),
+        GETTYSBURG_TRUSTED_ORIGIN: origin,
+      },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    server.stdout.on("data", (chunk) => (output += String(chunk)));
+    server.stderr.on("data", (chunk) => (output += String(chunk)));
+  }
+
   await waitForReadiness(origin, () => output);
   browser = await chromium.launch({ headless: true });
   await runScenario(browser, origin, {

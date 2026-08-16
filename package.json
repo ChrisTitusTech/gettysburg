@@ -20,6 +20,7 @@
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "@colyseus/sdk": "0.17.43",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",
     "@types/node": "26.2.0",

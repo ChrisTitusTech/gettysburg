@@ -82,6 +82,10 @@ proves the saved browser session resumes before clean shutdown.
 For an interactive same-origin proxy path, run:
 
 ```bash
+install -d -m 0700 .secrets
+umask 077
+openssl rand -hex 32 >.secrets/postgres-password
+chmod 0444 .secrets/postgres-password
 podman compose up --build
 ```
 

@@ -98,6 +98,7 @@ podman exec "${container_name}" pg_isready \
 podman exec --interactive "${container_name}" pg_restore \
 	--username=gettysburg \
 	--dbname=gettysburg \
+	--exit-on-error \
 	--no-owner \
 	--no-privileges <"${dump_plaintext}"
 
