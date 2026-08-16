@@ -32,13 +32,14 @@ readonly -a systemd_files=(
 	gettysburg-purge.timer
 )
 
-run_user() {
+run_user() (
+	cd "${service_root}"
 	runuser -u "${service_user}" -- env \
 		HOME="${service_root}" \
 		XDG_RUNTIME_DIR="/run/user/${service_uid}" \
 		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${service_uid}/bus" \
 		"$@"
-}
+)
 
 restore_previous_files() {
 	run_user systemctl --user disable --now gettysburg-purge.timer || true
