@@ -1357,6 +1357,13 @@ export class InMemoryGameService {
         "Command targets another game.",
       );
     }
+    if (game.commandResults.has(command.command_id)) {
+      return this.#failure(
+        game.state,
+        "command_id_conflict",
+        "Command identifier was already used by a gameplay command.",
+      );
+    }
 
     const canonicalHash = canonicalHostManagementCommandHash(command);
     const previous = game.hostCommandResults.get(command.command_id);
@@ -1634,6 +1641,13 @@ export class InMemoryGameService {
         game.state,
         "unauthorized",
         "Command targets another game.",
+      );
+    }
+    if (game.hostCommandResults.has(command.command_id)) {
+      return this.#failure(
+        game.state,
+        "command_id_conflict",
+        "Command identifier was already used by a host-management command.",
       );
     }
 

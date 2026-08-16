@@ -68,6 +68,7 @@ export interface CombatConfirmation {
 export interface CombatState {
   readonly attacker_loss_allocated: boolean;
   readonly attacker_retreated: boolean;
+  readonly attacker_hexes?: readonly HexCoordinate[];
   readonly attackers: readonly string[];
   readonly confirmation: CombatConfirmation | null;
   readonly defender_loss_allocated: boolean;

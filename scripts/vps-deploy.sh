@@ -18,6 +18,7 @@ readonly maintenance_caddy="${rollback_root}/Caddyfile.maintenance"
 candidate_revision=""
 candidate_image_id=""
 candidate_exposed=false
+candidate_migration_started=false
 previous_caddy=""
 service_uid=""
 readonly -a quadlet_files=(
@@ -95,8 +96,8 @@ restore_previous_files() {
 fail() {
 	local status=$?
 	trap - ERR
-	if [[ "${candidate_exposed}" == true ]]; then
-		printf 'Deployment failed after the candidate traffic switch; keeping the candidate and restoring maintenance mode instead of starting an older ruleset.\n' >&2
+	if [[ "${candidate_exposed}" == true || "${candidate_migration_started}" == true ]]; then
+		printf 'Deployment failed after candidate migration startup; keeping maintenance mode instead of starting older code against the migrated database.\n' >&2
 		install -o root -g root -m 0644 "${maintenance_caddy}" "${caddy_file}" || true
 		caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null 2>&1 || true
 		systemctl reload caddy || true
@@ -237,6 +238,7 @@ done
 run_user systemctl --user daemon-reload
 run_user systemctl --user start gettysburg-db.service
 wait_for_database_health
+candidate_migration_started=true
 run_user systemctl --user restart gettysburg-app.service
 
 for _ in {1..60}; do

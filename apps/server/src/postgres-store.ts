@@ -450,11 +450,17 @@ export class PostgresGameService implements GameService {
     input: unknown,
     options: { afterCommit?: () => void } = {},
   ) {
-    const result = await this.#mutate((service) =>
-      service.executeCommand(authorization, input),
-    );
-    options.afterCommit?.();
-    return result;
+    const execution = await this.#mutate((service) => {
+      let committed = false;
+      const result = service.executeCommand(authorization, input, {
+        afterCommit: () => {
+          committed = true;
+        },
+      });
+      return { committed, result };
+    });
+    if (execution.committed) options.afterCommit?.();
+    return execution.result;
   }
 
   async executeHostCommand(

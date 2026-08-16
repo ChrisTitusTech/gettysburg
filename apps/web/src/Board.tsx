@@ -314,6 +314,36 @@ export function Board({
 
   function moveSelected(target: HexCoordinate) {
     if (selectedUnit === undefined || selectedUnit.location === null) return;
+    if (disabled) {
+      setMovementNotice("Waiting for the authoritative server.");
+      return;
+    }
+    const retreat = retreatContext(selectedUnit.id);
+    if (retreat !== null) {
+      const path = retreatPath(selectedUnit.location, target, retreat.unitIds);
+      if (path.length <= 1) {
+        setMovementNotice("Choose a connected path to the first empty hex.");
+        return;
+      }
+      const destination = path.at(-1)!;
+      setMovementNotice(
+        `Submitting ${retreat.unitIds.length}-counter retreat to ${destination}.`,
+      );
+      onRetreat(retreat.combatId, retreat.unitIds, path);
+      return;
+    }
+    const advance = advanceContext(selectedUnit.id, selectedSingle);
+    if (advance !== null) {
+      if (!advance.destinationHexes.includes(target)) {
+        setMovementNotice("Choose a highlighted advance destination.");
+        return;
+      }
+      setMovementNotice(
+        `Submitting ${advance.unitIds.length}-counter advance to ${target}.`,
+      );
+      onAdvance(advance.combatId, advance.unitIds, target);
+      return;
+    }
     const unitIds = selectedIds();
     if (!canMoveStack(unitIds)) {
       setMovementNotice("This counter cannot move during the current phase.");
@@ -339,6 +369,24 @@ export function Board({
     }
     setMovementNotice(`Submitting ${distance} movement to ${target}.`);
     onMove(unitIds, target);
+  }
+
+  function declineSelectedAdvance() {
+    if (disabled) {
+      setMovementNotice("Waiting for the authoritative server.");
+      return;
+    }
+    if (selectedUnitId === null) {
+      setMovementNotice("Select an eligible counter before declining advance.");
+      return;
+    }
+    const advance = advanceContext(selectedUnitId, selectedSingle);
+    if (advance === null) {
+      setMovementNotice("The selected counter cannot decline this advance.");
+      return;
+    }
+    setMovementNotice("Submitting declined advance.");
+    onAdvance(advance.combatId, advance.unitIds, null);
   }
 
   function handleCounterKey(event: KeyboardEvent<SVGGElement>, unitId: string) {
@@ -676,12 +724,21 @@ export function Board({
           )}
           {pendingAdvance?.pending_choice?.kind !== "advance" ? null : (
             <g
-              aria-label="Decline advance drop zone"
+              aria-label="Decline advance"
               className={`advance-decline-target${unitDrag?.decline === true ? " active" : ""}`}
               data-decline-height={declineTarget.height}
               data-decline-width={declineTarget.width}
               data-decline-x={declineTarget.x}
               data-decline-y={declineTarget.y}
+              onClick={declineSelectedAdvance}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  declineSelectedAdvance();
+                }
+              }}
+              role="button"
+              tabIndex={0}
             >
               <rect
                 height={declineTarget.height}

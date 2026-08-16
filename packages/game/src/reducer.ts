@@ -510,6 +510,7 @@ function declareCombat(
   const combat: CombatState = {
     attacker_loss_allocated: false,
     attacker_retreated: false,
+    attacker_hexes: [...attackerHexes].sort() as HexCoordinate[],
     attackers,
     confirmation: null,
     defender_loss_allocated: false,
@@ -606,7 +607,12 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
     const combatIds = combat.attackers.filter(
       (id) => state.units[id]?.status === "deployed",
     );
-    const ids = stackedUnitsForSide(state, combatIds, state.active_side!);
+    const ids = stackedUnitsForSide(
+      state,
+      combatIds,
+      state.active_side!,
+      combat.attacker_hexes,
+    );
     if (ids.length > 0)
       choice = { kind: "retreat", side: state.active_side!, unit_ids: ids };
   } else if (!combat.defender_retreated && confirmation.defender_retreat) {
@@ -617,6 +623,7 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
       state,
       combatIds,
       otherSide(state.active_side!),
+      combat.defender_hexes,
     );
     if (ids.length > 0)
       choice = {
@@ -648,12 +655,14 @@ function stackedUnitsForSide(
   state: GameState,
   combatUnitIds: readonly string[],
   side: Side,
+  participantHexes?: readonly HexCoordinate[],
 ): string[] {
   const locations = new Set(
-    combatUnitIds.flatMap((id) => {
-      const location = state.units[id]?.location;
-      return location === null || location === undefined ? [] : [location];
-    }),
+    participantHexes ??
+      combatUnitIds.flatMap((id) => {
+        const location = state.units[id]?.location;
+        return location === null || location === undefined ? [] : [location];
+      }),
   );
   const ids = [...combatUnitIds];
   for (const unit of Object.values(state.units)) {
@@ -1200,6 +1209,7 @@ function endPhase(
         const combat: CombatState = {
           attacker_loss_allocated: false,
           attacker_retreated: false,
+          attacker_hexes: skirmish.attacker_hexes,
           attackers: skirmish.attackers,
           confirmation: null,
           defender_loss_allocated: false,

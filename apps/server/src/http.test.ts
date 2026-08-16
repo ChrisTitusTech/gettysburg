@@ -1,5 +1,5 @@
 import { type AddressInfo } from "node:net";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
 import { describe, expect, it, vi } from "vitest";
@@ -111,6 +111,39 @@ describe("service health", () => {
 });
 
 describe("HTTP game lifecycle", () => {
+  it("rate-limits distinct anonymous creations while allowing retries", async () => {
+    await withServer(true, async (origin) => {
+      const requests = Array.from({ length: 10 }, () => ({
+        creationCredential: randomBytes(32).toString("base64url"),
+        creationId: randomUUID(),
+      }));
+      const create = (request: (typeof requests)[number]) =>
+        fetch(`${origin}/api/games`, {
+          body: JSON.stringify({
+            creation_credential: request.creationCredential,
+            creation_id: request.creationId,
+            seat: "union",
+          }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        });
+
+      for (const request of requests) {
+        expect((await create(request)).status).toBe(201);
+      }
+      expect((await create(requests[9]!)).status).toBe(201);
+      const limited = await create({
+        creationCredential: randomBytes(32).toString("base64url"),
+        creationId: randomUUID(),
+      });
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("retry-after")).toBe("900");
+      expect(await limited.json()).toEqual({
+        error: "creation_rate_limited",
+      });
+    });
+  });
+
   it("rejects a malformed creation id distinctly from the seat", async () => {
     await withServer(true, async (origin) => {
       const response = await fetch(`${origin}/api/games`, {

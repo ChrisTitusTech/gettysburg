@@ -522,6 +522,17 @@ describe("Board", () => {
       ["devin", "gamble", "buford"],
       ["M9", retreatTarget],
     );
+    onRetreat.mockClear();
+    fireEvent.keyDown(counter, { key: "Enter" });
+    fireEvent.keyDown(
+      container.querySelector(`[data-coordinate="${retreatTarget}"]`)!,
+      { key: "Enter" },
+    );
+    expect(onRetreat).toHaveBeenCalledWith(
+      combatId,
+      ["devin", "gamble", "buford"],
+      ["M9", retreatTarget],
+    );
   });
 
   it("drag-advances a stack, Ctrl-advances one, and drag-declines", () => {
@@ -660,6 +671,24 @@ describe("Board", () => {
     });
     expect(tray).toHaveClass("active");
     fireEvent.pointerUp(trayPoint.svg, { pointerId: 7 });
+    expect(declineAdvance).toHaveBeenCalledWith(
+      combatId,
+      ["fixture-confederate-1", "fixture-general"],
+      null,
+    );
+    declineAdvance.mockClear();
+    fireEvent.keyDown(thirdCounter, { key: "Enter" });
+    fireEvent.keyDown(
+      third.container.querySelector('[data-coordinate="G5"]')!,
+      { key: "Enter" },
+    );
+    expect(declineAdvance).toHaveBeenCalledWith(
+      combatId,
+      ["fixture-confederate-1", "fixture-general"],
+      "G5",
+    );
+    declineAdvance.mockClear();
+    fireEvent.keyDown(tray, { key: "Enter" });
     expect(declineAdvance).toHaveBeenCalledWith(
       combatId,
       ["fixture-confederate-1", "fixture-general"],

@@ -102,12 +102,14 @@ export function createGettysburgRoom(
               return;
             }
             const authorization = client.auth as GameAuthorization;
+            let committed = false;
             const result = await gameService.executeCommand(
               authorization,
               message,
+              { afterCommit: () => (committed = true) },
             );
             client.send("commandResult", result);
-            if (result.ok) {
+            if (result.ok && committed) {
               this.broadcast("gameplayEvent", result.event);
               this.broadcast("snapshot", result.state);
             }

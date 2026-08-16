@@ -828,16 +828,76 @@ describe("authoritative gameplay commands", () => {
     const authorization = service.authenticate(host.credential, host.gameId);
     const commandId = randomUUID();
     const command = endPhaseCommand(host.gameId, 0, commandId);
+    let commitCount = 0;
 
-    const first = service.executeCommand(authorization, command);
-    expect(service.executeCommand(authorization, command)).toEqual(first);
+    const first = service.executeCommand(authorization, command, {
+      afterCommit: () => (commitCount += 1),
+    });
+    expect(
+      service.executeCommand(authorization, command, {
+        afterCommit: () => (commitCount += 1),
+      }),
+    ).toEqual(first);
     expect(
       service.executeCommand(
         authorization,
         moveCommand(host.gameId, 0, "u-wadsworth", "E3", commandId),
       ),
     ).toMatchObject({ error: "command_id_conflict", ok: false });
+    expect(commitCount).toBe(1);
     expect(service.getActions(host.gameId)).toHaveLength(1);
+  });
+
+  it("rejects command identifiers reused across command namespaces", () => {
+    const service = new InMemoryGameService();
+    const first = service.createGame("union");
+    const firstSeat = service.authenticate(first.credential, first.gameId);
+    const firstHost = service.authenticateHost(first.credential, first.gameId);
+    const gameplayId = randomUUID();
+    expect(
+      service.executeCommand(
+        firstSeat,
+        endPhaseCommand(first.gameId, 0, gameplayId),
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      service.executeHostCommand(
+        firstHost,
+        hostCommand(
+          first.gameId,
+          1,
+          "revokeInvitation",
+          { lookup_id: first.invitation.lookup_id },
+          gameplayId,
+        ),
+      ),
+    ).toMatchObject({ error: "command_id_conflict", ok: false });
+
+    const second = service.createGame("union", first.credential);
+    const secondSeat = service.authenticate(second.credential, second.gameId);
+    const secondHost = service.authenticateHost(
+      second.credential,
+      second.gameId,
+    );
+    const hostId = randomUUID();
+    expect(
+      service.executeHostCommand(
+        secondHost,
+        hostCommand(
+          second.gameId,
+          0,
+          "revokeInvitation",
+          { lookup_id: second.invitation.lookup_id },
+          hostId,
+        ),
+      ),
+    ).toMatchObject({ ok: true });
+    expect(
+      service.executeCommand(
+        secondSeat,
+        endPhaseCommand(second.gameId, 0, hostId),
+      ),
+    ).toMatchObject({ error: "command_id_conflict", ok: false });
   });
 
   it("does not disclose a duplicate result to another seat binding", () => {

@@ -885,6 +885,11 @@ describe("automatic combat workflow", () => {
         reduced_combat: null,
         steps_remaining: 1,
       }),
+      defenderGeneral: unit("defenderGeneral", "union", "general", "B1", {
+        combat: null,
+        reduced_combat: null,
+        steps_remaining: 1,
+      }),
     };
     let current = accept(
       state({ phase: "combat", units: oneStepUnits }),
@@ -920,6 +925,11 @@ describe("automatic combat workflow", () => {
       status: "eliminated",
       steps_remaining: 0,
       strength: "eliminated",
+    });
+    expect(current.combats[combatId]?.pending_choice).toEqual({
+      kind: "retreat",
+      side: "union",
+      unit_ids: ["defenderGeneral"],
     });
   });
 });
