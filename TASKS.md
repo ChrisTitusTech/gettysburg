@@ -180,15 +180,16 @@ implementation or local-validation failure remains.
     exact running revision, WebSocket, restart/resume, and two-client state
     synchronization must then pass.
   - Status: The code and review cleanup merged through PR #3 as `c6f406f`.
-    The operational-repair branch replaces the quote-fragile Quadlet expression
-    with a compiled readiness probe, makes container smoke assert healthy and
-    intentionally unhealthy states, and preserves the primary browser-acceptance
-    error when cleanup also fails. Its complete local repository gate,
-    desktop/tablet browser acceptance, rootless Podman health-state smoke, source
-    boundary, and generated-Quadlet checks pass. The task remains open until the
-    repair PR passes exact-head CI and review, merges, the verified off-host
-    watermark covers the database ledger, current `main` is deployed, and the
-    complete live release gate passes.
+    PR #4 on `codex/phase-2-operational-repair` replaces the quote-fragile
+    Quadlet expression with a compiled readiness probe, makes container smoke
+    assert healthy and intentionally unhealthy states, and preserves the primary
+    browser-acceptance error when cleanup also fails. Its complete local
+    repository gate, desktop/tablet browser acceptance, rootless Podman
+    health-state smoke, source boundary, generated-Quadlet checks, and built-in
+    review pass. The task remains open until PR #4 passes exact-head CI and
+    independent review, merges, the verified off-host watermark covers the
+    database ledger, current `main` is deployed, and the complete live release
+    gate passes.
 
 - [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
