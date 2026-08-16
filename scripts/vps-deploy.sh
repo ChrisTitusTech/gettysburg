@@ -167,7 +167,7 @@ for _ in {1..60}; do
 	sleep 1
 done
 run_user podman healthcheck run gettysburg-db >/dev/null
-run_user systemctl --user start gettysburg-app.service
+run_user systemctl --user restart gettysburg-app.service
 run_user systemctl --user enable --now gettysburg-purge.timer
 
 for _ in {1..60}; do
@@ -179,6 +179,19 @@ for _ in {1..60}; do
 done
 curl --fail --silent --show-error --max-time 5 \
 	http://127.0.0.1:3000/readyz >/dev/null
+
+running_image_id="$(run_user podman inspect \
+	--format '{{.Image}}' gettysburg-app)"
+if [[ "${running_image_id}" != "${candidate_image_id}" ]]; then
+	printf 'Running image %s does not match candidate %s.\n' \
+		"${running_image_id}" "${candidate_image_id}" >&2
+	false
+fi
+if [[ "$(run_user podman exec gettysburg-app node \
+	--input-type=module -e 'process.stdout.write(String(process.getuid()))')" == 0 ]]; then
+	printf 'The application container is running as root.\n' >&2
+	false
+fi
 
 install -o root -g root -m 0644 "${source_root}/ops/Caddyfile.vps" "${caddy_file}"
 caddy fmt --overwrite "${caddy_file}"
