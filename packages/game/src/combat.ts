@@ -9,6 +9,7 @@ import {
 } from "./protocol.js";
 
 const MAX_EXACT_COVER_VERTICES = 20;
+const MAX_EXACT_COVER_STATES = 50_000;
 
 export interface CombatOpportunity {
   readonly attacker_hexes: readonly HexCoordinate[];
@@ -270,6 +271,8 @@ function separateOpportunity(
     bigint,
     readonly (typeof indexedCandidates)[number][] | null
   >();
+  let exactStates = 0;
+  let exactSearchExhausted = false;
   const better = (
     left: readonly (typeof indexedCandidates)[number][],
     right: readonly (typeof indexedCandidates)[number][] | null,
@@ -292,6 +295,11 @@ function separateOpportunity(
     if (remaining === 0n) return [];
     const cached = memo.get(remaining);
     if (cached !== undefined) return cached;
+    if (exactStates >= MAX_EXACT_COVER_STATES) {
+      exactSearchExhausted = true;
+      return null;
+    }
+    exactStates += 1;
 
     let options: typeof indexedCandidates | null = null;
     for (let index = 0; index < vertices.length; index += 1) {
@@ -363,10 +371,12 @@ function separateOpportunity(
     }
     return selected;
   };
+  const exactSolution =
+    vertices.length <= MAX_EXACT_COVER_VERTICES ? solve(allVertices) : null;
   const solution =
-    vertices.length <= MAX_EXACT_COVER_VERTICES
-      ? solve(allVertices)
-      : solveGreedily();
+    vertices.length > MAX_EXACT_COVER_VERTICES || exactSearchExhausted
+      ? solveGreedily()
+      : exactSolution;
   if (solution === null) return [opportunity];
   return solution
     .map((candidate) => candidate.opportunity)

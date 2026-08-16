@@ -34,16 +34,22 @@ WITH ledger_base AS (
     g.id,
     g.deleted_at,
     coalesce(
-      nullif(snapshot_game.value->1->>'deletedBy', ''),
+      nullif(
+        (
+          SELECT snapshot_game.value->1->>'deletedBy'
+          FROM service_state AS service
+          CROSS JOIN LATERAL jsonb_array_elements(
+            coalesce(service.snapshot->'games', '[]'::jsonb)
+          ) AS snapshot_game(value)
+          WHERE snapshot_game.value->>0 = g.id::text
+          LIMIT 1
+        ),
+        ''
+      ),
       'migration-v3-backfill'
     ) AS actor,
     row_number() OVER (ORDER BY g.deleted_at, g.id) AS ordinal
   FROM games AS g
-  CROSS JOIN service_state AS service
-  LEFT JOIN LATERAL jsonb_array_elements(
-    coalesce(service.snapshot->'games', '[]'::jsonb)
-  ) AS snapshot_game(value)
-    ON snapshot_game.value->>0 = g.id::text
   WHERE g.deleted_at IS NOT NULL
     AND NOT EXISTS (
       SELECT 1 FROM deletion_ledger AS receipt WHERE receipt.game_id = g.id

@@ -42,7 +42,6 @@ export function createGettysburgRoom(
   eventBus?: GameEventBus,
 ): GameRoomConstructor {
   return class GettysburgRoom extends Room {
-    override autoDispose = false;
     override maxClients = 2;
     #gameId = "";
     #unsubscribeManagement: (() => void) | undefined;

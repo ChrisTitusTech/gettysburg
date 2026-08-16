@@ -46,11 +46,10 @@ async function waitForReadiness(origin, serverOutput) {
 }
 
 async function stopServer(server) {
-  if (server.exitCode !== null) {
+  if (server.exitCode !== null || server.signalCode !== null) {
     assert.equal(server.exitCode, 0);
     return;
   }
-  server.kill("SIGTERM");
   const exitCode = await new Promise((resolveExit, reject) => {
     const timeout = setTimeout(
       () => reject(new Error("Browser server did not stop")),
@@ -60,6 +59,7 @@ async function stopServer(server) {
       clearTimeout(timeout);
       resolveExit(code);
     });
+    server.kill("SIGTERM");
   });
   assert.equal(exitCode, 0);
 }

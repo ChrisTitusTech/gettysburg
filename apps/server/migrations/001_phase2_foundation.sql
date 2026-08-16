@@ -69,6 +69,9 @@ CREATE TABLE IF NOT EXISTS invitations (
   revoked_at timestamptz
 );
 
+CREATE INDEX IF NOT EXISTS invitations_game_id_idx
+  ON invitations (game_id);
+
 CREATE TABLE IF NOT EXISTS recovery_grants (
   lookup_id uuid PRIMARY KEY,
   game_id uuid NOT NULL REFERENCES games(id),
@@ -82,6 +85,9 @@ CREATE TABLE IF NOT EXISTS recovery_grants (
   consumed_at timestamptz,
   revoked_at timestamptz
 );
+
+CREATE INDEX IF NOT EXISTS recovery_grants_game_id_idx
+  ON recovery_grants (game_id);
 
 CREATE TABLE IF NOT EXISTS actions (
   id bigserial PRIMARY KEY,

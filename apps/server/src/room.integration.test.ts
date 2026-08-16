@@ -5,6 +5,7 @@ import {
   Client as ColyseusClient,
   type Room as ClientRoom,
 } from "@colyseus/sdk";
+import { matchMaker } from "@colyseus/core";
 import {
   COMMAND_SCHEMA_VERSION,
   type CommandResult,
@@ -76,6 +77,47 @@ describe("Colyseus authoritative room", () => {
       await server.gracefullyShutdown(false);
       server = undefined;
     }
+  });
+
+  it("disposes an empty room and reconstructs it from authoritative state", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const cookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const first = await new ColyseusClient(origin, {
+      headers: { cookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(first);
+    const firstRoomId = first.roomId;
+    await first.leave(true);
+    rooms.splice(rooms.indexOf(first), 1);
+    const disposalDeadline = Date.now() + 1_000;
+    while (
+      (await matchMaker.query({ roomId: firstRoomId })).length > 0 &&
+      Date.now() < disposalDeadline
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    expect(await matchMaker.query({ roomId: firstRoomId })).toHaveLength(0);
+
+    const reconstructed = await new ColyseusClient(origin, {
+      headers: { cookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(reconstructed);
+
+    expect(reconstructed.roomId).not.toBe(firstRoomId);
   });
 
   it("synchronizes two seats, rejects bad commands, and resumes latest state", async () => {

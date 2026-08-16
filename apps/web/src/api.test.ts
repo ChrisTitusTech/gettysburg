@@ -22,6 +22,20 @@ describe("API requests", () => {
     await expect(createGame("union")).rejects.toThrow("Upstream unavailable");
   });
 
+  it.each(["null", "[]", "true", '"text"'])(
+    "rejects a successful non-object JSON response %s",
+    async (body) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
+      );
+
+      await expect(createGame("union")).rejects.toThrow(
+        "Server returned an invalid response.",
+      );
+    },
+  );
+
   it("times out a request without AbortSignal.timeout support", async () => {
     vi.useFakeTimers();
     vi.stubGlobal(

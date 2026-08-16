@@ -9,8 +9,12 @@ export class GameEventBus {
   >();
 
   publishManagement(gameId: string, event: ManagementEvent): void {
-    for (const listener of this.#managementListeners.get(gameId) ?? []) {
-      listener(structuredClone(event));
+    for (const listener of [...(this.#managementListeners.get(gameId) ?? [])]) {
+      try {
+        listener(structuredClone(event));
+      } catch (error) {
+        console.error("Management event listener failed.", { error, gameId });
+      }
     }
   }
 

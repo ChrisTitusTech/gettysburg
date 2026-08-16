@@ -40,10 +40,29 @@ export function nightMovementPath(
   const path = shortestHexPath(origin, destination);
   if (!state.night) return path;
   const enemyZoc = enemyZoneOfControl(state, movingSide);
-  const blockedIndex = path.findIndex(
-    (coordinate, index) => index > 0 && enemyZoc.has(coordinate),
-  );
-  return blockedIndex < 0 ? path : path.slice(0, blockedIndex);
+  const frontier: HexCoordinate[] = [origin];
+  const previous = new Map<HexCoordinate, HexCoordinate | null>([
+    [origin, null],
+  ]);
+  for (let index = 0; index < frontier.length; index += 1) {
+    const current = frontier[index];
+    if (current === undefined) break;
+    for (const neighbor of adjacentHexes(current)) {
+      if (previous.has(neighbor) || enemyZoc.has(neighbor)) continue;
+      previous.set(neighbor, current);
+      if (neighbor === destination) {
+        const safePath = [destination];
+        let step: HexCoordinate | null = current;
+        while (step !== null) {
+          safePath.push(step);
+          step = previous.get(step) ?? null;
+        }
+        return safePath.reverse();
+      }
+      frontier.push(neighbor);
+    }
+  }
+  return [origin];
 }
 
 export function nightMovementIsLegal(

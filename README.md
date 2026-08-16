@@ -7,8 +7,8 @@ interface that can be self-hosted on the dedicated Gettysburg VPS.
 
 The local project workspace contains supplied board, rules, and order-of-battle
 references that are deliberately ignored by Git. The repository contains only
-the approved implementation plan and rights-safe project work. Application
-the current local candidate implements the Phase 2 rules-light tabletop in
+the approved implementation plan and rights-safe project work. The current
+application candidate implements the Phase 2 rules-light tabletop in
 `ROADMAP.md`.
 
 ## Project documents

@@ -102,7 +102,9 @@ export function App({ initialInvitation = null }: AppProps) {
         if (active) enterGame(session);
       })
       .catch(() => {
-        window.localStorage.removeItem(LAST_GAME_KEY);
+        if (window.localStorage.getItem(LAST_GAME_KEY) === gameId) {
+          window.localStorage.removeItem(LAST_GAME_KEY);
+        }
         if (active)
           setError("The saved game could not be resumed in this browser.");
       })

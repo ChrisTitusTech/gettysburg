@@ -32,4 +32,14 @@ describe("bearer credentials", () => {
       credentialVerifier(pepper, "invitation", credential),
     );
   });
+
+  it("rejects undersized verifier peppers for direct callers", () => {
+    expect(() =>
+      credentialVerifier(
+        randomBytes(31),
+        "browser-session",
+        generateCredential(),
+      ),
+    ).toThrow("at least 32 bytes");
+  });
 });

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   isDeletionLedgerAcknowledged,
+  loadCredentialPepper,
   loadDeletionLedgerWatermark,
 } from "./runtime-config.js";
 
@@ -42,6 +43,13 @@ describe("loadDeletionLedgerWatermark", () => {
       ).rejects.toThrow(/watermark/i);
     },
   );
+});
+
+describe("loadCredentialPepper", () => {
+  it("identifies an invalid pepper file as the failing source", async () => {
+    const file = await watermarkFile("invalid\n");
+    await expect(loadCredentialPepper({ file })).rejects.toThrow(file);
+  });
 });
 
 describe("isDeletionLedgerAcknowledged", () => {

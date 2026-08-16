@@ -156,7 +156,8 @@ export function configureHttpApplication(
       }
       next();
     } catch (error) {
-      next(error);
+      console.error("Unexpected HTTP application error.", error);
+      response.status(500).json({ error: "internal_error" });
     }
   });
 
@@ -359,6 +360,7 @@ export function configureHttpApplication(
       response: Response,
       next: NextFunction,
     ) => {
+      void next;
       if (error instanceof ServiceError) {
         response.status(errorStatus(error.code)).json({
           error: error.code,

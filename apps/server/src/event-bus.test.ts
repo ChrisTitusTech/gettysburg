@@ -27,4 +27,22 @@ describe("GameEventBus", () => {
     expect(first).not.toHaveBeenCalled();
     expect(replacement).toHaveBeenCalledWith(EVENT);
   });
+
+  it("delivers a stable listener snapshot and isolates listener failures", () => {
+    const bus = new GameEventBus();
+    const error = vi.spyOn(console, "error").mockImplementation(() => {});
+    const later = vi.fn();
+    let disposeLater = () => {};
+    bus.subscribeManagement("game", () => {
+      disposeLater();
+      throw new Error("listener failed");
+    });
+    disposeLater = bus.subscribeManagement("game", later);
+
+    bus.publishManagement("game", EVENT);
+
+    expect(later).toHaveBeenCalledWith(EVENT);
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+  });
 });

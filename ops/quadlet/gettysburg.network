@@ -4,3 +4,4 @@ Description=Gettysburg private application network
 [Network]
 NetworkName=gettysburg
 Driver=bridge
+Internal=true

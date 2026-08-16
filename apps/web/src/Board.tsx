@@ -182,11 +182,19 @@ export function Board({
               { x: -18, y: -11 },
               { x: 18, y: 11 },
             ]
-          : [
-              { x: -22, y: -14 },
-              { x: 22, y: -14 },
-              { x: 0, y: 22 },
-            ];
+          : stack.length === 3
+            ? [
+                { x: -22, y: -14 },
+                { x: 22, y: -14 },
+                { x: 0, y: 22 },
+              ]
+            : Array.from({ length: stack.length }, (_, slot) => {
+                const angle = (2 * Math.PI * slot) / stack.length;
+                return {
+                  x: Math.round(Math.cos(angle) * 24),
+                  y: Math.round(Math.sin(angle) * 20),
+                };
+              });
     stackPosition.set(unit.id, offsets[index] ?? { x: 0, y: 0 });
   }
   const renderedUnits = [...deployedUnits].sort((left, right) => {

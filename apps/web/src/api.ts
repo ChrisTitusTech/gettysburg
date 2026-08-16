@@ -74,7 +74,12 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
           : text.trim().slice(0, 200)),
     );
   }
-  if (body === undefined)
+  if (
+    body === undefined ||
+    body === null ||
+    typeof body !== "object" ||
+    Array.isArray(body)
+  )
     throw new Error("Server returned an invalid response.");
   return body;
 }

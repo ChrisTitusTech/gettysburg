@@ -791,6 +791,40 @@ describe("automatic combat workflow", () => {
       kind: "advance",
       side: "confederate",
     });
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command(
+          "advanceAfterCombat",
+          { combat_id: combatId, decline: false },
+          4,
+        ),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "invalid_hex",
+        message: "Choose either an advance destination or decline the advance.",
+      },
+      ok: false,
+    });
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command(
+          "advanceAfterCombat",
+          { combat_id: combatId, decline: true, destination: "B1" },
+          4,
+        ),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "invalid_hex",
+        message: "Choose either an advance destination or decline the advance.",
+      },
+      ok: false,
+    });
     current = accept(
       current,
       "confederate",

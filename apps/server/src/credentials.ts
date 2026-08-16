@@ -1,6 +1,7 @@
 import { createHmac, randomBytes } from "node:crypto";
 
 const CREDENTIAL_BYTES = 32;
+const PEPPER_MINIMUM_BYTES = 32;
 const CREDENTIAL_LENGTH = 43;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
@@ -28,6 +29,11 @@ export function credentialVerifier(
   domain: CredentialDomain,
   credential: string,
 ): string {
+  if (pepper.byteLength < PEPPER_MINIMUM_BYTES) {
+    throw new Error(
+      `Credential pepper must be at least ${PEPPER_MINIMUM_BYTES} bytes`,
+    );
+  }
   if (!isCanonicalCredential(credential)) {
     throw new Error("Credential must be canonical 32-byte base64url");
   }

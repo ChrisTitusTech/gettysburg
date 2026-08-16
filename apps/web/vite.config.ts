@@ -10,6 +10,7 @@ export default defineConfig({
     host: process.env.GETTYSBURG_WEB_HOST ?? "127.0.0.1",
     port: Number(process.env.GETTYSBURG_WEB_PORT ?? "5173"),
     proxy: {
+      "/api": serverOrigin,
       "/healthz": serverOrigin,
       "/matchmake": serverOrigin,
       "/readyz": serverOrigin,

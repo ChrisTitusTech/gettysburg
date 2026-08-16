@@ -131,10 +131,20 @@ function CombatCard({
           </button>
         </form>
       ) : null}
-      {combat.confirmation !== null && resolution !== null ? (
+      {combat.confirmation !== null && combat.rolls !== null ? (
         <div className="confirmed-combat-result">
           <strong>Confirmed result</strong>
-          <p>{outcomeSummary(combat.confirmation, resolution.margin)}</p>
+          <p>
+            {outcomeSummary(
+              combat.confirmation,
+              Math.abs(
+                combat.rolls.attacker +
+                  combat.confirmation.attacker_modifier -
+                  (combat.rolls.defender +
+                    combat.confirmation.defender_modifier),
+              ),
+            )}
+          </p>
         </div>
       ) : null}
       {choice?.kind === "loss" && choice.side === seat ? (
@@ -153,9 +163,10 @@ function CombatCard({
           <strong>Allocate {choice.count} step loss(es)</strong>
           {choice.unit_ids.map((id) => (
             <label key={id}>
-              {id}
+              {state.units[id]?.label ?? id}
               <input
                 min="0"
+                max={state.units[id]?.steps_remaining}
                 onChange={(event) =>
                   setLosses((current) => ({
                     ...current,
@@ -368,7 +379,8 @@ export function TabletopControls({
 
       <details className="counter-roster">
         <summary>
-          Counter roster ({deployed.length} deployed / 82 total)
+          Counter roster ({deployed.length} deployed /{" "}
+          {Object.values(state.units).length} total)
         </summary>
         <div>
           {Object.values(state.units).map((unit) => (

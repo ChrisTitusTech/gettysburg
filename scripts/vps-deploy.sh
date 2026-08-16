@@ -270,7 +270,7 @@ curl --fail --silent --show-error --max-time 15 \
 run_user podman image inspect \
 	--format 'revision={{ index .Labels "org.opencontainers.image.revision" }} image={{.Id}}' \
 	"${candidate_image_id}" >"${rollback_root}/candidate-image.txt"
-chown -R "${service_user}:${service_user}" "${rollback_root}"
+chown "${service_user}:${service_user}" "${rollback_root}/candidate-image.txt"
 chmod 0600 "${rollback_root}/candidate-image.txt"
 
 trap - ERR

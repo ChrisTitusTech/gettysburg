@@ -63,7 +63,6 @@ describe("enemy zones of control", () => {
     const current = state(true);
     expect(nightMovementPath(current, "confederate", "L6", "J6")).toEqual([
       "L6",
-      "K7",
     ]);
     expect(nightMovementIsLegal(current, "confederate", "L6", "K6")).toBe(
       false,
@@ -75,5 +74,39 @@ describe("enemy zones of control", () => {
     expect(nightMovementIsLegal(state(false), "confederate", "L6", "K6")).toBe(
       true,
     );
+  });
+
+  it("takes a shortest safe alternate route around enemy control at night", () => {
+    const current: GameState = {
+      ...state(true),
+      units: {
+        attacker: unit("attacker", "confederate", "A1"),
+        defender: unit("defender", "union", "C1"),
+      },
+    };
+
+    expect(nightMovementPath(current, "confederate", "A1", "C3")).toEqual([
+      "A1",
+      "A2",
+      "B2",
+      "C3",
+    ]);
+    expect(nightMovementIsLegal(current, "confederate", "A1", "C3")).toBe(true);
+  });
+
+  it("chooses a deterministic path when safe routes are equally short", () => {
+    const current: GameState = {
+      ...state(true),
+      units: {
+        attacker: unit("attacker", "confederate", "A1"),
+        defender: unit("defender", "union", "U11"),
+      },
+    };
+
+    expect(nightMovementPath(current, "confederate", "A1", "B2")).toEqual([
+      "A1",
+      "B1",
+      "B2",
+    ]);
   });
 });

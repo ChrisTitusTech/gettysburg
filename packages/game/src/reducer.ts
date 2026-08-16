@@ -981,8 +981,16 @@ function advanceAfterCombat(
   }
   const units: Record<string, UnitState> = { ...state.units };
   let summary = `Combat ${combat.id} advance declined`;
-  if (!command.payload.decline && command.payload.destination !== undefined) {
-    const destination = command.payload.destination;
+  const destination = command.payload.destination;
+  const hasDestination = destination !== undefined;
+  if (command.payload.decline === hasDestination) {
+    return failure(
+      state,
+      "invalid_hex",
+      "Choose either an advance destination or decline the advance.",
+    );
+  }
+  if (destination !== undefined) {
     const unitIds = command.payload.unit_ids ?? [];
     if (!(choice.destination_hexes ?? []).includes(destination)) {
       return failure(
@@ -1042,13 +1050,9 @@ function advanceAfterCombat(
     state,
     {
       combats: { ...state.combats, [combat.id]: nextCombat },
-      ...(!command.payload.decline && command.payload.destination !== undefined
+      ...(destination !== undefined
         ? {
-            objectives: objectivesAfterEntry(
-              state,
-              command.payload.destination,
-              actorSide,
-            ),
+            objectives: objectivesAfterEntry(state, destination, actorSide),
           }
         : {}),
       units,
