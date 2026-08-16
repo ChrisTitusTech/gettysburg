@@ -117,6 +117,31 @@ describe("Board", () => {
     ).toHaveAttribute("tabindex", "-1");
   });
 
+  it("allows a daytime move into an enemy zone of control to attack", async () => {
+    const onMove = vi.fn();
+    const attackState: GameState = {
+      ...state,
+      units: {
+        ...state.units,
+        "fixture-union-1": {
+          ...state.units["fixture-union-1"]!,
+          location: "G6",
+        },
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={attackState} />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+    );
+    fireEvent.click(container.querySelector('[data-coordinate="G5"]')!);
+
+    expect(onMove).toHaveBeenCalledWith(["fixture-confederate-1"], "G5");
+  });
+
   it("supports keyboard counter selection and a board-hex destination", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
@@ -581,6 +606,83 @@ describe("Board", () => {
     );
   });
 
+  it("finds an alternate retreat route around an enemy-occupied hex", () => {
+    const combatId = "22222222-2222-4222-8222-222222222222";
+    const unionCounter = state.units["fixture-union-1"]!;
+    const retreatState: GameState = {
+      ...state,
+      phase: "combat",
+      units: {
+        enemy: {
+          ...state.units["fixture-confederate-1"]!,
+          id: "enemy",
+          location: "C2",
+        },
+        friendly: {
+          ...unionCounter,
+          id: "friendly",
+          location: "C3",
+        },
+        retreating: {
+          ...unionCounter,
+          id: "retreating",
+          location: "B2",
+        },
+      },
+      combats: {
+        [combatId]: {
+          attacker_loss_allocated: false,
+          attacker_retreated: false,
+          attackers: ["enemy"],
+          confirmation: {
+            advance_offered: true,
+            attacker_losses: 0,
+            attacker_modifier: 3,
+            attacker_retreat: false,
+            defender_losses: 0,
+            defender_modifier: 3,
+            defender_retreat: true,
+            result: "attacker_win",
+          },
+          defender_loss_allocated: false,
+          defender_retreated: false,
+          defenders: ["retreating"],
+          id: combatId,
+          pending_choice: {
+            kind: "retreat",
+            side: "union",
+            unit_ids: ["retreating"],
+          },
+          rolls: { attacker: 8, defender: 1 },
+          status: "pending_choice",
+        },
+      },
+    };
+    const onRetreat = vi.fn();
+    const { container } = render(
+      <Board
+        onMove={vi.fn()}
+        onRetreat={onRetreat}
+        seat="union"
+        state={retreatState}
+      />,
+    );
+    const counter = container.querySelector('[data-unit-id="retreating"]')!;
+    const pointer = prepareBoardPointer(container, "D2");
+    fireEvent.pointerDown(counter, { button: 0, pointerId: 41 });
+    fireEvent.pointerMove(pointer.svg, {
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+      pointerId: 41,
+    });
+    fireEvent.pointerUp(pointer.svg, { pointerId: 41 });
+    expect(onRetreat).toHaveBeenCalledWith(
+      combatId,
+      ["retreating"],
+      ["B2", "C3", "D2"],
+    );
+  });
+
   it("drag-advances a stack, Ctrl-advances one, and drag-declines", () => {
     const combatId = "33333333-3333-4333-8333-333333333333";
     const advanceState: GameState = {
@@ -735,6 +837,13 @@ describe("Board", () => {
     );
     declineAdvance.mockClear();
     fireEvent.keyDown(tray, { key: "Enter" });
+    expect(declineAdvance).toHaveBeenCalledWith(
+      combatId,
+      ["fixture-confederate-1", "fixture-general"],
+      null,
+    );
+    declineAdvance.mockClear();
+    fireEvent.click(tray);
     expect(declineAdvance).toHaveBeenCalledWith(
       combatId,
       ["fixture-confederate-1", "fixture-general"],

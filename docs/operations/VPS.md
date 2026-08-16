@@ -205,9 +205,9 @@ unrecorded shell history:
    maintenance mode and keep the candidate running rather than starting an
    older ruleset against data the candidate may have written.
 8. Verify the Caddy route, WebSocket upgrade, and a
-   two-client smoke flow. The deploy script creates and retains one ordinary
-   smoke game so it does not bypass the deletion ledger or make readiness
-   depend on an off-host backup performed mid-deploy.
+   two-client smoke flow. The deploy script deletes its ordinary smoke game
+   after the last deployment-readiness check. The resulting live deletion
+   receipt does not drop readiness; it is included in the next off-host backup.
 9. Confirm the independent review and successful CI both reference the exact
    candidate revision recorded by the image label. Retain the last compatible
    image and backup until the release is accepted.
@@ -247,7 +247,11 @@ entrypoint needs to initialize the named volume and become the database user.
 The PostgreSQL and Node base images are pinned by digest. Secrets are created
 outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The
 deployment script records the exact Git revision and application image ID beside
-the pre-change rollback material.
+the pre-change rollback material. Before building or entering maintenance mode,
+the script requires `postgres.env` and `app.env` to exist together with matching
+database credentials, required settings, `gettysburg` ownership, and mode 0600.
+It creates both only when neither file nor a persistent database volume exists;
+a partial pair or missing secrets beside existing database data fails closed.
 The user timer in `ops/systemd/` runs the 30-day hard-purge job daily. Each dump
 records and verifies the database deletion-ledger watermark. The intentionally
 simple Phase 2 encryption design uses age and stores the identity on both the VPS
@@ -284,8 +288,12 @@ missed run starts after the workstation next boots. A successful copy verifies
 `pg_restore`, and atomically advances the
 non-secret `offhost-ledger-watermark` under the dedicated
 `~/.config/gettysburg-readiness/` directory on the VPS. The application mounts
-that directory read-only and refuses `/readyz`, gameplay APIs, room admission,
-and room commands when the value differs from the database ledger position.
+that directory read-only and compares it with the database ledger once during
+startup. A missing, invalid, or behind startup watermark refuses `/readyz`,
+gameplay APIs, room admission, and room commands until the ledger is synchronized
+and the application restarts. Receipts created after a successful startup do not
+make the live service unready; the next verified off-host backup advances the
+watermark for the next startup gate.
 The sole exception is an authenticated `deleteGame` retry with the exact command
 ID of an already accepted deletion; it can return its stored terminal result but
 cannot create a new deletion or mutate the game.

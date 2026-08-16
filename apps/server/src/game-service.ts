@@ -138,6 +138,7 @@ interface GameRecord {
       readonly authorizingBindingId: string;
       readonly authorizingBindingVersion: number;
       readonly canonicalHash: string;
+      readonly canonicalizationVersion: string | null;
       readonly result: CommandResult;
     }
   >;
@@ -157,6 +158,7 @@ interface GameRecord {
       readonly authorizingBindingId: string;
       readonly authorizingBindingVersion: number;
       readonly canonicalHash: string;
+      readonly canonicalizationVersion: string | null;
       readonly result: HostManagementSuccess;
       invitationLookupId?: string;
       sealedInvitationSecret?: string;
@@ -177,6 +179,7 @@ export interface GameServiceSnapshot {
           readonly authorizingBindingId: string;
           readonly authorizingBindingVersion: number;
           readonly canonicalHash: string;
+          readonly canonicalizationVersion?: string | null;
           readonly result: CommandResult;
         },
       ][];
@@ -196,6 +199,7 @@ export interface GameServiceSnapshot {
           readonly authorizingBindingId: string;
           readonly authorizingBindingVersion: number;
           readonly canonicalHash: string;
+          readonly canonicalizationVersion?: string | null;
           readonly result: HostManagementSuccess;
           readonly invitationLookupId?: string;
           readonly sealedInvitationSecret?: string;
@@ -652,17 +656,46 @@ export class InMemoryGameService {
       for (const [gameId, game] of options.snapshot.games) {
         const savedState = structuredClone(game.state);
         const savedActions = structuredClone(game.actions);
+        const canonicalizationVersions = new Map(
+          savedActions.flatMap((action) =>
+            action.commandId === null
+              ? []
+              : [[action.commandId, action.canonicalizationVersion] as const],
+          ),
+        );
         const handler = gameVersionHandler(savedState);
         this.#games.set(gameId, {
           actions: [...savedActions],
-          commandResults: new Map(structuredClone(game.commandResults)),
+          commandResults: new Map(
+            structuredClone(game.commandResults).map(([commandId, record]) => [
+              commandId,
+              {
+                ...record,
+                canonicalizationVersion:
+                  record.canonicalizationVersion ??
+                  canonicalizationVersions.get(commandId) ??
+                  null,
+              },
+            ]),
+          ),
           ...(game.creation === undefined
             ? {}
             : { creation: structuredClone(game.creation) }),
           deletedAt: game.deletedAt ?? null,
           deletedBy: game.deletedBy ?? null,
           hostCommandResults: new Map(
-            structuredClone(game.hostCommandResults ?? []),
+            structuredClone(game.hostCommandResults ?? []).map(
+              ([commandId, record]) => [
+                commandId,
+                {
+                  ...record,
+                  canonicalizationVersion:
+                    record.canonicalizationVersion ??
+                    canonicalizationVersions.get(commandId) ??
+                    null,
+                },
+              ],
+            ),
           ),
           state:
             handler === undefined
@@ -1381,6 +1414,13 @@ export class InMemoryGameService {
           "Command identifier belongs to another host binding.",
         );
       }
+      if (previous.canonicalizationVersion !== COMMAND_SCHEMA_VERSION) {
+        return this.#failure(
+          game.state,
+          "version_unavailable",
+          "This command retry uses an unavailable canonicalization version.",
+        );
+      }
       if (!hashesEqual(previous.canonicalHash, canonicalHash)) {
         return this.#failure(
           game.state,
@@ -1572,6 +1612,7 @@ export class InMemoryGameService {
       authorizingBindingId: authorization.bindingId,
       authorizingBindingVersion: authorization.bindingVersion,
       canonicalHash,
+      canonicalizationVersion: COMMAND_SCHEMA_VERSION,
       ...(invitation === undefined
         ? {}
         : {
@@ -1667,6 +1708,13 @@ export class InMemoryGameService {
           "Command identifier belongs to another seat binding.",
         );
       }
+      if (previous.canonicalizationVersion !== COMMAND_SCHEMA_VERSION) {
+        return this.#failure(
+          game.state,
+          "version_unavailable",
+          "This command retry uses an unavailable canonicalization version.",
+        );
+      }
       if (!hashesEqual(previous.canonicalHash, canonicalHash)) {
         return this.#failure(
           game.state,
@@ -1759,6 +1807,7 @@ export class InMemoryGameService {
         authorizingBindingId: authorization.bindingId,
         authorizingBindingVersion: authorization.bindingVersion,
         canonicalHash,
+        canonicalizationVersion: COMMAND_SCHEMA_VERSION,
         result: structuredClone(result),
       });
       game.actions.push({
@@ -1783,20 +1832,21 @@ export class InMemoryGameService {
       return structuredClone(result);
     }
 
+    const automaticSkirmishes =
+      command.command_name === "endPhase" &&
+      (game.state.phase === "movement" ||
+        (game.state.phase === "combat" &&
+          Object.keys(game.state.combats).length === 0))
+        ? combatSkirmishes(game.state, authorization.side)
+        : undefined;
     const reduced = reduceGameplayCommand(
       game.state,
       authorization.side,
       command,
       {
-        ...(command.command_name === "endPhase" &&
-        (game.state.phase === "movement" ||
-          (game.state.phase === "combat" &&
-            Object.keys(game.state.combats).length === 0))
+        ...(automaticSkirmishes !== undefined
           ? {
-              automaticCombats: combatSkirmishes(
-                game.state,
-                authorization.side,
-              ).map(() => ({
+              automaticCombats: (automaticSkirmishes ?? []).map(() => ({
                 combat_id: randomUUID(),
                 dice: {
                   attacker: randomInt(1, 11),
@@ -1821,6 +1871,7 @@ export class InMemoryGameService {
       authorizingBindingId: authorization.bindingId,
       authorizingBindingVersion: authorization.bindingVersion,
       canonicalHash,
+      canonicalizationVersion: COMMAND_SCHEMA_VERSION,
       result: structuredClone(result),
     });
     game.actions.push({

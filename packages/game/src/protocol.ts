@@ -354,6 +354,7 @@ export type CommandErrorCode =
   | "movement_exceeded"
   | "occupied"
   | "pending_choice"
+  | "rate_limited"
   | "phase_invalid"
   | "reinforcement_early"
   | "stale_version"

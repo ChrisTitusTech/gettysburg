@@ -1,7 +1,7 @@
 import { adjacentHexes, hexDistance, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
 import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
-import { enemyZoneOfControl, nightMovementPath } from "./zoc.js";
+import { enemyZoneOfControl, movementPath } from "./zoc.js";
 import type {
   CombatState,
   CommandFailure,
@@ -179,23 +179,14 @@ function moveUnit(
   if (unit.status !== "deployed" || unit.location === null) {
     return failure(state, "phase_invalid", "Only deployed counters can move.");
   }
-  const path = nightMovementPath(state, actorSide, unit.location, destination);
-  if (state.night && path.at(-1) !== destination) {
+  const path = movementPath(state, actorSide, unit.location, destination);
+  if (path.at(-1) !== destination) {
     return failure(
       state,
-      "phase_invalid",
-      "Night movement must withdraw from and may not enter an enemy zone of control.",
-    );
-  }
-  const distance = state.night
-    ? path.length - 1
-    : hexDistance(unit.location, destination);
-  const movementRemaining = unit.movement - (unit.movement_spent ?? 0);
-  if (distance > movementRemaining) {
-    return failure(
-      state,
-      "movement_exceeded",
-      `${unit.label} has ${movementRemaining} movement point${movementRemaining === 1 ? "" : "s"} remaining; ${destination} ${state.night ? `requires ${distance} movement points by the safe night route` : `is ${distance} hexes away`}.`,
+      state.night ? "phase_invalid" : "occupied",
+      state.night
+        ? "Night movement must withdraw from and may not enter an enemy zone of control."
+        : "Movement cannot pass through an enemy-occupied hex.",
     );
   }
   if (!destinationCanAccept(state, unit, destination)) {
@@ -203,6 +194,15 @@ function moveUnit(
       state,
       "occupied",
       "That destination is at its Phase 2 stacking capacity.",
+    );
+  }
+  const distance = path.length - 1;
+  const movementRemaining = unit.movement - (unit.movement_spent ?? 0);
+  if (distance > movementRemaining) {
+    return failure(
+      state,
+      "movement_exceeded",
+      `${unit.label} has ${movementRemaining} movement point${movementRemaining === 1 ? "" : "s"} remaining; ${destination} ${state.night ? `requires ${distance} movement points by the safe night route` : `is ${distance} hexes away`}.`,
     );
   }
   if (!sourceStacksRemainValid(state, [unit], destination)) {
@@ -265,17 +265,24 @@ function moveStack(
       "Stack movement requires deployed counters in one hex.",
     );
   }
-  const path = nightMovementPath(state, actorSide, source, destination);
-  if (state.night && path.at(-1) !== destination) {
+  const path = movementPath(state, actorSide, source, destination);
+  if (path.at(-1) !== destination) {
     return failure(
       state,
-      "phase_invalid",
-      "Night movement must withdraw from and may not enter an enemy zone of control.",
+      state.night ? "phase_invalid" : "occupied",
+      state.night
+        ? "Night movement must withdraw from and may not enter an enemy zone of control."
+        : "Movement cannot pass through an enemy-occupied hex.",
     );
   }
-  const distance = state.night
-    ? path.length - 1
-    : hexDistance(source, destination);
+  if (!destinationCanAcceptUnits(state, movers, destination)) {
+    return failure(
+      state,
+      "occupied",
+      "That destination is at its Phase 2 stacking capacity.",
+    );
+  }
+  const distance = path.length - 1;
   const limitingUnit = movers.find(
     (unit) => distance > unit.movement - (unit.movement_spent ?? 0),
   );
@@ -286,13 +293,6 @@ function moveStack(
       state,
       "movement_exceeded",
       `${limitingUnit.label} limits this stack to ${remaining} remaining movement point${remaining === 1 ? "" : "s"}.`,
-    );
-  }
-  if (!destinationCanAcceptUnits(state, movers, destination)) {
-    return failure(
-      state,
-      "occupied",
-      "That destination is at its Phase 2 stacking capacity.",
     );
   }
   if (!sourceStacksRemainValid(state, movers, destination)) {
@@ -377,7 +377,8 @@ function nightUnitsAbleToWithdraw(
     return adjacentHexes(unit.location).some(
       (destination) =>
         !enemyZoc.has(destination) &&
-        destinationCanAccept(state, unit, destination),
+        destinationCanAccept(state, unit, destination) &&
+        sourceStacksRemainValid(state, [unit], destination),
     );
   });
 }
@@ -645,46 +646,54 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
       side: otherSide(state.active_side!),
       unit_ids: combat.defenders,
     };
-  } else if (!combat.attacker_retreated && confirmation.attacker_retreat) {
-    const combatIds = combat.attackers.filter(
-      (id) => state.units[id]?.status === "deployed",
-    );
-    const ids = stackedUnitsForSide(
-      state,
-      combatIds,
-      state.active_side!,
-      combat.attacker_hexes,
-    );
-    if (ids.length > 0)
-      choice = { kind: "retreat", side: state.active_side!, unit_ids: ids };
-  } else if (!combat.defender_retreated && confirmation.defender_retreat) {
-    const combatIds = combat.defenders.filter(
-      (id) => state.units[id]?.status === "deployed",
-    );
-    const ids = stackedUnitsForSide(
-      state,
-      combatIds,
-      otherSide(state.active_side!),
-      combat.defender_hexes,
-    );
-    if (ids.length > 0)
-      choice = {
-        kind: "retreat",
-        side: otherSide(state.active_side!),
-        unit_ids: ids,
-      };
-  } else if (confirmation.advance_offered) {
-    const combatIds = combat.attackers.filter(
-      (id) => state.units[id]?.status === "deployed",
-    );
-    const ids = stackedUnitsForSide(state, combatIds, state.active_side!);
-    if (ids.length > 0)
-      choice = {
-        destination_hexes: combat.defender_hexes ?? [],
-        eligible_unit_ids: ids,
-        kind: "advance",
-        side: state.active_side!,
-      };
+  } else {
+    if (!combat.attacker_retreated && confirmation.attacker_retreat) {
+      const combatIds = combat.attackers.filter(
+        (id) => state.units[id]?.status === "deployed",
+      );
+      const ids = stackedUnitsForSide(
+        state,
+        combatIds,
+        state.active_side!,
+        combat.attacker_hexes,
+      );
+      if (ids.length > 0)
+        choice = { kind: "retreat", side: state.active_side!, unit_ids: ids };
+    }
+    if (
+      choice === null &&
+      !combat.defender_retreated &&
+      confirmation.defender_retreat
+    ) {
+      const combatIds = combat.defenders.filter(
+        (id) => state.units[id]?.status === "deployed",
+      );
+      const ids = stackedUnitsForSide(
+        state,
+        combatIds,
+        otherSide(state.active_side!),
+        combat.defender_hexes,
+      );
+      if (ids.length > 0)
+        choice = {
+          kind: "retreat",
+          side: otherSide(state.active_side!),
+          unit_ids: ids,
+        };
+    }
+    if (choice === null && confirmation.advance_offered) {
+      const combatIds = combat.attackers.filter(
+        (id) => state.units[id]?.status === "deployed",
+      );
+      const ids = stackedUnitsForSide(state, combatIds, state.active_side!);
+      if (ids.length > 0)
+        choice = {
+          destination_hexes: combat.defender_hexes ?? [],
+          eligible_unit_ids: ids,
+          kind: "advance",
+          side: state.active_side!,
+        };
+    }
   }
   return {
     ...combat,
@@ -797,6 +806,12 @@ function allocateLoss(
     );
   }
   const units = { ...state.units };
+  const lossHexes = new Set(
+    choice.unit_ids.flatMap((id) => {
+      const location = units[id]?.location;
+      return location === null || location === undefined ? [] : [location];
+    }),
+  );
   for (const id of choice.unit_ids) {
     const unit = units[id]!;
     const allocation = command.payload.allocations[id] ?? 0;
@@ -815,6 +830,33 @@ function allocateLoss(
       steps_remaining: steps,
       strength: steps === 0 ? "eliminated" : steps === 1 ? "reduced" : "full",
     };
+  }
+  for (const general of Object.values(units)) {
+    if (
+      general.side !== actorSide ||
+      general.kind !== "general" ||
+      general.status !== "deployed" ||
+      general.location === null ||
+      !lossHexes.has(general.location)
+    ) {
+      continue;
+    }
+    const supportedCombatUnitRemains = Object.values(units).some(
+      (unit) =>
+        unit.side === actorSide &&
+        unit.kind !== "general" &&
+        unit.status === "deployed" &&
+        unit.location === general.location,
+    );
+    if (!supportedCombatUnitRemains) {
+      units[general.id] = {
+        ...general,
+        location: null,
+        status: "eliminated",
+        steps_remaining: 0,
+        strength: "eliminated",
+      };
+    }
   }
   const marked: CombatState = {
     ...combat,
@@ -1236,6 +1278,13 @@ function endPhase(
   }
   if (needsAutomaticCombat) {
     const skirmishes = combatSkirmishes(state, actorSide);
+    if (skirmishes === null) {
+      return failure(
+        state,
+        "combat_invalid",
+        "Mandatory combat could not be separated into legal skirmishes.",
+      );
+    }
     if (
       skirmishes.length === 0 ||
       automaticCombats === undefined ||

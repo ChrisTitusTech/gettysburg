@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { InMemoryGameService } from "./game-service.js";
 import { InMemoryAsyncGameService } from "./postgres-store.js";
+import { ROOM_COMMAND_LIMIT } from "./room.js";
 import { createGettysburgServer } from "./server.js";
 
 async function reservePort(): Promise<number> {
@@ -522,5 +523,60 @@ describe("Colyseus authoritative room", () => {
         headers: { cookie: hostCookie, origin },
       }).joinOrCreate("game", { gameId: created.game_id }),
     ).rejects.toThrow();
+  });
+
+  it("rate-limits gameplay messages before invoking authoritative state", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const hostCookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const hostRoom = await new ColyseusClient(origin, {
+      headers: { cookie: hostCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(hostRoom);
+
+    const limited = nextMessage<CommandResult>(
+      hostRoom,
+      "commandResult",
+      (result) => !result.ok && result.error === "rate_limited",
+    );
+    for (let index = 0; index <= ROOM_COMMAND_LIMIT; index += 1) {
+      hostRoom.send("moveUnit", {});
+    }
+    await expect(limited).resolves.toMatchObject({
+      error: "rate_limited",
+      ok: false,
+    });
+    expect(service.getActions(created.game_id)).toHaveLength(0);
+
+    await hostRoom.leave(true);
+    rooms.splice(rooms.indexOf(hostRoom), 1);
+    const reconnectedRoom = await new ColyseusClient(origin, {
+      headers: { cookie: hostCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(reconnectedRoom);
+    const reconnectLimited = nextMessage<CommandResult>(
+      reconnectedRoom,
+      "commandResult",
+      (result) => !result.ok && result.error === "rate_limited",
+    );
+    reconnectedRoom.send("moveUnit", {});
+    await expect(reconnectLimited).resolves.toMatchObject({
+      error: "rate_limited",
+      ok: false,
+    });
+    expect(service.getActions(created.game_id)).toHaveLength(0);
   });
 });

@@ -1,4 +1,4 @@
-import { adjacentHexes, shortestHexPath } from "./coordinates.js";
+import { adjacentHexes } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
 import type { GameState, Side } from "./protocol.js";
 
@@ -31,15 +31,25 @@ export function isEnemyZoneOfControl(
   return enemyZoneOfControl(state, movingSide).has(coordinate);
 }
 
-export function nightMovementPath(
+export function movementPath(
   state: GameState,
   movingSide: Side,
   origin: HexCoordinate,
   destination: HexCoordinate,
 ): readonly HexCoordinate[] {
-  const path = shortestHexPath(origin, destination);
-  if (!state.night) return path;
-  const enemyZoc = enemyZoneOfControl(state, movingSide);
+  if (origin === destination) return [origin];
+  const blocked = new Set(
+    Object.values(state.units).flatMap((unit) =>
+      unit.side !== movingSide &&
+      unit.status === "deployed" &&
+      unit.location !== null
+        ? [unit.location]
+        : [],
+    ),
+  );
+  const enemyZoc = state.night
+    ? enemyZoneOfControl(state, movingSide)
+    : new Set<HexCoordinate>();
   const frontier: HexCoordinate[] = [origin];
   const previous = new Map<HexCoordinate, HexCoordinate | null>([
     [origin, null],
@@ -48,7 +58,13 @@ export function nightMovementPath(
     const current = frontier[index];
     if (current === undefined) break;
     for (const neighbor of adjacentHexes(current)) {
-      if (previous.has(neighbor) || enemyZoc.has(neighbor)) continue;
+      if (
+        previous.has(neighbor) ||
+        blocked.has(neighbor) ||
+        enemyZoc.has(neighbor)
+      ) {
+        continue;
+      }
       previous.set(neighbor, current);
       if (neighbor === destination) {
         const safePath = [destination];
@@ -63,6 +79,15 @@ export function nightMovementPath(
     }
   }
   return [origin];
+}
+
+export function nightMovementPath(
+  state: GameState,
+  movingSide: Side,
+  origin: HexCoordinate,
+  destination: HexCoordinate,
+): readonly HexCoordinate[] {
+  return movementPath(state, movingSide, origin, destination);
 }
 
 export function nightMovementIsLegal(

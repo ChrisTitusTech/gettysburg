@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 
 import { PostgresGameService } from "./postgres-store.js";
 import {
-  isDeletionLedgerAcknowledged,
+  isDeletionLedgerStartupReady,
   loadCredentialPepper,
 } from "./runtime-config.js";
 import { createGettysburgServer } from "./server.js";
@@ -44,20 +44,20 @@ const gameService = new PostgresGameService({
   pepper,
 });
 await gameService.migrate();
+const deletionLedgerStartupReady = await isDeletionLedgerStartupReady(
+  process.env.GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE,
+  await gameService.getDeletionLedger(),
+);
 const readiness = {
   isReady: async () => {
     if (
       process.env.GETTYSBURG_REQUIRED_DEPENDENCY === "unavailable" ||
+      !deletionLedgerStartupReady ||
       !(await gameService.isReady())
     ) {
       return false;
     }
-    const watermarkFile = process.env.GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE;
-    if (watermarkFile === undefined) return true;
-    return isDeletionLedgerAcknowledged(
-      watermarkFile,
-      await gameService.getDeletionLedger(),
-    );
+    return true;
   },
 };
 const gameServer = createGettysburgServer({

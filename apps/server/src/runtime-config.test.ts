@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   isDeletionLedgerAcknowledged,
+  isDeletionLedgerStartupReady,
   loadCredentialPepper,
   loadDeletionLedgerWatermark,
 } from "./runtime-config.js";
@@ -66,6 +67,27 @@ describe("isDeletionLedgerAcknowledged", () => {
   it("fails closed when the watermark cannot be verified", async () => {
     await expect(
       isDeletionLedgerAcknowledged("/missing/gettysburg-watermark", []),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("isDeletionLedgerStartupReady", () => {
+  it("captures the restore watermark at startup without gating later live receipts", async () => {
+    const receipts = [{ position: 1 }];
+    const ready = await isDeletionLedgerStartupReady(
+      await watermarkFile("1\n"),
+      receipts,
+    );
+    receipts.push({ position: 2 });
+    expect(ready).toBe(true);
+  });
+
+  it("fails a startup whose restore watermark is behind", async () => {
+    await expect(
+      isDeletionLedgerStartupReady(await watermarkFile("1\n"), [
+        { position: 1 },
+        { position: 2 },
+      ]),
     ).resolves.toBe(false);
   });
 });

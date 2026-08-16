@@ -86,7 +86,7 @@ function accept(
 ) {
   const automaticCombats =
     nextCommand.command_name === "endPhase" && current.phase === "movement"
-      ? combatSkirmishes(current, side).map(() => ({
+      ? combatSkirmishes(current, side)?.map(() => ({
           combat_id: randomUUID(),
           dice: { attacker: 5, defender: 5 },
         }))
@@ -368,6 +368,49 @@ describe("Phase 2 stacking capacity", () => {
     ).toMatchObject({ failure: { error: "occupied" }, ok: false });
   });
 
+  it.each(["moveUnit", "moveStack"] as const)(
+    "routes %s around an enemy-occupied intermediate hex",
+    (name) => {
+      const current = state({
+        units: {
+          enemy: unit("enemy", "union", "infantry", "A2"),
+          leader: unit("leader", "confederate", "general", "A1"),
+          mover: unit("mover", "confederate", "infantry", "A1", {
+            movement: 3,
+          }),
+        },
+      });
+      const payload =
+        name === "moveUnit"
+          ? { destination: "A3" as const, unit_id: "mover" }
+          : {
+              destination: "A3" as const,
+              unit_ids: ["mover", "leader"],
+            };
+      const moved = accept(current, "confederate", command(name, payload));
+      expect(moved.units.mover).toMatchObject({
+        location: "A3",
+        movement_spent: 3,
+      });
+    },
+  );
+
+  it("allows daytime movement into an enemy zone of control to attack", () => {
+    const current = state({
+      units: {
+        enemy: unit("enemy", "union", "infantry", "A3"),
+        mover: unit("mover", "confederate", "infantry", "A1"),
+      },
+    });
+    expect(
+      accept(
+        current,
+        "confederate",
+        command("moveUnit", { destination: "A2", unit_id: "mover" }),
+      ).units.mover,
+    ).toMatchObject({ location: "A2", movement_spent: 1 });
+  });
+
   it("rejects partial movement that leaves the source stack over capacity", () => {
     const current = state({
       units: {
@@ -515,6 +558,26 @@ describe("night movement and combat", () => {
           "Night movement cannot end while these counters can withdraw from enemy zones of control: nelson (K6).",
       },
       ok: false,
+    });
+  });
+
+  it("does not deadlock night movement on a general that cannot leave its source stack", () => {
+    const current = nightState({
+      first: unit("first", "confederate", "infantry", "K6", {
+        movement_spent: 5,
+      }),
+      general: unit("general", "confederate", "general", "K6"),
+      second: unit("second", "confederate", "artillery", "K6", {
+        movement_spent: 5,
+      }),
+      union: unit("union", "union", "infantry", "J5"),
+    });
+
+    const next = accept(current, "confederate", command("endPhase", {}));
+    expect(next.phase).toBe("combat");
+    expect(Object.values(next.combats)[0]).toMatchObject({
+      attackers: ["first", "second"],
+      defenders: ["union"],
     });
   });
 
@@ -954,6 +1017,57 @@ describe("automatic combat workflow", () => {
     });
   });
 
+  it("rejects a retreat path that crosses an enemy-occupied hex", () => {
+    const current = state({
+      active_side: "confederate",
+      combats: {
+        [combatId]: {
+          attacker_loss_allocated: false,
+          attacker_retreated: false,
+          attackers: ["enemy"],
+          confirmation: {
+            advance_offered: true,
+            attacker_losses: 0,
+            attacker_modifier: 3,
+            attacker_retreat: false,
+            defender_losses: 0,
+            defender_modifier: 3,
+            defender_retreat: true,
+            result: "attacker_win",
+          },
+          defender_loss_allocated: false,
+          defender_retreated: false,
+          defenders: ["retreating"],
+          id: combatId,
+          pending_choice: {
+            kind: "retreat",
+            side: "union",
+            unit_ids: ["retreating"],
+          },
+          rolls: { attacker: 8, defender: 1 },
+          status: "pending_choice",
+        },
+      },
+      phase: "combat",
+      units: {
+        enemy: unit("enemy", "confederate", "infantry", "C2"),
+        retreating: unit("retreating", "union", "infantry", "B2"),
+      },
+    });
+
+    expect(
+      reduceGameplayCommand(
+        current,
+        "union",
+        command("retreatStack", {
+          combat_id: combatId,
+          path: ["B2", "C2", "D2"],
+          unit_ids: ["retreating"],
+        }),
+      ),
+    ).toMatchObject({ failure: { error: "occupied" }, ok: false });
+  });
+
   it("eliminates a combat-one counter on its first allocated loss", () => {
     const oneStepUnits = {
       attacker: unit("attacker", "confederate", "infantry", "A1", {
@@ -1005,10 +1119,70 @@ describe("automatic combat workflow", () => {
       steps_remaining: 0,
       strength: "eliminated",
     });
-    expect(current.combats[combatId]?.pending_choice).toEqual({
-      kind: "retreat",
-      side: "union",
-      unit_ids: ["defenderGeneral"],
+    expect(current.units.defenderGeneral).toMatchObject({
+      location: null,
+      status: "eliminated",
+      steps_remaining: 0,
+      strength: "eliminated",
+    });
+    expect(current.combats[combatId]?.pending_choice).toMatchObject({
+      destination_hexes: ["B1"],
+      kind: "advance",
+      side: "confederate",
+    });
+  });
+
+  it("eliminates a general when both combat units in its defeated stack are eliminated", () => {
+    const defeatedStack = {
+      attacker: unit("attacker", "confederate", "infantry", "A1", {
+        combat: 8,
+      }),
+      first: unit("first", "union", "infantry", "B1", {
+        combat: 1,
+        reduced_combat: null,
+        steps_remaining: 1,
+      }),
+      general: unit("general", "union", "general", "B1"),
+      second: unit("second", "union", "artillery", "B1", {
+        combat: 1,
+        reduced_combat: null,
+        steps_remaining: 1,
+      }),
+    };
+    let current = accept(
+      state({ phase: "combat", units: defeatedStack }),
+      "confederate",
+      command("declareCombat", {
+        attackers: ["attacker"],
+        combat_id: combatId,
+        defenders: ["first", "second"],
+      }),
+      { attacker: 10, defender: 1 },
+    );
+    current = accept(
+      current,
+      "confederate",
+      command("confirmCombatResult", { combat_id: combatId }, 1),
+    );
+    current = accept(
+      current,
+      "union",
+      command(
+        "allocateLoss",
+        { allocations: { first: 1, second: 1 }, combat_id: combatId },
+        2,
+      ),
+    );
+    expect(current.units.first?.status).toBe("eliminated");
+    expect(current.units.second?.status).toBe("eliminated");
+    expect(current.units.general).toMatchObject({
+      location: null,
+      status: "eliminated",
+      steps_remaining: 0,
+    });
+    expect(current.combats[combatId]?.pending_choice).toMatchObject({
+      kind: "advance",
+      side: "confederate",
     });
   });
 });

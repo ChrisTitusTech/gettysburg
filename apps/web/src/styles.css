@@ -793,7 +793,14 @@ summary {
 }
 
 .advance-decline-target {
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.advance-decline-target:focus rect,
+.advance-decline-target:hover rect {
+  fill: rgb(96 39 32 / 96%);
+  stroke: #ffe0b2;
 }
 
 .advance-decline-target rect {
