@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
 import { Pool } from "pg";
@@ -548,6 +548,40 @@ postgres("PostgreSQL durability", () => {
       [created.gameId],
     );
     expect(normalized.rows[0]?.count).toBe("1");
+  });
+
+  it("reconstructs more than nine receipts in numeric ledger order", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const existingLedger = await service.getDeletionLedger();
+    const additions = Array.from({ length: 11 }, (_, index) => ({
+      actor: "off-host-recovery:ordering-test",
+      deletedAt: Date.UTC(2026, 7, 15) + index,
+      gameId: randomUUID(),
+      position: existingLedger.length + index + 1,
+      purgedAt: null,
+    }));
+    await service.synchronizeDeletionLedger([...existingLedger, ...additions]);
+    await service.close();
+
+    await administration.query(
+      `UPDATE service_state
+       SET snapshot = jsonb_set(snapshot, '{deletionLedger}', '[]'::jsonb)
+       WHERE singleton = true`,
+    );
+    const reconstructed = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await reconstructed.migrate();
+    await expect(reconstructed.getDeletionLedger()).resolves.toEqual([
+      ...existingLedger,
+      ...additions,
+    ]);
+    await reconstructed.close();
   });
 
   it("persists an externally synchronized deletion receipt atomically", async () => {

@@ -256,7 +256,7 @@ export class PostgresGameService implements GameService {
                       ELSE (extract(epoch FROM purged_at) * 1000)::bigint::text
                     END AS purged_at
              FROM deletion_ledger
-             ORDER BY position`,
+             ORDER BY deletion_ledger.position`,
           );
           const receipts = storedLedger.rows.map((row) => ({
             actor: row.actor,
