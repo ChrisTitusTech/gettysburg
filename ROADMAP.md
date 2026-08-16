@@ -118,8 +118,8 @@ an auditable action log.
   reinforcement schedule as typed content with provenance.
 - Add full/reduced/eliminated counter state and required general stacking support.
 - Implement all phase transitions across 24 turns and identify night turns.
-- Add server dice, manual combat declarations/results workflow, losses, retreat,
-  advance, objectives, and completion state.
+- Add automatic server dice and unit-factor combat results, confirmation,
+  losses, retreat, advance, objectives, and completion state.
 - Add PostgreSQL schema, migrations, snapshots, ordered actions, and resume.
 - Add invite lifecycle and the operator-recovery contract from `SPEC.md`:
   authenticated local action, old-binding revocation, a single-use recovery
@@ -128,8 +128,11 @@ an auditable action log.
 
 ### Dependencies and risks
 
-- Requires the missing Battle Manual, complete counter faces, setup, objective,
-  victory, and optional-rule decisions for a fidelity claim.
+- Uses owner-approved derived reduced values: halve each full combat factor and
+  round up, with combat-one counters eliminated on their first loss. Reduced
+  face artwork, per-hex terrain modifiers, and optional-rule decisions remain
+  outside the Phase 2 rules-light fidelity claim and are Phase 3/publication
+  inputs.
 - Database migration and backup procedures must be ready before durable staging.
 - Supplied art remains private unless the rights decision allows its use.
 
@@ -171,12 +174,17 @@ from a connection or persistence failure.
 
 ### Included work
 
-- Implement path cost, roads, terrain, streams, zones of control, generals, and
-  stacking validation.
-- Implement combat grouping, adjacency, modifiers/cap, die interpretation,
+- Extend the Phase 2 one-point-per-hex movement budget with path cost, roads,
+  terrain, streams, zones of control, generals, and stacking validation.
+- Extend adjacent contact discovery, same-hex grouping, and capped unit-factor
+  modifiers with complete ZOC grouping, terrain modifiers, die interpretation,
   defender tie, loss thresholds, allocation, retreat, and advance.
 - Implement reinforcement entry, night-turn behavior, objective control, and
   final victory evaluation.
+  - Core night withdrawal, prohibition on entering enemy ZOC, and combat for
+    trapped units only were pulled forward as a Phase 2 correctness fix.
+    Remaining work includes nighttime reorganization and complete advanced ZOC
+    interactions.
 - Add rules explanations, previews, warnings, and deterministic replay tests.
 - Add explicit rule-version metadata so existing games remain interpretable.
 

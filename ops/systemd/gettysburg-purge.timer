@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Gettysburg expired-game purge
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30m
+Unit=gettysburg-purge.service
+
+[Install]
+WantedBy=timers.target

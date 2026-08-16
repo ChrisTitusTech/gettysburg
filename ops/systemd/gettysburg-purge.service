@@ -1,0 +1,7 @@
+[Unit]
+Description=Purge expired Gettysburg soft-deleted games
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/bin/systemctl --user is-active --quiet gettysburg-app.service
+ExecStart=/usr/bin/podman exec gettysburg-app node apps/server/dist/operator.js purge-deleted

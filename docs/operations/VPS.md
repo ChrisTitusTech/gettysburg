@@ -21,8 +21,9 @@ point-in-time baseline and must be refreshed before a production change.
 | Kernel | `7.0.0-29-generic` |
 | Time | UTC, NTP synchronized |
 
-DNS resolves the domain to the public IPv4. Caddy redirects HTTP to HTTPS,
-serves the current placeholder over HTTP/2, and returns `ok` at `/healthz`.
+DNS resolves the domain to the public IPv4. Caddy redirects HTTP to HTTPS and
+proxies the Phase 2 rootless staging application over HTTP/2. Public `/healthz`
+and PostgreSQL-backed `/readyz` passed after deployment.
 The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
@@ -142,9 +143,9 @@ network=netavark
 graph=/srv/gettysburg/.local/share/containers/storage
 ```
 
-The rootless build/run path and a temporary Quadlet boot test passed. The smoke
-container and unit were removed, leaving no application containers or Quadlet
-files after validation.
+The rootless build/run path and the persistent Phase 2 Quadlets pass. The
+application and PostgreSQL containers are managed by the lingering `gettysburg`
+user manager; the application process runs as UID/GID 1000:1000.
 
 Persistent layout:
 
@@ -164,7 +165,7 @@ image, Quadlet file, command line, or project documentation.
 
 Caddy 2.11.4 is installed from the official package repository and runs as an
 enabled host service. Its configuration is `/etc/caddy/Caddyfile`. The current
-site is a readiness placeholder.
+site proxies the accepted Phase 2 staging revision to `127.0.0.1:3000`.
 
 The intended production flow is:
 
@@ -194,12 +195,105 @@ unrecorded shell history:
 1. Fetch the exact reviewed revision into `/srv/gettysburg/src`.
 2. Build or pull an immutable image and record its digest.
 3. Back up PostgreSQL and persistent state before a migration.
-4. Install/update Quadlet files under the service account.
-5. Reload the user manager, start the database, run reviewed migrations, and
+4. Put Caddy in maintenance mode and stop the old application so no old-ruleset
+   writes can race the candidate or make rollback unsafe.
+5. Install/update Quadlet files under the service account.
+6. Reload the user manager, start the database, run reviewed migrations, and
    start the application.
-6. Verify local liveness/readiness, the Caddy route, WebSocket upgrade, and a
-   two-client smoke flow.
-7. Retain the last compatible image and backup until the release is accepted.
+7. Verify local liveness/readiness and the exact running image before switching
+   Caddy to the candidate. If a post-switch public check fails, restore
+   maintenance mode and keep the candidate running rather than starting an
+   older ruleset against data the candidate may have written.
+8. Verify the Caddy route, WebSocket upgrade, and a
+   two-client smoke flow. The deploy script creates and retains one ordinary
+   smoke game so it does not bypass the deletion ledger or make readiness
+   depend on an off-host backup performed mid-deploy.
+9. Confirm the independent review and successful CI both reference the exact
+   candidate revision recorded by the image label. Retain the last compatible
+   image and backup until the release is accepted.
+
+The reviewed repository entry points are:
+
+```bash
+# Root: refuse a dirty checkout, build the exact HEAD, back up an existing
+# database, install rootless Quadlets, validate Caddy, and verify readiness.
+scripts/vps-deploy.sh
+
+# Gettysburg service account: create an age-encrypted PostgreSQL dump and
+# deletion-ledger export, then verify an isolated restore.
+scripts/vps-backup.sh
+scripts/vps-restore-test.sh \
+  /srv/gettysburg/backups/TIMESTAMP/gettysburg.dump.age
+
+# Gettysburg service account: issue a short-lived, one-use recovery grant.
+scripts/vps-recovery.sh issue-seat-recovery GAME_ID SIDE OPERATOR_IDENTITY
+scripts/vps-recovery.sh issue-host-recovery GAME_ID OPERATOR_IDENTITY
+scripts/vps-recovery.sh purge-deleted
+
+# Maintainer workstation: copy a new encrypted backup locally and acknowledge
+# its deletion-ledger watermark only after checksums and decryption pass.
+scripts/offhost-backup.sh
+```
+
+Each recovery issue command returns a `redemption_path` containing the one-time
+bearer fragment. Send the complete public-origin URL to the intended recipient
+over a private channel; the browser removes the fragment before claiming it.
+
+The Quadlets are under `ops/quadlet/`; they run both containers rootlessly with
+read-only root filesystems, private named volumes, and an internal network. The
+application drops all capabilities. PostgreSQL drops the defaults and restores
+only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
+entrypoint needs to initialize the named volume and become the database user.
+The PostgreSQL and Node base images are pinned by digest. Secrets are created
+outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The
+deployment script records the exact Git revision and application image ID beside
+the pre-change rollback material.
+The user timer in `ops/systemd/` runs the 30-day hard-purge job daily. Each dump
+records and verifies the database deletion-ledger watermark. The intentionally
+simple Phase 2 encryption design uses age and stores the identity on both the VPS
+and maintainer workstation. This is easier to operate than an offline-only key;
+it protects backup files and the off-host copy at rest but does not protect them
+from a total VPS compromise. The workstation is the selected off-host target.
+The root deployment script installs the Ubuntu `age` package when absent,
+generates the VPS identity once, derives its recipient file, and validates both
+before any mandatory pre-deploy backup. It does not invent an acknowledgement
+watermark. On the first run it provisions the key, initializes PostgreSQL and an
+unready candidate behind maintenance mode, then stops with instructions. This
+gives the workstation backup command a real migrated database to copy; traffic
+remains disabled until that verified copy creates the acknowledgement and the
+deployment is rerun.
+
+Install `age` on the maintainer workstation, then copy the generated identity
+through the existing key-only SSH path:
+
+```bash
+install -d -m 0700 ~/.config/gettysburg
+scp gettysburg:/srv/gettysburg/.config/gettysburg/backup-age-identity \
+  ~/.config/gettysburg/backup-age-identity
+chmod 0600 ~/.config/gettysburg/backup-age-identity
+scripts/offhost-backup.sh
+# Rerun scripts/vps-deploy.sh on the VPS after this succeeds.
+```
+
+Install `ops/workstation-systemd/gettysburg-offhost-backup.{service,timer}` in
+`~/.config/systemd/user/`, then enable the timer. It uses the existing
+`ssh gettysburg` identity and writes mode-0700 backups below
+`~/.local/state/gettysburg/offhost-backups/`. The timer is persistent, so a
+missed run starts after the workstation next boots. A successful copy verifies
+`SHA256SUMS`, decrypts and validates the ledger, completes an isolated rootless
+`pg_restore`, and atomically advances the
+non-secret `offhost-ledger-watermark` under the dedicated
+`~/.config/gettysburg-readiness/` directory on the VPS. The application mounts
+that directory read-only and refuses `/readyz`, gameplay APIs, room admission,
+and room commands when the value differs from the database ledger position.
+The sole exception is an authenticated `deleteGame` retry with the exact command
+ID of an already accepted deletion; it can return its stored terminal result but
+cannot create a new deletion or mutate the game.
+The copy refuses to acknowledge a watermark lower than either the remote
+acknowledgement or any retained workstation backup.
+The service defaults to the GitHub checkout at `%h/github/gettysburg`; set
+`GETTYSBURG_CHECKOUT_ROOT=/absolute/checkout/path` in
+`~/.config/gettysburg/offhost-backup.env` only when the checkout lives elsewhere.
 
 Use the real lingering user manager for service actions. From a root SSH shell,
 an explicit non-interactive invocation is:
@@ -224,15 +318,31 @@ Existing host-configuration backups:
 - `/root/vps-bootstrap-backups/Caddyfile.package-default-20260815T025031Z`
 - `/root/ssh-config-backups/00-skysilk.conf.disabled-20260815T025031Z`
 
-These are local rollback artifacts, not application backups. Before production,
-add scheduled PostgreSQL dumps and persistent-volume backups under
-`/srv/gettysburg/backups`, copy encrypted backups off-host, set retention, and
-prove restore. A backup is not accepted until a restore has been verified.
+These are local rollback artifacts, not application backups. Historical
+plaintext staging dumps predate the age workflow and should remain protected by
+the service-account directory until their documented retention expires. A new
+backup is accepted only after strict checksum validation, off-host copy, and an
+isolated rootless restore.
+
+For recovery, decrypt the newest off-host `deletion-ledger.json.age`, copy the
+plaintext temporarily into the application container, and run:
+
+```bash
+node apps/server/dist/operator.js sync-deletion-ledger \
+  /tmp/deletion-ledger.json
+```
+
+Remove the plaintext immediately, atomically set the mounted watermark to the
+same final position, and only then admit traffic. Synchronization is prefix-
+checked and idempotent: a missing position, conflicting receipt, stale external
+ledger, or mismatched readiness watermark fails closed. A soft-delete event is
+written and replicated immediately with a null purge time; synchronization marks
+any restored pre-deletion game inaccessible. The later hard-purge event removes
+the retained game and related records.
 
 ## Host-baseline verification commands
 
-This is a host-only audit of the current placeholder and does not accept an
-application release. Run:
+This is a host-only audit of the current staging deployment. Run:
 
 ```bash
 ssh gettysburg

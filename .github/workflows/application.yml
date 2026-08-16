@@ -1,0 +1,83 @@
+name: Application
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: application-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GETTYSBURG_POSTGRES_TEST_URL: postgresql://gettysburg@127.0.0.1:5432/gettysburg_test
+    services:
+      postgres:
+        image: postgres:18.1-alpine
+        env:
+          POSTGRES_DB: gettysburg_test
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_USER: gettysburg
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gettysburg -d gettysburg_test"
+          --health-interval 2s --health-timeout 2s --health-retries 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: pnpm
+          node-version: 24.13.1
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check formatting
+        run: pnpm format:check
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Type-check
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Chromium for browser acceptance
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Run two-player browser acceptance
+        run: pnpm browser:acceptance
+
+      - name: Smoke-test startup and readiness
+        run: timeout 45s pnpm smoke
+
+      - name: Build and smoke-test the non-root container
+        env:
+          GETTYSBURG_CONTAINER_ENGINE: docker
+        run: pnpm container:smoke

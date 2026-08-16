@@ -1,0 +1,5 @@
+FROM docker.io/library/caddy:2.10.2-alpine
+
+# The upstream binary can bind privileged ports. This deployment listens on
+# 8080, so remove the unused file capability before dropping every capability.
+RUN setcap -r /usr/bin/caddy

@@ -1,8 +1,24 @@
 # Gettysburg project tasks
 
-## Current phase: Phase 0 project foundation
+## Current phase: Phase 2 digital-tabletop MVP
 
-Phase 1 tasks are queued below and must not start until PR #1 merges.
+Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
+at `https://gettysburg.christitus.com` as of 2026-08-16. The local
+PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. PR #2 is
+ready for review. The full local, browser, PostgreSQL, container, deployment,
+encrypted backup/restore, and independent-review gates pass. Exact-head CI must
+pass on the final documentation commit before the owner-controlled merge of the
+ready PR.
+
+## Phase 1 open gates
+
+PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
+Phase 1 work may use clearly labelled fixture content while the source and rights
+decisions remain open.
+
+Local implementation is complete on `codex/phase-1-scaffold` as of 2026-08-15.
+The phase remains open only for the owner-controlled review/publication gates
+recorded below; no implementation or local-validation failure remains.
 
 - [ ] Resolve the minimum content and rights decisions for prototype work.
   - Scope: Obtain or explicitly defer the Battle Manual, complete counter faces,
@@ -13,8 +29,13 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
     inputs are present; clean-clone content-schema checks pass independently.
   - Manual validation: Project owner reviews the interpretation/rights ledger.
   - Dependencies or blockers: Additional physical source material and owner input.
+  - Status: Implementation complete. The ledger explicitly defers every missing
+    input, names ChrisTitusTech as owner, and blocks later fidelity/public-release
+    claims at the appropriate phase. Owner review is still unobserved. Follow-up:
+    ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before Phase 1 is
+    marked complete.
 
-- [ ] Scaffold the typed pnpm workspace and CI gate.
+- [x] Scaffold the typed pnpm workspace and CI gate.
   - Scope: Create `apps/web`, `apps/server`, `packages/game`, and
     `packages/content`; pin supported Node/pnpm versions; add format, lint,
     type-check, test, build, and development scripts.
@@ -27,8 +48,12 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
   - Manual validation: `pnpm dev` starts the browser and server together for
     interactive development and stops cleanly on operator request.
   - Dependencies or blockers: None.
+  - Status: Complete. PR #1 merged as
+    `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c`, and its exact-head workspace and
+    documentation CI passed. The supported entry points continue to pass on
+    Node.js 24 with pnpm 11.21.0.
 
-- [ ] Implement the board calibration and accessible two-counter client.
+- [x] Implement the board calibration and accessible two-counter client.
   - Scope: Create an approved original or clean-room fixture board, map the
     playable A-U/1-11 coordinates, and add SVG pan, zoom, select, and move intent
     for two fixture counters. Keep scan-derived intermediates local and ignored.
@@ -39,8 +64,12 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
   - Manual validation: Desktop and tablet screenshots at minimum, fit, and zoomed
     views; pointer, touch, and keyboard inspection.
   - Dependencies or blockers: Board geometry calibration.
+  - Status: Complete. Content and component tests pass. Playwright verified
+    pointer, keyboard, and touch flows at 1440 x 900 and 1024 x 768, and refreshed
+    minimum, fit, and zoomed evidence is checked in under
+    `docs/evidence/phase-1`.
 
-- [ ] Implement the authoritative multiplayer room.
+- [x] Implement the authoritative multiplayer room.
   - Scope: Create/join, one-time invitation claim, Union/Confederate seats,
     hashed browser-session credentials and multi-game seat bindings, audited
     operator recovery, versioned `moveUnit`,
@@ -58,8 +87,14 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
     covered explicitly.
   - Manual validation: Two independent browser contexts complete the full flow.
   - Dependencies or blockers: Workspace scaffold and protocol types.
+  - Status: Complete for the Phase 1 live-process persistence boundary. Tests
+    cover credential hardening, invitation replay, multiple-game bindings,
+    reconnect, seat recovery/revocation, binding-scoped idempotency, crash/retry,
+    invalid/stale/unauthorized commands, ordered events, gap detection, and exact
+    WebSocket-origin rejection. The two-context browser flow passes at both
+    required viewport sizes.
 
-- [ ] Add the production-shaped local runtime and health checks.
+- [x] Add the production-shaped local runtime and health checks.
   - Scope: Rootless-compatible container image, local compose/development path,
     `/healthz` liveness, `/readyz` readiness, graceful shutdown, and documented
     environment contract without secrets. Phase 1 runs in explicitly configured
@@ -76,6 +111,11 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
     equivalent reverse-proxy test and confirm the proxied application process is
     non-root.
   - Dependencies or blockers: Server entry point.
+  - Status: Complete. `pnpm container:smoke` passes with Podman at UID/GID
+    1000:1000, zero added capabilities, read-only root filesystem, ready and
+    fail-closed dependency modes, and clean shutdown. The same-origin Caddy
+    compose path passes at `http://127.0.0.1:8080`; both application and proxy
+    run non-root with all capabilities dropped and were removed after validation.
 
 - [ ] Complete Phase 1 review and evidence.
   - Scope: Final diff, complete local gate, built-in review, independent review,
@@ -91,24 +131,148 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
     and follow-up before leaving this task open; never mark it complete on an
     unexplained skip.
   - Dependencies or blockers: All Phase 1 implementation tasks.
+  - Status: Implementation evidence complete. The full repository gate, browser
+    acceptance, container smoke, compose proxy run, Markdown lint, Action lint,
+    source-asset boundary, secret scan, and final diff checks pass. Built-in
+    review found a cross-binding idempotency disclosure; the fix and regression
+    tests pass. PR #1 merged after exact-head CI. The remaining owner gate is
+    ChrisTitusTech's review of the rights ledger; this task and Phase 1 remain
+    open until that manual result is recorded.
 
 ## Backlog by phase
 
 ### Phase 2
 
-- [ ] Encode the complete approved map, units, counter states, setup, and entries.
-- [ ] Implement the 24-turn rules-light tabletop workflow and server dice.
-- [ ] Add PostgreSQL migrations, transactions, snapshots, actions, and resume.
-- [ ] Add secure invitations and operator recovery.
-- [ ] Deploy and restore-test the private staging service on the VPS.
-- [ ] Complete a full two-player Phase 2 acceptance game.
+- [x] Encode the complete approved map, units, counter states, setup, and entries.
+  - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
+    turns/hexes, eight objectives, night turns, and victory schedule are typed
+    with local-source provenance and tests. The newly supplied Battle Manual is
+    ignored, hashed, visually reviewed, and not committed. The owner approved
+    deriving reduced combat values as half the full value rounded up; combat-one
+    counters are one-step units eliminated by their first loss. The client has an
+    original vector terrain presentation based on the local board reference,
+    including woods, hills, roads, streams, town, and landmark layers; these are
+    deliberately not used as rules data until that review. The artwork now uses
+    one continuous hand-drawn paper, ink, and watercolor landscape beneath the
+    transparent play grid, so woods and elevation cross hex edges naturally.
+    Streams join into board-spanning waterways, and every road, railroad, and
+    stream reaches the clipped outer board edge instead of stopping mid-map. The
+    owner confirmed that I5, J5, and J6 do not receive hill artwork. The typed
+    terrain fields stay explicitly unavailable because Phase 2 combat is
+    unit-factor-only; reviewed per-hex terrain enforcement remains Phase 3 work.
+- [x] Implement the 24-turn rules-light tabletop workflow and server dice.
+  - Status: Movement, stacking, reinforcement entry, phase progression,
+    cryptographic d10 rolls, confirmation, loss, retreat, advance, objectives,
+    casualty scoring, night checks, automatic victory, and completion are
+    server-authoritative. Ending movement now discovers every adjacent occupied-
+    hex contact and deterministically exact-covers the whole contact network with
+    legal independent skirmishes. Every eligible combat counter is assigned once,
+    same-hex counters stay together, one side of each skirmish occupies one hex,
+    and players cannot omit a touching stack or manually choose a grouping. The
+    same authoritative action assigns separate cryptographic d10 rolls to both
+    sides of every skirmish; modifiers and results are calculated independently,
+    never cumulatively. The board draws each generated contact and presents
+    labels, hexes, rolls, and capped printed combat-factor totals without raw ID
+    or coordinate entry. Defender terrain adjustments remain excluded until the
+    per-hex transcription is reviewed. Core night rules are now authoritative:
+    the server and drag preview reject movement or reinforcement entry into an
+    enemy ZOC, require every counter with a legal withdrawal to leave before
+    movement ends, and create night combat only for combat counters unable to
+    withdraw. Normal board drag now moves a whole
+    friendly stack atomically at its slowest allowance; Ctrl-drag selects one
+    counter. Retreat is also board drag, and every surviving counter and general
+    from one losing hex moves together along connected hexes to the first empty
+    hex. Advance and decline are board drag actions too: winning stacks are
+    highlighted, vacated defender hexes are authoritative drop targets, and a
+    visible tray accepts a declined advance. No board action requires typed hex
+    coordinates. The empty Confederate opening is skipped so turn 1 starts at Union
+    movement without artificial actions. Tests cover every phase-table row,
+    automatic mandatory combat entry, dense-network legal separation,
+    independent server rolls, nonadjacent combat skipping, night ZOC entry and
+    withdrawal boundaries, trapped-only night combat, legacy declaration
+    rejection, stacking shape, atomic movement and retreat, reinforcement gates,
+    defender-wins-ties and every loss threshold, multi-choice combat, and a
+    gap-free 47-action two-seat game through turn 24.
+- [x] Add PostgreSQL migrations, transactions, snapshots, actions, and resume.
+  - Status: Migrations are concurrent-start safe and idempotent. Real PostgreSQL
+    tests prove restart reconstruction and atomic rollback on injected action-row
+    failure. Startup, browser, and container checks pass; the container check
+    resumes a secure-cookie session after application restart. A local `pg_dump`
+    restore reproduced the game ID, versions, and state hash exactly.
+- [x] Add secure invitations and operator recovery.
+  - Status: One-use fragment invitations, hashed credentials, replay/mismatch
+    rejection, binding-scoped authorization, audited one-use seat and host
+    recovery, host-issued/revoked replacement invitations, seat surrender, and
+    30-day soft deletion, daily hard purge, and minimal append-only soft-delete
+    and purge receipts now persist across restart and pass in-memory, HTTP, and
+    real PostgreSQL tests. Invitation secrets returned by an idempotent
+    issue retry are encrypted with the server-held key outside the database and
+    destroyed on claim or revocation. Invitation and operator-recovery claims
+    retain client idempotency across lost responses, host-only controls and
+    active invitation lookup IDs survive reload and seat surrender, and browser
+    recovery paths scrub bearer fragments before redemption. Gameplay,
+    management, and audit actions
+    share the gap-free event sequence while management/audit events preserve the
+    gameplay version. Backups encrypt the PostgreSQL dump and exported deletion
+    ledger with age, record and verify the database ledger watermark, and are
+    copied daily to the maintainer workstation before that watermark is
+    acknowledged.
+    Redacted host-management events now broadcast through the live room and
+    advance only the shared event cursor. Restore synchronization reapplies every
+    externally retained tombstone or purge event atomically, so a pre-deletion
+    backup cannot restore access; `/readyz` fails closed until the mounted
+    off-host watermark equals the live ledger.
+- [x] Deploy and restore-test the private staging service on the VPS.
+  - Status: Rootless Quadlet services run code revision
+    `f6a9ec27927d756daf5711188edbe4d564fed373`, recorded
+    by the image label and deployment rollback record behind host Caddy at
+    `https://gettysburg.christitus.com`. Local/public health and readiness,
+    HSTS, non-root application UID/GID, internal-only application network,
+    image-revision label, public WebSocket origin, an automatic public
+    two-client state-synchronization transaction, two independent browser
+    sessions, application restart/resume, PostgreSQL
+    restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
+    pass. The post-deployment encrypted backup
+    `20260816T072304Z` includes the encrypted credential pepper and passed strict
+    checksums, remote isolated restore (`17:48:47:13`), off-host copy validation,
+    and the deletion-ledger watermark gate. The original Caddy
+    placeholder and failed candidate units were restored after each
+    pre-acceptance deployment failure.
+- [x] Complete a full two-player Phase 2 acceptance game.
+  - Status: Real two-browser create/join/reject/reconnect workflows pass locally
+    and through public HTTPS/WebSockets at 1440 x 900 and 1024 x 768. A separate
+    public two-browser run completed all 47 authoritative transitions through
+    turn 24, reached the completed state at version 47, captured
+    `test-results/phase-2-live/live-full-game-complete.png`, and deleted its test
+    game through the confirmed host workflow. The owner confirmed the human
+    24-turn acceptance game is complete. CodeRabbit reviewed the complete
+    Phase 2 diff, every validated finding was addressed, and the final focused
+    reviews returned zero findings. The built-in Codex review completed a direct
+    multi-pass review with every validated durability, deployment, readiness,
+    and backup finding addressed. PR #2 requires exact-head Application and
+    Documentation CI before merge.
+
+- [x] Add the immutable ruleset/content version registry gate.
+  - Status: Saved games resolve through the exact ruleset/content pair. Unknown
+    pairs remain stored but fail mutation/resume with `version_unavailable`, and
+    PostgreSQL readiness fails closed until the matching handler/content bundle
+    is restored. Unit and readiness paths cover the unsupported-version case.
 
 ### Phase 3
 
-- [ ] Implement and test movement, terrain, roads, streams, ZOC, and stacking.
-- [ ] Implement and test combat grouping, modifiers, results, loss, retreat, and
-  advance.
-- [ ] Implement and test reinforcement, night, objective, and victory rules.
+- [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
+  stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
+  spending, atomic stack drag, Ctrl single-counter drag, and a capped route
+  preview are complete in Phase 2.
+- [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
+  loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
+  mandatory legal skirmish separation, independent automatic two-die unit-factor
+  result interpretation, and printed-factor modifier totals are complete in
+  Phase 2. Phase 3 retains verified per-hex terrain modifiers and any remaining
+  rule-derived ZOC effects.
+- [ ] Implement and test remaining reinforcement, night, objective, and victory
+  rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
+  trapped-only combat are complete; nighttime reorganization remains.
 - [ ] Add rule versions, explanations, previews, and deterministic replay.
 - [ ] Complete a full rules-enforced acceptance game.
 
@@ -123,7 +287,7 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 
 ## Phase 0 completion gate
 
-- [ ] Merge PR #1 to establish the project foundation and implementation
+- [x] Merge PR #1 to establish the project foundation and implementation
   direction.
   - Scope: Source inventory, product plan, specification, phased roadmap, current
     tasks, repository instructions, and verified VPS operations baseline.
@@ -138,8 +302,9 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 
 ### Phase 0 gate evidence
 
-- Status: In progress until PR #1 is merged; the completion checkbox remains
-  open and Phase 1 work remains blocked.
+- Status: Complete. PR #1 merged as
+  `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15 after the exact-head
+  Documentation check passed.
 - Final diff: Planning, repository-policy, documentation-validation, source
   boundary, and VPS baseline files only. The supplied JPG/PDF inputs are ignored,
   untracked, and absent from the staged diff.
@@ -158,8 +323,6 @@ Phase 1 tasks are queued below and must not start until PR #1 merges.
 | Browser | ChrisTitusTech | Not run: there is no runnable UI | Phase 0 has no client | Run two sessions at desktop and tablet widths in Phase 1 |
 | Container | ChrisTitusTech | Not run: there is no application image | Phase 0 has no runtime | Add and run the non-root container smoke gate in Phase 1 |
 | Independent review | ChrisTitusTech | CodeRabbit CLI returned zero findings on the staged diff | No unavailable check | Reverify the published exact head before merge |
-| Exact-head CI | ChrisTitusTech | Not run: no published PR head exists | PR #1 is not yet published | Require the final-head Documentation check before merge |
+| Exact-head CI | ChrisTitusTech | Passed: Validate planning foundation | No unavailable check | Reverify the Phase 1 exact head before merge |
 
-- Post-merge follow-up: Project owner marks the Phase 0 checkbox complete, changes
-  the current-phase heading to Phase 1, and records the merge commit in the first
-  Phase 1 task-status update.
+- Post-merge follow-up: Completed in the first Phase 1 task-status update.

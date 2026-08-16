@@ -1,0 +1,11 @@
+dist
+coverage
+node_modules
+gameboard.jpg
+Rules1.pdf
+Rules2.pdf
+OOP-Union.pdf
+OOP-Confederate.pdf
+gettysburg-battle-manual_OCR.pdf
+**/*.md
+.github/workflows/documentation.yml
