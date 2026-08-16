@@ -76,13 +76,13 @@ if [[ "${remote_acknowledgement}" != missing &&
 fi
 
 remote_backup_directory="$(ssh -o "ControlPath=${control_path}" "${ssh_host}" \
-	'service_uid="$(id -u gettysburg)"; runuser -u gettysburg -- env HOME=/srv/gettysburg XDG_RUNTIME_DIR="/run/user/${service_uid}" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${service_uid}/bus" /srv/gettysburg/src/scripts/vps-backup.sh')"
+	'cd /srv/gettysburg; service_uid="$(id -u gettysburg)"; runuser -u gettysburg -- env HOME=/srv/gettysburg XDG_RUNTIME_DIR="/run/user/${service_uid}" DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${service_uid}/bus" /srv/gettysburg/src/scripts/vps-backup.sh')"
 if [[ ! "${remote_backup_directory}" =~ ^/srv/gettysburg/backups/[0-9]{8}T[0-9]{6}Z$ ]]; then
 	printf 'Unexpected remote backup path: %s\n' "${remote_backup_directory}" >&2
 	exit 1
 fi
 restore_result="$(ssh -o "ControlPath=${control_path}" "${ssh_host}" \
-	"service_uid=\"\$(id -u gettysburg)\"; runuser -u gettysburg -- env HOME=/srv/gettysburg XDG_RUNTIME_DIR=\"/run/user/\${service_uid}\" DBUS_SESSION_BUS_ADDRESS=\"unix:path=/run/user/\${service_uid}/bus\" /srv/gettysburg/src/scripts/vps-restore-test.sh '${remote_backup_directory}/gettysburg.dump.age'")"
+	"cd /srv/gettysburg; service_uid=\"\$(id -u gettysburg)\"; runuser -u gettysburg -- env HOME=/srv/gettysburg XDG_RUNTIME_DIR=\"/run/user/\${service_uid}\" DBUS_SESSION_BUS_ADDRESS=\"unix:path=/run/user/\${service_uid}/bus\" /srv/gettysburg/src/scripts/vps-restore-test.sh '${remote_backup_directory}/gettysburg.dump.age'")"
 readonly restore_result
 if [[ ! "${restore_result}" =~ ^[0-9]+:[0-9]+:[0-9]+:[0-9]+$ ]]; then
 	printf 'Unexpected restore-test result: %s\n' "${restore_result}" >&2

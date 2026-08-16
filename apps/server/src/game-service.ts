@@ -697,19 +697,27 @@ export class InMemoryGameService {
     }
     const gameDeletionStates = new Map<string, "deleted" | "purged">();
     for (const [index, receipt] of externalReceipts.entries()) {
-      if (
-        receipt.position !== index + 1 ||
-        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      const invalidFields = [
+        receipt.position === index + 1 ? undefined : "position",
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
           receipt.gameId,
-        ) ||
-        !Number.isSafeInteger(receipt.deletedAt) ||
-        (receipt.purgedAt !== null &&
-          !Number.isSafeInteger(receipt.purgedAt)) ||
-        receipt.deletedAt < 0 ||
-        (receipt.purgedAt !== null && receipt.purgedAt < receipt.deletedAt) ||
-        receipt.actor.trim() === ""
-      ) {
-        throw new Error("External deletion ledger is invalid");
+        )
+          ? undefined
+          : "gameId",
+        Number.isSafeInteger(receipt.deletedAt) && receipt.deletedAt >= 0
+          ? undefined
+          : "deletedAt",
+        receipt.purgedAt === null ||
+        (Number.isSafeInteger(receipt.purgedAt) &&
+          receipt.purgedAt >= receipt.deletedAt)
+          ? undefined
+          : "purgedAt",
+        receipt.actor.trim() === "" ? "actor" : undefined,
+      ].filter((field): field is string => field !== undefined);
+      if (invalidFields.length > 0) {
+        throw new Error(
+          `External deletion ledger receipt ${index + 1} has invalid ${invalidFields.join(", ")}`,
+        );
       }
       const local = this.#deletionLedger[index];
       const matchesLocal =
