@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
+  ApiResponseError,
   claimInvitation,
   claimHostRecovery,
   claimSeatRecovery,
@@ -173,6 +174,7 @@ export function App({
     }
     let active = true;
     let connectedRoom: Room | undefined;
+    let serverEvicting = false;
     eventCursorReference.current = {
       event_sequence: activeGame.state.event_sequence,
       state_version: activeGame.state.version,
@@ -238,6 +240,7 @@ export function App({
           return;
         }
         if (result.event.command_name === "surrenderSeat") {
+          serverEvicting = true;
           if (activeGame.is_host) {
             void resumeGame(activeGame.game_id)
               .then((session) => {
@@ -255,7 +258,6 @@ export function App({
             window.localStorage.removeItem(LAST_GAME_KEY);
             window.history.replaceState(null, "", "/");
             setActiveGame(null);
-            void connectedRoom?.leave(true);
           }
         }
         setError(null);
@@ -354,7 +356,9 @@ export function App({
     return () => {
       active = false;
       roomReference.current = null;
-      if (connectedRoom !== undefined) void connectedRoom.leave(true);
+      if (connectedRoom !== undefined && !serverEvicting) {
+        void connectedRoom.leave(true);
+      }
     };
   }, [activeGame?.game_id, activeGame?.seat, enterGame, reconnectAttempt]);
 
@@ -400,6 +404,9 @@ export function App({
         payload,
         commandId,
       );
+      if (!result.ok) {
+        throw new ApiResponseError(result.message, 409, result.error);
+      }
       if (commandName !== "deleteGame") {
         const synchronized = await resumeGame(activeGame.game_id);
         if (!synchronized.is_host) {

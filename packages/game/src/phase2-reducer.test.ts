@@ -367,6 +367,31 @@ describe("Phase 2 stacking capacity", () => {
       ),
     ).toMatchObject({ failure: { error: "occupied" }, ok: false });
   });
+
+  it("rejects partial movement that leaves the source stack over capacity", () => {
+    const current = state({
+      units: {
+        first: unit("first", "confederate", "infantry", "A1"),
+        general: unit("general", "confederate", "general", "A1"),
+        second: unit("second", "confederate", "artillery", "A1"),
+      },
+    });
+
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command("moveUnit", { destination: "B1", unit_id: "general" }),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "occupied",
+        message:
+          "Moving that counter would leave its source stack over capacity.",
+      },
+      ok: false,
+    });
+  });
 });
 
 describe("night movement and combat", () => {
@@ -873,6 +898,60 @@ describe("automatic combat workflow", () => {
     expect(current.combats[combatId]?.status).toBe("resolved");
     expect(current.units.attacker?.location).toBe("B1");
     expect(current.units.attackerGeneral?.location).toBe("B1");
+  });
+
+  it("rejects a partial advance that leaves its source stack over capacity", () => {
+    const current = state({
+      combats: {
+        [combatId]: {
+          attacker_loss_allocated: true,
+          attacker_retreated: false,
+          attackers: ["first", "second"],
+          confirmation: null,
+          defender_loss_allocated: true,
+          defender_retreated: true,
+          defenders: ["defender"],
+          id: combatId,
+          pending_choice: {
+            destination_hexes: ["B1"],
+            eligible_unit_ids: ["first", "general", "second"],
+            kind: "advance",
+            side: "confederate",
+          },
+          rolls: null,
+          status: "pending_choice",
+        },
+      },
+      phase: "combat",
+      units: {
+        defender: unit("defender", "union", "infantry", null, {
+          status: "eliminated",
+        }),
+        first: unit("first", "confederate", "infantry", "A1"),
+        general: unit("general", "confederate", "general", "A1"),
+        second: unit("second", "confederate", "artillery", "A1"),
+      },
+    });
+
+    expect(
+      reduceGameplayCommand(
+        current,
+        "confederate",
+        command("advanceAfterCombat", {
+          combat_id: combatId,
+          decline: false,
+          destination: "B1",
+          unit_ids: ["general"],
+        }),
+      ),
+    ).toMatchObject({
+      failure: {
+        error: "occupied",
+        message:
+          "Advancing those counters would leave their source stack over capacity.",
+      },
+      ok: false,
+    });
   });
 
   it("eliminates a combat-one counter on its first allocated loss", () => {

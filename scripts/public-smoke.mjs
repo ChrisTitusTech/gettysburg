@@ -65,6 +65,36 @@ const guestRoom = await new ColyseusClient(origin, {
   headers: { cookie: guestCookie, origin },
 }).joinOrCreate("game", { gameId: created.game_id });
 
+async function deleteSmokeGame() {
+  const resumeResponse = await fetch(`${origin}/api/games/${created.game_id}`, {
+    headers: { cookie: hostCookie },
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(resumeResponse.status, 200);
+  const session = await resumeResponse.json();
+  const deleteResponse = await fetch(
+    `${origin}/api/games/${created.game_id}/host-commands`,
+    {
+      body: JSON.stringify({
+        command_id: randomUUID(),
+        command_name: "deleteGame",
+        expected_version: session.state.version,
+        game_id: created.game_id,
+        payload: { confirm: true },
+        schema: "gettysburg-command/v1",
+      }),
+      headers: {
+        "content-type": "application/json",
+        cookie: hostCookie,
+      },
+      method: "POST",
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
+  assert.equal(deleteResponse.status, 200);
+  assert.equal((await deleteResponse.json()).ok, true);
+}
+
 try {
   assert.equal(guestRoom.roomId, hostRoom.roomId);
   const synchronized = nextMessage(
@@ -90,7 +120,11 @@ try {
   assert.equal(resumeResponse.status, 200);
   assert.equal((await resumeResponse.json()).state.version, 1);
 } finally {
-  await Promise.all([hostRoom.leave(true), guestRoom.leave(true)]);
+  try {
+    await Promise.all([hostRoom.leave(true), guestRoom.leave(true)]);
+  } finally {
+    await deleteSmokeGame();
+  }
 }
 
 process.stdout.write(`Public two-client smoke passed for ${created.game_id}\n`);

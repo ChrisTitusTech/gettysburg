@@ -112,6 +112,9 @@ export function createGettysburgRoom(
             if (result.ok && committed) {
               this.broadcast("gameplayEvent", result.event);
               this.broadcast("snapshot", result.state);
+              if (result.event.command_name === "surrenderSeat") {
+                client.leave(4001);
+              }
             }
           } catch (error) {
             if (error instanceof ServiceError) {

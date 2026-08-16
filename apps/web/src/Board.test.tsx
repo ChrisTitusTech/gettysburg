@@ -373,6 +373,52 @@ describe("Board", () => {
     expect(singleMove).toHaveBeenCalledWith(["fixture-confederate-1"], "G5");
   });
 
+  it("offers a touch-operable one-counter selection mode", async () => {
+    const stackedState: GameState = {
+      ...state,
+      units: {
+        ...state.units,
+        "fixture-general": {
+          ...state.units["fixture-confederate-1"]!,
+          combat: null,
+          id: "fixture-general",
+          kind: "general",
+          label: "A. P. Hill",
+          movement: 10,
+        },
+      },
+    };
+    const onMove = vi.fn();
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={stackedState} />,
+    );
+    const mode = screen.getByRole("button", { name: "One counter" });
+    await userEvent.click(mode);
+    expect(mode).toHaveAttribute("aria-pressed", "true");
+
+    const counter = container.querySelector(
+      '[data-unit-id="fixture-confederate-1"]',
+    )!;
+    const pointer = prepareBoardPointer(container, "G5");
+    fireEvent.pointerDown(counter, {
+      button: 0,
+      pointerId: 4,
+      pointerType: "touch",
+    });
+    fireEvent.pointerMove(pointer.svg, {
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+      pointerId: 4,
+      pointerType: "touch",
+    });
+    fireEvent.pointerUp(pointer.svg, {
+      pointerId: 4,
+      pointerType: "touch",
+    });
+
+    expect(onMove).toHaveBeenCalledWith(["fixture-confederate-1"], "G5");
+  });
+
   it("keeps a Ctrl-selected general detached for a later drag", () => {
     const stackedState: GameState = {
       ...state,

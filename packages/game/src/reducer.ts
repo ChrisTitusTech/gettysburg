@@ -126,10 +126,38 @@ function destinationCanAcceptUnits(
       unit.location === destination,
   );
   if (occupants.some((unit) => unit.side !== movers[0]?.side)) return false;
-  const finalUnits = [...occupants, ...movers];
-  const generals = finalUnits.filter((unit) => unit.kind === "general").length;
-  const combatUnits = finalUnits.length - generals;
+  return stackIsWithinCapacity([...occupants, ...movers]);
+}
+
+function stackIsWithinCapacity(units: readonly UnitState[]): boolean {
+  const generals = units.filter((unit) => unit.kind === "general").length;
+  const combatUnits = units.length - generals;
   return generals <= 1 && combatUnits <= (generals === 1 ? 2 : 1);
+}
+
+function sourceStacksRemainValid(
+  state: GameState,
+  movers: readonly UnitState[],
+  destination: string,
+): boolean {
+  const moverIds = new Set(movers.map((unit) => unit.id));
+  const sources = new Set(
+    movers.flatMap((unit) =>
+      unit.location === null || unit.location === destination
+        ? []
+        : [unit.location],
+    ),
+  );
+  return [...sources].every((source) =>
+    stackIsWithinCapacity(
+      Object.values(state.units).filter(
+        (unit) =>
+          !moverIds.has(unit.id) &&
+          unit.status === "deployed" &&
+          unit.location === source,
+      ),
+    ),
+  );
 }
 
 function moveUnit(
@@ -175,6 +203,13 @@ function moveUnit(
       state,
       "occupied",
       "That destination is at its Phase 2 stacking capacity.",
+    );
+  }
+  if (!sourceStacksRemainValid(state, [unit], destination)) {
+    return failure(
+      state,
+      "occupied",
+      "Moving that counter would leave its source stack over capacity.",
     );
   }
   return accepted(
@@ -258,6 +293,13 @@ function moveStack(
       state,
       "occupied",
       "That destination is at its Phase 2 stacking capacity.",
+    );
+  }
+  if (!sourceStacksRemainValid(state, movers, destination)) {
+    return failure(
+      state,
+      "occupied",
+      "Moving those counters would leave their source stack over capacity.",
     );
   }
   const movedUnits = { ...state.units };
@@ -1049,6 +1091,13 @@ function advanceAfterCombat(
         state,
         "occupied",
         "The dragged counters cannot occupy that advance destination.",
+      );
+    }
+    if (!sourceStacksRemainValid(state, movers, destination)) {
+      return failure(
+        state,
+        "occupied",
+        "Advancing those counters would leave their source stack over capacity.",
       );
     }
     for (const unit of movers) {

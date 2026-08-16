@@ -144,7 +144,7 @@ interface GameRecord {
   readonly creation?: {
     readonly creationId: string;
     readonly invitationLookupId: string;
-    readonly sealedCredential: string;
+    sealedCredential?: string;
     sealedInvitationSecret?: string;
     readonly sessionId: string;
     readonly side: Side;
@@ -183,7 +183,7 @@ export interface GameServiceSnapshot {
       readonly creation?: {
         readonly creationId: string;
         readonly invitationLookupId: string;
-        readonly sealedCredential: string;
+        readonly sealedCredential?: string;
         readonly sealedInvitationSecret?: string;
         readonly sessionId: string;
         readonly side: Side;
@@ -858,8 +858,10 @@ export class InMemoryGameService {
     const receipts: DeletionReceipt[] = [];
 
     for (const invitation of this.#invitations.values()) {
-      if (invitation.expiresAt <= purgedAt)
+      if (invitation.expiresAt <= purgedAt) {
         delete invitation.sealedClaimCredential;
+        this.#destroyInvitationSecret(invitation.lookupId);
+      }
     }
     for (const grant of this.#recoveryGrants.values()) {
       if (grant.expiresAt <= purgedAt) delete grant.sealedClaimCredential;
@@ -920,6 +922,7 @@ export class InMemoryGameService {
         invitation.claimedAt !== null ||
         invitation.revokedAt !== null ||
         invitation.expiresAt <= this.#now() ||
+        replay.creation.sealedCredential === undefined ||
         replay.creation.sealedInvitationSecret === undefined
       ) {
         throw new ServiceError(
@@ -1978,7 +1981,7 @@ export class InMemoryGameService {
       );
     }
 
-    const session = this.#resolveOrCreateSession(input.credential);
+    const session = this.#resolveOrCreateSession(undefined);
     grant.claimId = input.claimId ?? randomUUID();
     grant.sealedClaimCredential = sealInvitationSecret(
       this.#pepper,
@@ -2128,7 +2131,7 @@ export class InMemoryGameService {
       );
     }
     this.#requireActiveGame(grant.gameId);
-    const session = this.#resolveOrCreateSession(input.credential);
+    const session = this.#resolveOrCreateSession(undefined);
     grant.claimId = input.claimId ?? randomUUID();
     grant.sealedClaimCredential = sealInvitationSecret(
       this.#pepper,
@@ -2360,6 +2363,7 @@ export class InMemoryGameService {
   #destroyInvitationSecret(lookupId: string): void {
     for (const game of this.#games.values()) {
       if (game.creation?.invitationLookupId === lookupId) {
+        delete game.creation.sealedCredential;
         delete game.creation.sealedInvitationSecret;
       }
       for (const record of game.hostCommandResults.values()) {

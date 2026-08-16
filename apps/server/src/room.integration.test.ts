@@ -419,6 +419,64 @@ describe("Colyseus authoritative room", () => {
     });
   });
 
+  it("disconnects a seat socket after that seat surrenders", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const hostCookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const claimResponse = await fetch(
+      `${origin}/api/invitations/${created.invitation.lookup_id}/claim`,
+      {
+        body: JSON.stringify({ secret: created.invitation.secret }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      },
+    );
+    const guestCookie = cookieFrom(claimResponse);
+    const hostRoom = await new ColyseusClient(origin, {
+      headers: { cookie: hostCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(hostRoom);
+    const guestRoom = await new ColyseusClient(origin, {
+      headers: { cookie: guestCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(guestRoom);
+    const surrendered = nextMessage<GameState>(
+      hostRoom,
+      "snapshot",
+      (snapshot) => snapshot.version === 1,
+    );
+    const guestLeft = new Promise<number>((resolve) =>
+      guestRoom.onLeave(resolve),
+    );
+
+    guestRoom.send("surrenderSeat", {
+      command_id: randomUUID(),
+      command_name: "surrenderSeat",
+      expected_version: 0,
+      game_id: created.game_id,
+      payload: {},
+      schema: COMMAND_SCHEMA_VERSION,
+    });
+
+    await expect(surrendered).resolves.toMatchObject({ version: 1 });
+    await expect(guestLeft).resolves.toBe(4001);
+    rooms.splice(rooms.indexOf(guestRoom), 1);
+  });
+
   it("blocks room joins and commands when readiness becomes unavailable", async () => {
     const service = new InMemoryGameService();
     const readiness = { available: true, isReady: () => readiness.available };

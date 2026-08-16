@@ -109,6 +109,7 @@ export function Board({
 }: BoardProps) {
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
+  const [singleCounterMode, setSingleCounterMode] = useState(false);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
   const [movementNotice, setMovementNotice] = useState<string | null>(null);
@@ -206,9 +207,22 @@ export function Board({
   function selectUnit(unitId: string, single = false) {
     if (state.units[unitId]?.side === seat) {
       setSelectedUnitId(unitId);
-      setSelectedSingle(single);
+      setSelectedSingle(single || singleCounterMode);
       setMovementNotice(null);
     }
+  }
+
+  function toggleSingleCounterMode() {
+    setSingleCounterMode((current) => {
+      const next = !current;
+      if (selectedUnitId !== null) setSelectedSingle(next);
+      setMovementNotice(
+        next
+          ? "Single-counter mode enabled. Select or drag one counter from a stack."
+          : "Stack movement mode enabled.",
+      );
+      return next;
+    });
   }
 
   function movementStackIds(unitId: string, single: boolean): string[] {
@@ -424,7 +438,9 @@ export function Board({
     const retreat = retreatContext(unitId);
     const single =
       retreat === null &&
-      (event.ctrlKey || (selectedUnitId === unitId && selectedSingle));
+      (event.ctrlKey ||
+        singleCounterMode ||
+        (selectedUnitId === unitId && selectedSingle));
     const advance = retreat === null ? advanceContext(unitId, single) : null;
     selectUnit(unitId, single);
     const unit = state.units[unitId];
@@ -618,7 +634,7 @@ export function Board({
           <p className="eyebrow">Original rules-light tabletop board</p>
           <h2 id="board-heading">A-U / 1-11 field</h2>
         </div>
-        <div className="zoom-controls" aria-label="Board zoom controls">
+        <div className="zoom-controls" aria-label="Board controls">
           <button
             type="button"
             onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - 0.35))}
@@ -639,6 +655,13 @@ export function Board({
             onClick={() => setZoom((value) => Math.min(MAX_ZOOM, value + 0.35))}
           >
             Zoom in
+          </button>
+          <button
+            aria-pressed={singleCounterMode}
+            type="button"
+            onClick={toggleSingleCounterMode}
+          >
+            One counter
           </button>
           <output aria-label="Current zoom">{Math.round(zoom * 100)}%</output>
         </div>
@@ -886,7 +909,8 @@ export function Board({
                   onClick={(event: MouseEvent<SVGGElement>) =>
                     selectUnit(
                       unit.id,
-                      event.ctrlKey && retreatContext(unit.id) === null,
+                      (event.ctrlKey || singleCounterMode) &&
+                        retreatContext(unit.id) === null,
                     )
                   }
                   onKeyDown={(event) => handleCounterKey(event, unit.id)}
@@ -964,7 +988,7 @@ export function Board({
                   : advanceContext(selectedUnit.id) !== null
                     ? "Advance pending: drag to a highlighted hex or the decline tray"
                     : selectedSingle
-                      ? "Single-counter mode: drag this counter alone; click it normally to rejoin its stack"
+                      ? "Single-counter mode: drag this counter alone; turn off One counter to rejoin its stack"
                       : `Movement remaining: ${movementAllowance(selectedIds())} (stack limit)`}
               </span>
               <span>
@@ -988,7 +1012,7 @@ export function Board({
             movementNotice ??
             (disabled
               ? "Waiting for the authoritative server."
-              : "Drag a stack to move it together. Hold Ctrl before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
+              : "Drag a stack to move it together. Hold Ctrl or turn on One counter before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
         </p>
       </aside>
     </section>

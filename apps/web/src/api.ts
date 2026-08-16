@@ -1,5 +1,6 @@
 import {
   COMMAND_SCHEMA_VERSION,
+  type CommandFailure,
   type GameState,
   type ActionEvent,
   type HostManagementCommandName,
@@ -177,7 +178,7 @@ export function resumeGame(
   );
 }
 
-export interface HostCommandResponse {
+export interface HostCommandSuccess {
   readonly event: ManagementEvent;
   readonly invitation?: {
     readonly lookup_id: string;
@@ -185,6 +186,8 @@ export interface HostCommandResponse {
   };
   readonly ok: true;
 }
+
+export type HostCommandResponse = CommandFailure | HostCommandSuccess;
 
 export function sendHostCommand(
   gameId: string,

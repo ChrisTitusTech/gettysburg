@@ -569,6 +569,55 @@ describe("in-memory game lifecycle", () => {
     );
   });
 
+  it("erases replayable creation credentials after the invitation is claimed", () => {
+    const service = new InMemoryGameService();
+    const creationId = randomUUID();
+    const creationCredential = "A".repeat(43);
+    const created = service.createGame(
+      "union",
+      undefined,
+      creationId,
+      creationCredential,
+    );
+
+    expect(service.exportSnapshot().games[0]?.[1].creation).toMatchObject({
+      sealedCredential: expect.any(String),
+      sealedInvitationSecret: expect.any(String),
+    });
+    service.claimInvitation({
+      lookupId: created.invitation.lookup_id,
+      secret: created.invitation.secret,
+    });
+
+    expect(service.exportSnapshot().games[0]?.[1].creation).not.toHaveProperty(
+      "sealedCredential",
+    );
+    expect(service.exportSnapshot().games[0]?.[1].creation).not.toHaveProperty(
+      "sealedInvitationSecret",
+    );
+    expectServiceError(
+      () =>
+        service.createGame("union", undefined, creationId, creationCredential),
+      "creation_unavailable",
+    );
+  });
+
+  it("erases replayable creation credentials after the invitation expires", () => {
+    let now = Date.UTC(2026, 7, 16);
+    const service = new InMemoryGameService({ now: () => now });
+    service.createGame("union");
+    now += 8 * 24 * 60 * 60 * 1_000;
+
+    service.purgeDeletedGames();
+
+    expect(service.exportSnapshot().games[0]?.[1].creation).not.toHaveProperty(
+      "sealedCredential",
+    );
+    expect(service.exportSnapshot().games[0]?.[1].creation).not.toHaveProperty(
+      "sealedInvitationSecret",
+    );
+  });
+
   it("renews the persisted session when reusing its browser credential", () => {
     let now = Date.UTC(2026, 7, 16);
     const service = new InMemoryGameService({ now: () => now });
@@ -965,9 +1014,11 @@ describe("operator seat recovery", () => {
     const claimId = randomUUID();
     const recovered = service.claimSeatRecovery({
       claimId,
+      credential: host.credential,
       lookupId: grant.lookup_id,
       secret: grant.secret,
     });
+    expect(recovered.credential).not.toBe(host.credential);
     expect(
       service.claimSeatRecovery({
         claimId,
@@ -1297,9 +1348,11 @@ describe("Phase 2 seat and host lifecycle", () => {
     const claimId = randomUUID();
     const recovered = service.claimHostRecovery({
       claimId,
+      credential: first.credential,
       lookupId: grant.lookup_id,
       secret: grant.secret,
     });
+    expect(recovered.credential).not.toBe(first.credential);
     expect(
       service.claimHostRecovery({
         claimId,

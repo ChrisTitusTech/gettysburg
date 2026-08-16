@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGame, resumeGame } from "./api";
+import { createGame, resumeGame, sendHostCommand } from "./api";
 
 describe("API requests", () => {
   afterEach(() => {
@@ -139,5 +139,29 @@ describe("API requests", () => {
     await bodyStarted;
     controller.abort(new DOMException("Cancelled", "AbortError"));
     await cancelled;
+  });
+
+  it("returns a host-command failure body from an HTTP 200 response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        Response.json({
+          current_version: 2,
+          error: "stale_version",
+          message: "Game changed; the latest state has been restored.",
+          ok: false,
+        }),
+      ),
+    );
+
+    await expect(
+      sendHostCommand("11111111-1111-4111-8111-111111111111", 1, "deleteGame", {
+        confirm: true,
+      }),
+    ).resolves.toMatchObject({
+      current_version: 2,
+      error: "stale_version",
+      ok: false,
+    });
   });
 });
