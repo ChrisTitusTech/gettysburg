@@ -287,11 +287,13 @@ state or event versions. Turn 2 starts with Confederate movement normally once
 its scheduled reinforcements are available.
 
 Phase 2 enforces the printed movement allowance as a simple one-point-per-hex
-budget and enforces the core night withdrawal, no-entry, and trapped-combat ZOC
-rules. Phase 3 adds automated validation for variable movement costs, roads,
-terrain, streams, remaining zones of control, generals, stacking, combat
-grouping, modifiers, losses, retreats, advances, remaining reinforcement entry,
-nighttime reorganization, objectives, and victory.
+budget, never routes movement through an enemy-occupied hex, permits daytime
+movement into an enemy zone of control to establish an attack, and enforces the
+core night withdrawal, no-entry, and trapped-combat ZOC rules. Phase 3 adds
+automated validation for variable movement costs, roads, terrain, streams,
+remaining zones of control, generals, stacking, combat grouping, modifiers,
+losses, retreats, advances, remaining reinforcement entry, nighttime
+reorganization, objectives, and victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
 
@@ -316,7 +318,10 @@ movement point, including across multiple moves in the same movement phase; no
 counter can exceed its printed allowance and each budget resets at the start of
 its side's next movement phase. Reinforcement units are
 rejected by `moveUnit` and must use `enterReinforcement`; eliminated and other
-off-board units are rejected. Phase 2 permits at most one general in a hex. A
+off-board units are rejected. The authoritative shortest legal route cannot
+enter an enemy-occupied hex. Daytime routes may enter an enemy zone of control,
+including an empty hex adjacent to an enemy counter, while night routes may not
+enter one. Phase 2 permits at most one general in a hex. A
 destination without a general permits at most one combat unit; a
 destination with one general permits at most two combat units. An empty
 destination accepts either unit type; a general-only destination accepts up to
@@ -329,9 +334,10 @@ hex. Before ending movement, every friendly deployed counter currently in an
 enemy ZOC must withdraw when it has movement remaining and at least one adjacent
 non-ZOC destination that satisfies ownership and stacking. Variable terrain
 cost, other route obstruction, daytime ZOC cost, stream, road, and other
-advanced stacking legality remain player-adjudicated until Phase 3. Acceptance cases
-cover empty, general-only, combat-only, general-plus-one-combat, and full
-destinations for both mover types.
+advanced stacking legality remain player-adjudicated until Phase 3. Acceptance
+cases cover empty, general-only, combat-only, general-plus-one-combat, and full
+destinations for both mover types, enemy-occupied route detours, and legal
+daytime entry into an enemy zone of control.
 
 ### Phase 2 reinforcement-entry command contract
 
@@ -360,7 +366,9 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   hex. This permits many attacking hexes against one defending hex or one
   attacking hex against many defending hexes, but never a multi-hex-versus-
   multi-hex battle. Players cannot omit a touching combat stack or choose a
-  different grouping.
+  different grouping. Exact-cover separation is work-bounded and fails the
+  phase command closed if it cannot produce a complete legal partition; the
+  server never substitutes an illegal multi-hex-versus-multi-hex battle.
 - The same authoritative `endPhase` action creates a unique combat ID and one
   cryptographically secure d10 roll per side for every skirmish. Each skirmish
   stores and resolves its own dice and capped unit-factor modifiers; rolls and
@@ -394,7 +402,9 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   non-negative integer allocation, including zero, for every participant owned by
   that seat and no other unit. Allocations cannot exceed available steps, and the
   total must exactly satisfy the pending loss count before advancing to retreat
-  or advance.
+  or advance. When losses eliminate every combat counter in a general's
+  participating stack, that unsupported general is eliminated in the same
+  authoritative action and is not left behind or offered a retreat.
 - `retreatUnit` handles a lone retreating counter. `retreatStack` supplies the
   combat ID, every pending counter from one original hex, and its connected drag
   path. The pending IDs include surviving combat units plus any friendly general
@@ -403,6 +413,8 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   the same final hex. The path starts at their current hex, enters connected
   adjacent hexes, cannot enter an enemy-occupied hex, and stops at the first
   empty hex; a friendly-occupied hex therefore forces the retreat to continue.
+  The browser searches for a legal connected route rather than committing to an
+  enemy-blocked shortest path when another legal route exists.
   Phase 3 adds enemy-ZOC priority, forced off-board retreat, and the remaining
   complete retreat legality.
 - `advanceAfterCombat` supplies the combat ID, the eligible counters dragged
@@ -412,7 +424,9 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   before dragging selects only the grabbed eligible counter. Dropping on a
   highlighted vacated hex advances the submitted counters atomically, while
   dropping into the visible Decline advance tray declines without coordinate
-  entry. The server verifies every submitted counter against the pending choice,
+  entry. After selecting eligible counters, clicking or keyboard-activating that
+  tray also declines without a drag. The server verifies every submitted counter
+  against the pending choice,
   same-source location, seat, deployment, destination, and stacking capacity.
   Only the active attacking seat may resolve the choice. Completion or decline
   marks the combat resolved.

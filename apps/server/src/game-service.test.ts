@@ -897,6 +897,65 @@ describe("authoritative gameplay commands", () => {
     expect(service.getActions(host.gameId)).toHaveLength(1);
   });
 
+  it("rejects a saved retry produced by an unavailable canonicalization version", () => {
+    const pepper = new Uint8Array(32).fill(9);
+    const original = new InMemoryGameService({ pepper });
+    const host = original.createGame("union");
+    const command = endPhaseCommand(host.gameId, 0);
+    expect(
+      original.executeCommand(
+        original.authenticate(host.credential, host.gameId),
+        command,
+      ),
+    ).toMatchObject({ ok: true });
+    const snapshot = original.exportSnapshot();
+    const futureSnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === host.gameId
+            ? {
+                ...record,
+                actions: record.actions.map((action) =>
+                  action.commandId === command.command_id
+                    ? {
+                        ...action,
+                        canonicalizationVersion: "gettysburg-command/v99",
+                      }
+                    : action,
+                ),
+                commandResults: record.commandResults.map(
+                  ([commandId, result]) => [
+                    commandId,
+                    commandId === command.command_id
+                      ? {
+                          ...result,
+                          canonicalizationVersion: "gettysburg-command/v99",
+                        }
+                      : result,
+                  ],
+                ),
+              }
+            : record,
+        ],
+      ),
+    };
+    const restored = new InMemoryGameService({
+      pepper,
+      snapshot: futureSnapshot,
+    });
+
+    expect(
+      restored.executeCommand(
+        restored.authenticate(host.credential, host.gameId),
+        command,
+      ),
+    ).toMatchObject({ error: "version_unavailable", ok: false });
+    expect(restored.getGameState(host.gameId).version).toBe(1);
+    expect(restored.getActions(host.gameId)).toHaveLength(1);
+  });
+
   it("rejects command identifiers reused across command namespaces", () => {
     const service = new InMemoryGameService();
     const first = service.createGame("union");

@@ -191,7 +191,7 @@ export function separateOpportunity(
   state: GameState,
   opportunity: CombatOpportunity,
   stateBudget = EXACT_COVER_STATE_BUDGET,
-): readonly CombatOpportunity[] {
+): readonly CombatOpportunity[] | null {
   if (!opportunity.requires_separation) return [opportunity];
 
   const attackersByHex = new Map<HexCoordinate, readonly string[]>();
@@ -215,7 +215,7 @@ export function separateOpportunity(
   ].sort(compareText);
   // A valid board has only 231 unique hexes. Fail closed on corrupted or
   // synthetic state before constructing exponential candidate subsets.
-  if (vertices.length > 231) return [opportunity];
+  if (vertices.length > 231) return null;
 
   const candidates = new Map<string, SkirmishCandidate>();
   for (const defenderHex of opportunity.defender_hexes) {
@@ -336,8 +336,7 @@ export function separateOpportunity(
 
   const allVertices = (1n << BigInt(vertices.length)) - 1n;
   const solution = solve(allVertices);
-  if (stateBudgetExhausted) return [opportunity];
-  if (solution === null) return [opportunity];
+  if (stateBudgetExhausted || solution === null) return null;
   return solution
     .map((candidate) => candidate.opportunity)
     .sort((left, right) => compareText(left.id, right.id));
@@ -423,8 +422,12 @@ export function combatOpportunities(
 export function combatSkirmishes(
   state: GameState,
   attackerSide: Side,
-): readonly CombatOpportunity[] {
-  return combatOpportunities(state, attackerSide).flatMap((opportunity) =>
-    separateOpportunity(state, opportunity),
-  );
+): readonly CombatOpportunity[] | null {
+  const skirmishes: CombatOpportunity[] = [];
+  for (const opportunity of combatOpportunities(state, attackerSide)) {
+    const separated = separateOpportunity(state, opportunity);
+    if (separated === null) return null;
+    skirmishes.push(...separated);
+  }
+  return skirmishes;
 }

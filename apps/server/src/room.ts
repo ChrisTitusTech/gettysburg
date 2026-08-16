@@ -19,6 +19,20 @@ export interface GameRoomOptions {
 
 type GameRoomConstructor = new () => Room;
 
+export const ROOM_COMMAND_LIMIT = 30;
+const ROOM_COMMAND_WINDOW_MS = 10_000;
+
+export function pruneExpiredCommandWindows(
+  commandWindows: Map<string, { count: number; windowStartedAt: number }>,
+  now: number,
+): void {
+  for (const [bindingId, candidate] of commandWindows) {
+    if (now - candidate.windowStartedAt >= ROOM_COMMAND_WINDOW_MS) {
+      commandWindows.delete(bindingId);
+    }
+  }
+}
+
 function failure(error: ServiceError): CommandFailure {
   const preservedCodes = new Set<CommandFailure["error"]>([
     "game_deleted",
@@ -41,6 +55,11 @@ export function createGettysburgRoom(
   readiness: ReadinessState,
   eventBus?: GameEventBus,
 ): GameRoomConstructor {
+  const commandWindows = new Map<
+    string,
+    { count: number; windowStartedAt: number }
+  >();
+  let lastCommandWindowPruneAt = 0;
   return class GettysburgRoom extends Room {
     // Keep the room matchable while a reload overlaps the old socket. onJoin
     // replaces the prior connection for the same binding, so stable occupancy
@@ -92,6 +111,29 @@ export function createGettysburgRoom(
       for (const commandName of commandNames) {
         this.onMessage(commandName, async (client, message: unknown) => {
           try {
+            const authorization = client.auth as GameAuthorization;
+            const now = Date.now();
+            if (now - lastCommandWindowPruneAt >= ROOM_COMMAND_WINDOW_MS) {
+              pruneExpiredCommandWindows(commandWindows, now);
+              lastCommandWindowPruneAt = now;
+            }
+            const previousWindow = commandWindows.get(authorization.bindingId);
+            const window =
+              previousWindow === undefined ||
+              now - previousWindow.windowStartedAt >= ROOM_COMMAND_WINDOW_MS
+                ? { count: 0, windowStartedAt: now }
+                : previousWindow;
+            if (window.count >= ROOM_COMMAND_LIMIT) {
+              client.send("commandResult", {
+                current_version: 0,
+                error: "rate_limited",
+                message: "Too many gameplay commands. Wait before retrying.",
+                ok: false,
+              } satisfies CommandFailure);
+              return;
+            }
+            window.count += 1;
+            commandWindows.set(authorization.bindingId, window);
             if (!(await readiness.isReady())) {
               client.send("commandResult", {
                 current_version: 0,
@@ -101,7 +143,6 @@ export function createGettysburgRoom(
               } satisfies CommandFailure);
               return;
             }
-            const authorization = client.auth as GameAuthorization;
             let committed = false;
             const result = await gameService.executeCommand(
               authorization,

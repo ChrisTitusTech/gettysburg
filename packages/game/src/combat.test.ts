@@ -122,6 +122,8 @@ describe("combat discovery", () => {
     });
 
     const skirmishes = combatSkirmishes(current, "confederate");
+    expect(skirmishes).not.toBeNull();
+    if (skirmishes === null) throw new Error("Expected legal skirmishes");
     expect(skirmishes.map((skirmish) => skirmish.id)).toEqual([
       "K6+L6-K7",
       "L8-K8+L7",
@@ -142,7 +144,7 @@ describe("combat discovery", () => {
     ).toBe(true);
   });
 
-  it("falls back deterministically when the exact-cover state budget is exhausted", () => {
+  it("fails closed when the exact-cover state budget is exhausted", () => {
     const current = state({
       firstAttacker: unit("firstAttacker", "confederate", "K6", 2),
       secondAttacker: unit("secondAttacker", "confederate", "L6", 2),
@@ -151,7 +153,7 @@ describe("combat discovery", () => {
     });
     const opportunity = combatOpportunities(current, "confederate")[0]!;
     expect(opportunity.requires_separation).toBe(true);
-    expect(separateOpportunity(current, opportunity, 0)).toEqual([opportunity]);
+    expect(separateOpportunity(current, opportunity, 0)).toBeNull();
   });
 
   it("keeps one attacker in one battle with every touching defender", () => {
@@ -215,6 +217,8 @@ describe("combat discovery", () => {
 
     const started = performance.now();
     const skirmishes = combatSkirmishes(state(units), "confederate");
+    expect(skirmishes).not.toBeNull();
+    if (skirmishes === null) throw new Error("Expected legal skirmishes");
     expect(performance.now() - started).toBeLessThan(250);
     expect(
       skirmishes.flatMap((skirmish) => [
@@ -281,6 +285,8 @@ describe("combat discovery", () => {
     ]);
 
     const skirmishes = combatSkirmishes(state(units), "confederate");
+    expect(skirmishes).not.toBeNull();
+    if (skirmishes === null) throw new Error("Expected legal skirmishes");
     expect(skirmishes).toHaveLength(9);
     expect(
       new Set(

@@ -70,7 +70,9 @@ in single-counter mode for a later drag. A normal click rejoins its stack. When
 a retreat is pending, the highlighted losing stack is dragged together to the
 first empty hex. When an advance is pending, drag a highlighted winning stack
 to a highlighted vacated defender hex, or into the visible Decline advance
-tray. All board movement and combat movement is coordinate-entry-free.
+tray. You can also select an eligible winning counter and click or
+keyboard-activate the tray to decline. All board movement and combat movement
+is coordinate-entry-free.
 
 ## Local container path
 

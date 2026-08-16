@@ -53,6 +53,52 @@ wait_for_database_health() {
 	return 1
 }
 
+environment_has_exact_assignment() {
+	local file=$1
+	local key=$2
+	local expected_value=$3
+	local line
+	local matches=0
+
+	while IFS= read -r line || [[ -n "${line}" ]]; do
+		if [[ "${line}" == "${key}="* ]]; then
+			matches=$((matches + 1))
+			[[ "${line}" == "${key}=${expected_value}" ]] || return 1
+		fi
+	done <"${file}"
+	[[ "${matches}" -eq 1 ]]
+}
+
+validate_environment_pair() {
+	local app_file=$1
+	local postgres_file=$2
+	local database_password
+
+	if [[ ! -f "${postgres_file}" || ! -f "${app_file}" ]]; then
+		return 1
+	fi
+	if [[ "$(stat -c '%a' "${postgres_file}")" != 600 ||
+	"$(stat -c '%a' "${app_file}")" != 600 ||
+	"$(stat -c '%U:%G' "${postgres_file}")" != "${service_user}:${service_user}" ||
+	"$(stat -c '%U:%G' "${app_file}")" != "${service_user}:${service_user}" ]]; then
+		return 1
+	fi
+	database_password="$(sed -n 's/^POSTGRES_PASSWORD=//p' "${postgres_file}")"
+	if [[ ! "${database_password}" =~ ^[[:xdigit:]]{64}$ ]]; then
+		return 1
+	fi
+	environment_has_exact_assignment "${postgres_file}" POSTGRES_DB gettysburg &&
+		environment_has_exact_assignment "${postgres_file}" POSTGRES_USER gettysburg &&
+		environment_has_exact_assignment "${postgres_file}" POSTGRES_PASSWORD "${database_password}" &&
+		environment_has_exact_assignment "${app_file}" DATABASE_URL \
+			"postgresql://gettysburg:${database_password}@gettysburg-db:5432/gettysburg" &&
+		environment_has_exact_assignment "${app_file}" GETTYSBURG_CREDENTIAL_PEPPER_FILE \
+			/var/lib/gettysburg/credential-pepper &&
+		environment_has_exact_assignment "${app_file}" GETTYSBURG_SERVER_HOST 0.0.0.0 &&
+		environment_has_exact_assignment "${app_file}" GETTYSBURG_SERVER_PORT 3000 &&
+		environment_has_exact_assignment "${app_file}" GETTYSBURG_TRUSTED_ORIGIN "${public_origin}"
+}
+
 restore_previous_files() {
 	run_user systemctl --user disable --now gettysburg-purge.timer || true
 	run_user systemctl --user stop gettysburg-app.service gettysburg-db.service \
@@ -119,7 +165,7 @@ if ! command -v age >/dev/null || ! command -v age-keygen >/dev/null; then
 fi
 service_uid="$(id -u "${service_user}")"
 readonly service_uid
-for command in age age-keygen caddy curl git install openssl runuser sed sha256sum systemctl; do
+for command in age age-keygen caddy curl git grep install openssl runuser sed sha256sum stat systemctl; do
 	command -v "${command}" >/dev/null
 done
 if [[ ! -d "${source_root}/.git" ]]; then
@@ -154,7 +200,31 @@ if [[ -f "${caddy_file}" ]]; then
 fi
 trap fail ERR
 
-if [[ ! -f "${secret_root}/postgres.env" ]]; then
+postgres_environment_exists=false
+app_environment_exists=false
+[[ -f "${secret_root}/postgres.env" ]] && postgres_environment_exists=true
+[[ -f "${secret_root}/app.env" ]] && app_environment_exists=true
+if [[ "${postgres_environment_exists}" != "${app_environment_exists}" ]]; then
+	printf 'Deployment requires postgres.env and app.env to exist as a validated pair; refusing a partial secret configuration.\n' >&2
+	exit 1
+fi
+if [[ "${postgres_environment_exists}" == true ]]; then
+	if ! validate_environment_pair \
+		"${secret_root}/app.env" "${secret_root}/postgres.env"; then
+		printf 'The existing deployment environment files are incomplete or inconsistent.\n' >&2
+		exit 1
+	fi
+else
+	if run_user podman volume exists gettysburg-db-data; then
+		printf 'Persistent database data exists without its original deployment environment files.\n' >&2
+		exit 1
+	else
+		volume_status=$?
+		if [[ "${volume_status}" -ne 1 ]]; then
+			printf 'Unable to determine whether persistent database data exists; refusing to generate credentials.\n' >&2
+			exit 1
+		fi
+	fi
 	database_password="$(openssl rand -hex 32)"
 	umask 077
 	printf 'POSTGRES_DB=gettysburg\nPOSTGRES_USER=gettysburg\nPOSTGRES_PASSWORD=%s\n' \
@@ -164,8 +234,9 @@ if [[ ! -f "${secret_root}/postgres.env" ]]; then
 	chown "${service_user}:${service_user}" \
 		"${secret_root}/postgres.env" "${secret_root}/app.env"
 	chmod 0600 "${secret_root}/postgres.env" "${secret_root}/app.env"
-	unset database_password
+	unset database_password volume_status
 fi
+unset postgres_environment_exists app_environment_exists
 if [[ ! -f "${secret_root}/backup-age-identity" ]]; then
 	umask 077
 	age-keygen --output "${secret_root}/backup-age-identity" >/dev/null

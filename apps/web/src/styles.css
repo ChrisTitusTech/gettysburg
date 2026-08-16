@@ -476,11 +476,12 @@ summary {
 .board-frame {
   height: clamp(28rem, 67vh, 58rem);
   overflow: hidden;
-  border: 1px solid #827451;
-  background: #9d997d;
+  border: 1px solid #6b5730;
+  background: #817b58;
   box-shadow:
-    inset 0 0 0 3px rgb(41 35 22 / 34%),
-    0 14px 38px rgb(0 0 0 / 24%);
+    inset 0 0 0 3px rgb(41 30 14 / 46%),
+    inset 0 0 34px rgb(55 40 17 / 34%),
+    0 16px 42px rgb(0 0 0 / 28%);
 }
 
 .board-svg {
@@ -497,198 +498,38 @@ summary {
 }
 
 .board-ground {
-  fill: #aaa78d;
+  fill: #8b835b;
 }
 
 .hex {
   fill: transparent;
-  stroke: #5b5736;
-  stroke-width: 1.05;
+  stroke: transparent;
+  stroke-width: 1.1;
   cursor: crosshair;
   transition: filter 100ms ease;
 }
 
-.hex:hover {
+.hex:hover,
+.hex:focus-visible {
   fill: rgb(244 224 129 / 24%);
+  stroke: #f4e081;
+  stroke-width: 2;
 }
 
-.board-paper {
-  fill: url("#board-paper-pattern");
-}
-
-.board-feature-layer {
+.board-artwork-image {
   pointer-events: none;
-}
-
-.board-feature-layer path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.hill-wash ellipse {
-  fill: #b66c4b;
-  opacity: 0.2;
-}
-
-.hill-wash path {
-  stroke: #8d5b40;
-  stroke-width: 1.45;
-  opacity: 0.42;
-}
-
-.rough-hill-wash ellipse {
-  fill: #8e5d63;
-  opacity: 0.27;
-}
-
-.rough-hill-wash path {
-  stroke: #68464b;
-  stroke-width: 1.6;
-  opacity: 0.5;
-}
-
-.cultivated-fields path {
-  stroke: #687247;
-  stroke-dasharray: 1 3.5;
-  stroke-width: 2.4;
-  opacity: 0.48;
-}
-
-.woodland-underpainting {
-  fill: #536c3d;
-  opacity: 0.18;
-}
-
-.woodland-underpainting-secondary {
-  fill: #334f32;
-  opacity: 0.14;
-}
-
-.map-tree-crown {
-  stroke: #263e29;
-  stroke-width: 0.8;
-}
-
-.map-tree-conifer {
-  stroke-linejoin: round;
-}
-
-.tree-tone-0 .map-tree-crown {
-  fill: #314e31;
-}
-
-.tree-tone-1 .map-tree-crown {
-  fill: #46603a;
-}
-
-.tree-tone-2 .map-tree-crown {
-  fill: #586c3d;
-}
-
-.map-tree-shadow {
-  stroke: #233a29;
-  stroke-width: 1.1;
-  opacity: 0.58;
-}
-
-.map-tree-trunk {
-  stroke: #765c34;
-  stroke-width: 1.4;
-  opacity: 0.72;
-}
-
-.town-landscape ellipse {
-  fill: #b26d51;
-  opacity: 0.24;
-}
-
-.town-street {
-  stroke: #d3b071;
-  stroke-width: 4.5;
-  opacity: 0.9;
-}
-
-.town-building {
-  stroke: #4f3a32;
-  stroke-width: 0.8;
-}
-
-.building-tone-0 {
-  fill: #6a493d;
-}
-
-.building-tone-1 {
-  fill: #d3b27a;
-}
-
-.building-tone-2 {
-  fill: #8c5946;
-}
-
-.road-edge {
-  stroke: #914e40;
-  stroke-width: 4.2;
-  opacity: 0.32;
-}
-
-.road-center {
-  stroke: #c66f53;
-  stroke-width: 1.7;
-  opacity: 0.78;
-}
-
-.railroad-edge {
-  stroke: #4e3b35;
-  stroke-width: 3.7;
-  opacity: 0.72;
-}
-
-.railroad-ties {
-  stroke: #9b684d;
-  stroke-dasharray: 1 5;
-  stroke-width: 1.8;
-}
-
-.stream-bank {
-  stroke: #315b73;
-  stroke-width: 7.5;
-  opacity: 0.82;
-}
-
-.stream-water {
-  stroke: #5ca5c1;
-  stroke-width: 4.2;
-}
-
-.stream-highlight {
-  stroke: #9bc7d2;
-  stroke-width: 1.1;
-  opacity: 0.7;
-}
-
-.terrain-label {
-  fill: #393321;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 7px;
-  font-style: italic;
-  font-weight: 800;
-  letter-spacing: 0.35px;
-  paint-order: stroke;
-  stroke: rgb(218 201 126 / 72%);
-  stroke-width: 1.9px;
-  text-anchor: middle;
+  image-rendering: auto;
 }
 
 .hex-label {
-  fill: #403b28;
+  fill: #342e1d;
   font-family: Georgia, "Times New Roman", serif;
   font-size: 8.5px;
   font-weight: 700;
   paint-order: stroke;
   pointer-events: none;
-  stroke: rgb(220 207 139 / 68%);
-  stroke-width: 2.2px;
+  stroke: rgb(231 210 128 / 78%);
+  stroke-width: 2.3px;
   text-anchor: middle;
 }
 
@@ -793,7 +634,14 @@ summary {
 }
 
 .advance-decline-target {
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.advance-decline-target:focus rect,
+.advance-decline-target:hover rect {
+  fill: rgb(96 39 32 / 96%);
+  stroke: #ffe0b2;
 }
 
 .advance-decline-target rect {

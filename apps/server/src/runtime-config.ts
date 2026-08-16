@@ -77,3 +77,22 @@ export async function isDeletionLedgerAcknowledged(
     return false;
   }
 }
+
+export async function isDeletionLedgerStartupReady(
+  file: string | undefined,
+  receipts: readonly { readonly position: number }[],
+): Promise<boolean> {
+  return file === undefined || isDeletionLedgerAcknowledged(file, receipts);
+}
+
+export async function loadDeletionLedgerStartupReadiness(
+  file: string | undefined,
+  loadReceipts: () => Promise<readonly { readonly position: number }[]>,
+): Promise<boolean> {
+  if (file === undefined) return true;
+  try {
+    return await isDeletionLedgerStartupReady(file, await loadReceipts());
+  } catch {
+    return false;
+  }
+}

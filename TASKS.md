@@ -2,13 +2,12 @@
 
 ## Current phase: Phase 2 digital-tabletop MVP
 
-Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
-at `https://gettysburg.christitus.com` as of 2026-08-16. The local
-PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. PR #2 is
-ready for review. The full local, browser, PostgreSQL, container, deployment,
-encrypted backup/restore, and independent-review gates pass. Exact-head CI must
-pass on the final documentation commit before the owner-controlled merge of the
-ready PR.
+Phase 2 merged through PR #2 as
+`e0ba1f65ca310acbeed9dcffae693506abeb9aa8` and remains deployed to private
+staging at `https://gettysburg.christitus.com` as of 2026-08-16. The local
+PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. A focused
+post-merge cleanup is in progress for owner-reported battle interactions and the
+seven review threads that remained unresolved when PR #2 merged.
 
 ## Phase 1 open gates
 
@@ -143,21 +142,39 @@ recorded below; no implementation or local-validation failure remains.
 
 ### Phase 2
 
+- [ ] Complete the Phase 2 post-merge battle and review cleanup.
+  - Scope: Block movement and retreat through enemy-occupied hexes while
+    preserving legal daytime attack approach into enemy zones of control;
+    eliminate an unsupported general with its defeated combat stack; make the
+    selected-unit decline action clickable; and address the remaining PR #2
+    rate-limit, night-withdrawal, retreat-route, canonicalization, exact-cover,
+    environment-pair, and readiness findings.
+  - Acceptance criteria: Authoritative rules and the browser agree on movement,
+    retreat, loss, and advance choices; every remaining PR #2 thread has a
+    tested fix; the complete local gate, desktop/tablet two-browser flow,
+    built-in review, independent review, and exact-head cleanup-PR CI pass.
+  - Status: Implementation, the complete local gate, real PostgreSQL integration,
+    desktop/tablet browser acceptance, and the rootless container smoke test pass.
+    Built-in, independent, and hosted review findings are addressed. The task
+    remains open until the cleanup PR has clean current-head checks and merges.
+
 - [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
     turns/hexes, eight objectives, night turns, and victory schedule are typed
     with local-source provenance and tests. The newly supplied Battle Manual is
     ignored, hashed, visually reviewed, and not committed. The owner approved
     deriving reduced combat values as half the full value rounded up; combat-one
-    counters are one-step units eliminated by their first loss. The client has an
-    original vector terrain presentation based on the local board reference,
-    including woods, hills, roads, streams, town, and landmark layers; these are
-    deliberately not used as rules data until that review. The artwork now uses
-    one continuous hand-drawn paper, ink, and watercolor landscape beneath the
-    transparent play grid, so woods and elevation cross hex edges naturally.
-    Streams join into board-spanning waterways, and every road, railroad, and
-    stream reaches the clipped outer board edge instead of stopping mid-map. The
-    owner confirmed that I5, J5, and J6 do not receive hill artwork. The typed
+    counters are one-step units eliminated by their first loss. The client uses
+    the owner-approved original deluxe raster board beneath the transparent,
+    calibrated 231-hex interaction grid. Its hand-painted woods, hills, roads,
+    streams, town, and landmarks remain presentation-only and are deliberately
+    not used as rules data until the per-hex terrain review. The painted streams
+    visually follow the hex-grid landscape and reach the board boundaries, while
+    exact edge topology remains deferred to typed Phase 3 data. The separate Time
+    Record Track and center-bottom A/B entry markers are intentionally omitted.
+    The owner selected this exact artwork revision for the cleanup PR; its
+    provenance, dimensions, and checksum are recorded in the source-asset ledger.
+    The typed
     terrain fields stay explicitly unavailable because Phase 2 combat is
     unit-factor-only; reviewed per-hex terrain enforcement remains Phase 3 work.
 - [x] Implement the 24-turn rules-light tabletop workflow and server dice.
@@ -180,12 +197,14 @@ recorded below; no implementation or local-validation failure remains.
     movement ends, and create night combat only for combat counters unable to
     withdraw. Normal board drag now moves a whole
     friendly stack atomically at its slowest allowance; Ctrl-drag selects one
-    counter. Retreat is also board drag, and every surviving counter and general
-    from one losing hex moves together along connected hexes to the first empty
-    hex. Advance and decline are board drag actions too: winning stacks are
-    highlighted, vacated defender hexes are authoritative drop targets, and a
-    visible tray accepts a declined advance. No board action requires typed hex
-    coordinates. The empty Confederate opening is skipped so turn 1 starts at Union
+    counter. Retreat is also board drag, and every surviving counter and supported
+    general from one losing hex moves together along a legal connected route to
+    the first empty hex; a general is eliminated when combat losses remove every
+    combat counter in its stack. Advance uses board drag: winning stacks are
+    highlighted and vacated defender hexes are authoritative drop targets. The
+    visible decline tray accepts a drop or, after unit selection, a click or
+    keyboard activation. No board action requires typed hex coordinates. The
+    empty Confederate opening is skipped so turn 1 starts at Union
     movement without artificial actions. Tests cover every phase-table row,
     automatic mandatory combat entry, dense-network legal separation,
     independent server rolls, nonadjacent combat skipping, night ZOC entry and

@@ -9,6 +9,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { Board } from "./Board";
+import { BOARD_ARTWORK_BOUNDS } from "./BoardTerrain";
 
 const state: GameState = {
   active_side: "confederate",
@@ -115,6 +116,31 @@ describe("Board", () => {
     expect(
       screen.getByRole("button", { name: /Union fixture counter, P7/ }),
     ).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("allows a daytime move into an enemy zone of control to attack", async () => {
+    const onMove = vi.fn();
+    const attackState: GameState = {
+      ...state,
+      units: {
+        ...state.units,
+        "fixture-union-1": {
+          ...state.units["fixture-union-1"]!,
+          location: "G6",
+        },
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={attackState} />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+    );
+    fireEvent.click(container.querySelector('[data-coordinate="G5"]')!);
+
+    expect(onMove).toHaveBeenCalledWith(["fixture-confederate-1"], "G5");
   });
 
   it("supports keyboard counter selection and a board-hex destination", async () => {
@@ -581,7 +607,84 @@ describe("Board", () => {
     );
   });
 
-  it("drag-advances a stack, Ctrl-advances one, and drag-declines", () => {
+  it("finds an alternate retreat route around an enemy-occupied hex", () => {
+    const combatId = "22222222-2222-4222-8222-222222222222";
+    const unionCounter = state.units["fixture-union-1"]!;
+    const retreatState: GameState = {
+      ...state,
+      phase: "combat",
+      units: {
+        enemy: {
+          ...state.units["fixture-confederate-1"]!,
+          id: "enemy",
+          location: "C2",
+        },
+        friendly: {
+          ...unionCounter,
+          id: "friendly",
+          location: "C3",
+        },
+        retreating: {
+          ...unionCounter,
+          id: "retreating",
+          location: "B2",
+        },
+      },
+      combats: {
+        [combatId]: {
+          attacker_loss_allocated: false,
+          attacker_retreated: false,
+          attackers: ["enemy"],
+          confirmation: {
+            advance_offered: true,
+            attacker_losses: 0,
+            attacker_modifier: 3,
+            attacker_retreat: false,
+            defender_losses: 0,
+            defender_modifier: 3,
+            defender_retreat: true,
+            result: "attacker_win",
+          },
+          defender_loss_allocated: false,
+          defender_retreated: false,
+          defenders: ["retreating"],
+          id: combatId,
+          pending_choice: {
+            kind: "retreat",
+            side: "union",
+            unit_ids: ["retreating"],
+          },
+          rolls: { attacker: 8, defender: 1 },
+          status: "pending_choice",
+        },
+      },
+    };
+    const onRetreat = vi.fn();
+    const { container } = render(
+      <Board
+        onMove={vi.fn()}
+        onRetreat={onRetreat}
+        seat="union"
+        state={retreatState}
+      />,
+    );
+    const counter = container.querySelector('[data-unit-id="retreating"]')!;
+    const pointer = prepareBoardPointer(container, "D2");
+    fireEvent.pointerDown(counter, { button: 0, pointerId: 41 });
+    fireEvent.pointerMove(pointer.svg, {
+      clientX: pointer.clientX,
+      clientY: pointer.clientY,
+      pointerId: 41,
+    });
+    fireEvent.pointerUp(pointer.svg, { pointerId: 41 });
+    expect(onRetreat).toHaveBeenCalledWith(
+      combatId,
+      ["retreating"],
+      ["B2", "C3", "D2"],
+    );
+  });
+
+  it("drag-advances a stack, Ctrl-advances one, and declines by drag or pointer click", async () => {
     const combatId = "33333333-3333-4333-8333-333333333333";
     const advanceState: GameState = {
       ...state,
@@ -705,6 +808,12 @@ describe("Board", () => {
     const tray = third.container.querySelector(
       ".advance-decline-target",
     ) as SVGGElement;
+    const board = third.container.querySelector(".board-svg") as SVGSVGElement;
+    const setPointerCapture = vi.fn();
+    Object.defineProperty(board, "setPointerCapture", {
+      configurable: true,
+      value: setPointerCapture,
+    });
     const trayPoint = prepareBoardPoint(third.container, {
       x: Number(tray.dataset.declineX) + Number(tray.dataset.declineWidth) / 2,
       y: Number(tray.dataset.declineY) + Number(tray.dataset.declineHeight) / 2,
@@ -740,9 +849,20 @@ describe("Board", () => {
       ["fixture-confederate-1", "fixture-general"],
       null,
     );
+    declineAdvance.mockClear();
+    const user = userEvent.setup();
+    await user.pointer({ keys: "[MouseLeft]", target: thirdCounter });
+    setPointerCapture.mockClear();
+    await user.pointer({ keys: "[MouseLeft]", target: tray });
+    expect(setPointerCapture).not.toHaveBeenCalled();
+    expect(declineAdvance).toHaveBeenCalledWith(
+      combatId,
+      ["fixture-confederate-1", "fixture-general"],
+      null,
+    );
   });
 
-  it("renders the clean-room battlefield terrain presentation", () => {
+  it("renders the approved clean-room battlefield artwork", () => {
     const { container } = render(
       <Board onMove={vi.fn()} seat="union" state={state} />,
     );
@@ -761,27 +881,31 @@ describe("Board", () => {
     expect(container.querySelector('[data-coordinate="O7"]')).toHaveClass(
       "terrain-town",
     );
-    const streams = [...container.querySelectorAll(".stream-water")];
-    expect(streams).toHaveLength(2);
-    expect(
-      streams.every(
-        (stream) => stream.getAttribute("data-crosses-board") === "true",
-      ),
-    ).toBe(true);
-    const roads = [...container.querySelectorAll(".road-center")];
-    expect(roads).toHaveLength(8);
-    expect(
-      roads.every(
-        (road) => road.getAttribute("data-reaches-board-edge") === "true",
-      ),
-    ).toBe(true);
-    expect(container.querySelector("#board-play-field")).toBeInTheDocument();
-    expect(
-      container.querySelectorAll(".woodland-cluster").length,
-    ).toBeGreaterThan(40);
-    expect(container.querySelector(".board-landmarks")).toHaveTextContent(
-      "GETTYSBURG",
+    expect(container.querySelector(".deluxe-board-art")).toHaveAttribute(
+      "data-art-finish",
+      "deluxe-raster",
     );
+    const artwork = container.querySelector(".board-artwork-image");
+    expect(artwork).toHaveAttribute(
+      "href",
+      expect.stringContaining("gettysburg-board-deluxe.png"),
+    );
+    expect(artwork).toHaveAttribute("x", String(BOARD_ARTWORK_BOUNDS.x));
+    expect(artwork).toHaveAttribute("y", String(BOARD_ARTWORK_BOUNDS.y));
+    expect(artwork).toHaveAttribute(
+      "width",
+      String(BOARD_ARTWORK_BOUNDS.width),
+    );
+    expect(artwork).toHaveAttribute(
+      "height",
+      String(BOARD_ARTWORK_BOUNDS.height),
+    );
+    expect(artwork).toHaveAttribute("preserveAspectRatio", "none");
+    expect(container.querySelector("[data-grid-presentation]")).toHaveAttribute(
+      "data-grid-presentation",
+      "interaction-only",
+    );
+    expect(container).not.toHaveTextContent(/TIME RECORD TRACK/i);
   });
 
   it("draws a combat link between adjacent hostile counters", () => {

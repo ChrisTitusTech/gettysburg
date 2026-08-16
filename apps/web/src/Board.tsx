@@ -6,11 +6,12 @@ import {
   pointToCoordinate,
 } from "@gettysburg/content";
 import {
+  adjacentHexes,
   combatFactorModifier,
   combatOpportunities,
   currentCombatValue,
   hexDistance,
-  nightMovementPath,
+  movementPath,
   shortestHexPath,
   type GameState,
   type HexCoordinate,
@@ -363,21 +364,20 @@ export function Board({
       setMovementNotice("This counter cannot move during the current phase.");
       return;
     }
-    const distance = hexDistance(selectedUnit.location, target);
+    const path = movementPath(state, seat, selectedUnit.location, target);
+    if (path.at(-1) !== target) {
+      setMovementNotice(
+        state.night
+          ? "Night movement must withdraw from and cannot enter an enemy zone of control."
+          : "Movement cannot pass through an enemy-occupied hex.",
+      );
+      return;
+    }
+    const distance = path.length - 1;
     const remaining = movementAllowance(unitIds);
     if (distance > remaining) {
       setMovementNotice(
         `${target} is ${distance} hexes away; this ${unitIds.length === 1 ? "counter has" : "stack has"} ${remaining} movement remaining.`,
-      );
-      return;
-    }
-    if (
-      state.night &&
-      nightMovementPath(state, seat, selectedUnit.location, target).at(-1) !==
-        target
-    ) {
-      setMovementNotice(
-        "Night movement must withdraw from and cannot enter an enemy zone of control.",
       );
       return;
     }
@@ -516,24 +516,41 @@ export function Board({
     target: HexCoordinate,
     unitIds: readonly string[],
   ): readonly HexCoordinate[] {
-    const rawPath = shortestHexPath(source, target);
-    const path: HexCoordinate[] = [source];
     const moving = new Set(unitIds);
-    for (const coordinate of rawPath.slice(1)) {
-      const occupants = deployedUnits.filter(
-        (unit) => !moving.has(unit.id) && unit.location === coordinate,
-      );
-      if (occupants.some((unit) => unit.side !== seat)) break;
-      path.push(coordinate);
-      if (occupants.length === 0) break;
+    const frontier: HexCoordinate[] = [source];
+    const previous = new Map<HexCoordinate, HexCoordinate | null>([
+      [source, null],
+    ]);
+    for (let index = 0; index < frontier.length; index += 1) {
+      const current = frontier[index];
+      if (current === undefined) break;
+      for (const neighbor of adjacentHexes(current)) {
+        if (previous.has(neighbor)) continue;
+        const occupants = deployedUnits.filter(
+          (unit) => !moving.has(unit.id) && unit.location === neighbor,
+        );
+        if (occupants.some((unit) => unit.side !== seat)) continue;
+        previous.set(neighbor, current);
+        if (neighbor === target && occupants.length === 0) {
+          const path: HexCoordinate[] = [target];
+          let step: HexCoordinate | null = current;
+          while (step !== null) {
+            path.push(step);
+            step = previous.get(step) ?? null;
+          }
+          return path.reverse();
+        }
+        if (occupants.length > 0) frontier.push(neighbor);
+      }
     }
-    return path;
+    return [source];
   }
 
   function handlePointerDown(event: PointerEvent<SVGSVGElement>) {
     if (event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(".counter") !== null) return;
+    if (target.closest(".advance-decline-target") !== null) return;
     if (selectedUnitId !== null && target.closest(".hex") !== null) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = {
@@ -571,7 +588,7 @@ export function Board({
             ? unitMove.destinationHexes.includes(target)
               ? shortestHexPath(unit.location, target)
               : [unit.location]
-            : nightMovementPath(state, seat, unit.location, target).slice(
+            : movementPath(state, seat, unit.location, target).slice(
                 0,
                 movementAllowance(unitMove.unitIds) + 1,
               );
@@ -587,7 +604,7 @@ export function Board({
               ? `${unitMove.unitIds.length} counter${unitMove.unitIds.length === 1 ? "" : "s"}: release to advance to ${endpoint}.`
               : "Drag to a highlighted vacated hex or the Decline advance tray."
             : state.night &&
-                nightMovementPath(state, seat, unit.location, target).at(-1) !==
+                movementPath(state, seat, unit.location, target).at(-1) !==
                   target
               ? "Night movement stops before an enemy zone of control. Withdraw away from enemy counters."
               : `${unitMove.unitIds.length === 1 ? unit.label : `${unitMove.unitIds.length}-counter stack`}: ${path.length - 1} of ${movementAllowance(unitMove.unitIds)} movement to ${endpoint}.`,
@@ -692,7 +709,10 @@ export function Board({
           <g aria-hidden="true">
             <BoardTerrain />
           </g>
-          <g aria-label="Board destinations">
+          <g
+            aria-label="Board destinations"
+            data-grid-presentation="interaction-only"
+          >
             {FIXTURE_HEXES.map((hex) => (
               <polygon
                 aria-label={
@@ -781,7 +801,7 @@ export function Board({
                 x={declineTarget.x + declineTarget.width / 2}
                 y={declineTarget.y + 47}
               >
-                Drop eligible counters here
+                Select eligible counters, then click
               </text>
             </g>
           )}
