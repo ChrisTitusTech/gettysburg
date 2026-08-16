@@ -11,6 +11,16 @@ the approved implementation plan and rights-safe project work. The current
 application candidate implements the Phase 2 rules-light tabletop in
 `ROADMAP.md`.
 
+## Current status
+
+Phase 2 code and its battle/review cleanup are merged through PR #3. Operational
+closeout is still active: post-merge Application CI must return to green, and the
+private staging service must receive the current reviewed revision and repeat
+the complete health, readiness, WebSocket, restart/resume, and two-client release
+gate. The currently deployed older revision is live for liveness but unavailable
+for readiness. See `TASKS.md` for the dated evidence; do not infer production
+readiness from the existence of the public staging URL.
+
 ## Project documents
 
 - `PLAN.md` - product direction, decisions, delivery strategy, and gates
@@ -18,6 +28,8 @@ application candidate implements the Phase 2 rules-light tabletop in
 - `ROADMAP.md` - ordered implementation phases and exit criteria
 - `TASKS.md` - current reviewable work and validation status
 - `docs/references/SOURCE_ASSETS.md` - local-only source inventory and missing inputs
+- `docs/references/TERRAIN_ADJUSTMENTS.md` - per-hex terrain/modifier owner-review
+  worksheet
 - `docs/operations/VPS.md` - verified deployment target and operating model
 
 ## Current technical direction

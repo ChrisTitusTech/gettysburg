@@ -28,6 +28,26 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
+## Current staging exception: 2026-08-16
+
+The successful deployment evidence above is historical acceptance for revision
+`f6a9ec27927d756daf5711188edbe4d564fed373`; it is not a current healthy-service
+claim. A follow-up inspection found that revision still running while repository
+`main` is `c6f406f56541ab1e9b08db6ef860b7cedaa164fb`. Public `/healthz` returned
+200, but `/readyz` returned 503. The database deletion-ledger watermark was 14
+while the last verified off-host acknowledgment was 13, so the deployed older
+revision correctly failed closed. The container also reported unhealthy because
+the generated Quadlet health command terminated with an `Unterminated quoted
+string` shell error.
+
+Do not restart or redeploy merely to bypass these gates. First produce and verify
+the next encrypted off-host backup so its acknowledgment covers watermark 14,
+fix and test the Quadlet health command, restore green Application CI on the
+exact current `main`, and deploy that reviewed revision through the contract
+below. Re-run local/public health and readiness, container health, exact image
+revision, HTTPS/WebSocket, restart/resume, and two-client synchronization before
+marking Phase 2 operationally closed.
+
 ## Capacity
 
 | Resource | Verified value |

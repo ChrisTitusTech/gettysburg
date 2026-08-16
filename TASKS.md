@@ -1,13 +1,30 @@
 # Gettysburg project tasks
 
-## Current phase: Phase 2 digital-tabletop MVP
+## Current phase: Phase 2 operational closeout
 
-Phase 2 merged through PR #2 as
-`e0ba1f65ca310acbeed9dcffae693506abeb9aa8` and remains deployed to private
-staging at `https://gettysburg.christitus.com` as of 2026-08-16. The local
-PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. A focused
-post-merge cleanup is in progress for owner-reported battle interactions and the
-seven review threads that remained unresolved when PR #2 merged.
+Phase 2 implementation merged through PR #2 as
+`e0ba1f65ca310acbeed9dcffae693506abeb9aa8`. Its battle-rules and review cleanup
+merged through PR #3 as `c6f406f56541ab1e9b08db6ef860b7cedaa164fb` on
+2026-08-16 after the pull-request head passed Application CI, Documentation CI,
+and CodeRabbit review. At the evidence capture, local `main` was clean and
+matched `origin/main`.
+
+Phase 2 remains open for operational closeout. Post-merge Documentation CI
+passed on `c6f406f`, but post-merge Application CI failed while the browser
+acceptance harness asserted that its server exited with status 1 during
+`stopServer`. The same `pnpm browser:acceptance` command passed locally at
+desktop and tablet widths on 2026-08-16, so the hosted failure must be rerun or
+fixed and cannot be treated as a completed exact-head gate.
+
+Private staging at `https://gettysburg.christitus.com` is still running revision
+`f6a9ec27927d756daf5711188edbe4d564fed373`, not current `main`. Public
+`/healthz` returns 200, but `/readyz` returns 503 because the deployed revision
+checks the deletion ledger continuously and its verified off-host watermark is
+13 while the database watermark is 14. The application container also reports
+unhealthy because its generated Quadlet health command fails with an
+`Unterminated quoted string` shell error. Phase 2 cannot be marked complete until
+the current-main CI, backup watermark, deployment, health, readiness, WebSocket,
+restart/resume, and two-client gates pass.
 
 ## Phase 1 open gates
 
@@ -15,24 +32,29 @@ PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
 decisions remain open.
 
-Local implementation is complete on `codex/phase-1-scaffold` as of 2026-08-15.
-The phase remains open only for the owner-controlled review/publication gates
-recorded below; no implementation or local-validation failure remains.
+Phase 1 implementation is merged into `main`. The phase remains open only for
+the owner-controlled review/publication gates recorded below; no Phase 1
+implementation or local-validation failure remains.
 
-- [ ] Resolve the minimum content and rights decisions for prototype work.
-  - Scope: Obtain or explicitly defer the Battle Manual, complete counter faces,
-    scenario setup, victory/objective rules, optional rules, and art-use decision.
+- [ ] Record the owner review of the interpretation and rights ledger.
+  - Scope: Confirm the Phase 2 Scenario Five interpretations and original board
+    approval, then explicitly approve or defer the per-hex terrain transcription,
+    reduced-face presentation, optional/additional-scenario scope, and public-use
+    rights decision.
   - Acceptance criteria: Every item is linked to an approved source or labelled
     fixture/deferred with an owner and a phase gate.
   - Automated validation: Owner-local source inventory hashes pass when ignored
     inputs are present; clean-clone content-schema checks pass independently.
-  - Manual validation: Project owner reviews the interpretation/rights ledger.
-  - Dependencies or blockers: Additional physical source material and owner input.
-  - Status: Implementation complete. The ledger explicitly defers every missing
-    input, names ChrisTitusTech as owner, and blocks later fidelity/public-release
-    claims at the appropriate phase. Owner review is still unobserved. Follow-up:
-    ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before Phase 1 is
-    marked complete.
+  - Manual validation: Project owner reviews the interpretation/rights ledger
+    and `docs/references/TERRAIN_ADJUSTMENTS.md`.
+  - Dependencies or blockers: Project-owner review and decisions.
+  - Status: Implementation complete. The Battle Manual, Scenario Five setup,
+    objective/victory schedule, front values, reduced-value formula, and original
+    deluxe board are recorded. The ledger explicitly retains the remaining
+    terrain, optional-rule, additional-scenario, reduced-art, and publication
+    decisions with ChrisTitusTech as owner. Owner review is still unobserved.
+    Follow-up: ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before
+    Phase 1 is marked complete.
 
 - [x] Scaffold the typed pnpm workspace and CI gate.
   - Scope: Create `apps/web`, `apps/server`, `packages/game`, and
@@ -142,7 +164,7 @@ recorded below; no implementation or local-validation failure remains.
 
 ### Phase 2
 
-- [ ] Complete the Phase 2 post-merge battle and review cleanup.
+- [ ] Complete the Phase 2 post-merge battle and operational cleanup.
   - Scope: Block movement and retreat through enemy-occupied hexes while
     preserving legal daytime attack approach into enemy zones of control;
     eliminate an unsupported general with its defeated combat stack; make the
@@ -152,11 +174,21 @@ recorded below; no implementation or local-validation failure remains.
   - Acceptance criteria: Authoritative rules and the browser agree on movement,
     retreat, loss, and advance choices; every remaining PR #2 thread has a
     tested fix; the complete local gate, desktop/tablet two-browser flow,
-    built-in review, independent review, and exact-head cleanup-PR CI pass.
-  - Status: Implementation, the complete local gate, real PostgreSQL integration,
-    desktop/tablet browser acceptance, and the rootless container smoke test pass.
-    Built-in, independent, and hosted review findings are addressed. The task
-    remains open until the cleanup PR has clean current-head checks and merges.
+    built-in review, independent review, and current-main CI pass. The verified
+    off-host backup watermark must cover the live deletion ledger before current
+    `main` is deployed. Local/public health and readiness, container health,
+    exact running revision, WebSocket, restart/resume, and two-client state
+    synchronization must then pass.
+  - Status: The code and review cleanup merged through PR #3 as `c6f406f`.
+    The operational-repair branch replaces the quote-fragile Quadlet expression
+    with a compiled readiness probe, makes container smoke assert healthy and
+    intentionally unhealthy states, and preserves the primary browser-acceptance
+    error when cleanup also fails. Its complete local repository gate,
+    desktop/tablet browser acceptance, rootless Podman health-state smoke, source
+    boundary, and generated-Quadlet checks pass. The task remains open until the
+    repair PR passes exact-head CI and review, merges, the verified off-host
+    watermark covers the database ledger, current `main` is deployed, and the
+    complete live release gate passes.
 
 - [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
@@ -242,7 +274,8 @@ recorded below; no implementation or local-validation failure remains.
     backup cannot restore access; `/readyz` fails closed until the mounted
     off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
-  - Status: Rootless Quadlet services run code revision
+  - Status: The original Phase 2 deployment and restore acceptance completed on
+    code revision
     `f6a9ec27927d756daf5711188edbe4d564fed373`, recorded
     by the image label and deployment rollback record behind host Caddy at
     `https://gettysburg.christitus.com`. Local/public health and readiness,
@@ -254,7 +287,12 @@ recorded below; no implementation or local-validation failure remains.
     pass. The post-deployment encrypted backup
     `20260816T072304Z` includes the encrypted credential pepper and passed strict
     checksums, remote isolated restore (`17:48:47:13`), off-host copy validation,
-    and the deletion-ledger watermark gate. The original Caddy
+    and the deletion-ledger watermark gate. This is historical acceptance
+    evidence, not the current service-health claim: as of the 2026-08-16
+    follow-up, the same revision remains deployed with `/readyz` returning 503,
+    database watermark 14 ahead of acknowledged watermark 13, and a malformed
+    container health command. The operational-cleanup task above owns the new
+    backup, current-main deployment, and repeat release gate. The original Caddy
     placeholder and failed candidate units were restored after each
     pre-acceptance deployment failure.
 - [x] Complete a full two-player Phase 2 acceptance game.
@@ -268,8 +306,10 @@ recorded below; no implementation or local-validation failure remains.
     Phase 2 diff, every validated finding was addressed, and the final focused
     reviews returned zero findings. The built-in Codex review completed a direct
     multi-pass review with every validated durability, deployment, readiness,
-    and backup finding addressed. PR #2 requires exact-head Application and
-    Documentation CI before merge.
+    and backup finding addressed. PR #2 passed exact-head Application and
+    Documentation CI and merged as `e0ba1f6`; later current-main CI and staging
+    health are tracked by the operational-cleanup task rather than reopening
+    this completed human acceptance run.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown
@@ -282,7 +322,9 @@ recorded below; no implementation or local-validation failure remains.
 - [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
-  preview are complete in Phase 2.
+  preview are complete in Phase 2. A 231-coordinate terrain/defense worksheet is
+  ready for owner review in `docs/references/TERRAIN_ADJUSTMENTS.md`; every row
+  remains non-authoritative until checked and assigned an exact value.
 - [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
   loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
   mandatory legal skirmish separation, independent automatic two-die unit-factor

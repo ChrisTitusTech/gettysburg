@@ -124,13 +124,32 @@ counter backs.
 
 - Complete counter sheets including every reduced-face artwork treatment
 - Optional rules and whether they are in scope
-- Reviewed per-hex terrain transcription for the irregular board
+- Owner-reviewed per-hex terrain transcription and exact defensive adjustments;
+  the draft worksheet is `TERRAIN_ADJUSTMENTS.md`
 - Rights or licensing basis for any public use of the supplied scans, names,
   artwork, or wording
 
 The approved formula may supply Phase 2 reduced combat data. Any remaining
 fixture values must be visibly labelled and must not be presented as final game
 content.
+
+## Current decision status
+
+The Battle Manual, board, and orders of battle now support the approved Phase 2
+Scenario Five setup, 82 source-card counter fronts, reinforcement schedule,
+night turns, objectives, casualty scoring, automatic-victory checks, and final
+victory comparison. The owner-approved reduced-value formula supplies gameplay
+data, and the tracked deluxe board is approved original presentation artwork.
+Those decisions close the earlier Phase 2 setup, objective, victory, and front-
+value questions.
+
+The remaining owner gates are narrower but still release-blocking: record the
+formal review of this interpretation/rights ledger, approve exact Battle Manual
+interpretations and a reviewed per-hex terrain/edge transcription before Phase 3
+enforcement using `TERRAIN_ADJUSTMENTS.md`, decide optional-rule and
+additional-scenario scope, decide the reduced-face presentation, and establish a
+rights or clean-room basis for every name, artwork element, and explanation
+shipped in the first public release.
 
 ## Phase 1 interpretation and rights ledger
 

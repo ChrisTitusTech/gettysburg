@@ -23,6 +23,16 @@ The primary interaction target is a current desktop browser. Tablet landscape
 is required before production release. Phone play is a later optimization and
 must not be claimed until the full board workflow is manually validated.
 
+## Current implementation boundary
+
+The merged application implements the Phase 2 Scenario Five rules-light digital
+tabletop, durable PostgreSQL state, recovery, and private-staging workflow. That
+evidence does not claim complete Phase 3 terrain/rule enforcement or Phase 4
+production readiness. Phase 2 operational closeout is also still active because
+current-main Application CI is red and the deployed older revision currently
+fails readiness. `TASKS.md` owns the live status so temporary operational facts
+do not weaken the requirements below.
+
 ## Source game facts
 
 The implementation must preserve these facts visible in the supplied material:
@@ -291,9 +301,13 @@ budget, never routes movement through an enemy-occupied hex, permits daytime
 movement into an enemy zone of control to establish an attack, and enforces the
 core night withdrawal, no-entry, and trapped-combat ZOC rules. Phase 3 adds
 automated validation for variable movement costs, roads, terrain, streams,
-remaining zones of control, generals, stacking, combat grouping, modifiers,
-losses, retreats, advances, remaining reinforcement entry, nighttime
-reorganization, objectives, and victory.
+remaining zones of control and advanced stacking, authoritative terrain combat
+modifiers, retreat priority and forced off-board retreat, remaining reinforcement
+restrictions, nighttime reorganization, and any source-approved objective or
+victory edge cases. Phase 2 already enforces basic general stacking, mandatory
+contact grouping, independent unit-factor results, loss allocation, connected
+retreat, eligible advance, objective control, casualty scoring, automatic-victory
+checks, and final victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
 
@@ -764,12 +778,16 @@ accepted when:
 
 ## Unresolved questions
 
-- What are the complete Battle Manual rules referenced by the two supplied pages?
+- Which remaining Battle Manual interpretations must be approved for complete
+  Phase 3 enforcement?
 - What artwork, if any, should appear on reduced counter faces beyond the
   owner-approved derived combat values?
-- What is the precise initial setup for each scenario?
-- How are objectives scored and victory determined?
+- Is Scenario Five the only scenario required for the first release; if not,
+  what are the approved setup and victory contracts for each additional scenario?
+- Which rows and exact adjustments in
+  `docs/references/TERRAIN_ADJUSTMENTS.md` are owner-approved, and what edge data
+  completes their authoritative movement and combat interpretation?
 - Which optional rules, if any, are required?
-- Is the first deployment private/invite-only, and what rights exist for supplied
-  artwork and wording?
+- Is the first production release private/invite-only, and what rights exist for
+  every supplied name, artwork element, and rule explanation proposed for it?
 - Is asynchronous turn notification required before the first production release?

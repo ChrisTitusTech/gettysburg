@@ -27,6 +27,6 @@ VOLUME ["/var/lib/gettysburg"]
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=10s --timeout=2s --start-period=5s --retries=3 \
-  CMD ["node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+  CMD ["node", "apps/server/dist/readiness-healthcheck.js"]
 
 CMD ["sh", "scripts/container-entrypoint.sh"]
