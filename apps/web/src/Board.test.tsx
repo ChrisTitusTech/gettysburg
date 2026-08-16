@@ -9,11 +9,7 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { Board } from "./Board";
-import {
-  STREAM_EDGE_ROUTES,
-  isBoardBoundaryPoint,
-  isBoardHexEdgeSegment,
-} from "./BoardTerrain";
+import { BOARD_ARTWORK_BOUNDS } from "./BoardTerrain";
 
 const state: GameState = {
   active_side: "confederate",
@@ -866,7 +862,7 @@ describe("Board", () => {
     );
   });
 
-  it("renders the clean-room battlefield terrain presentation", () => {
+  it("renders the approved clean-room battlefield artwork", () => {
     const { container } = render(
       <Board onMove={vi.fn()} seat="union" state={state} />,
     );
@@ -885,45 +881,31 @@ describe("Board", () => {
     expect(container.querySelector('[data-coordinate="O7"]')).toHaveClass(
       "terrain-town",
     );
-    const streams = [...container.querySelectorAll(".stream-water")];
-    expect(streams).toHaveLength(2);
-    expect(
-      streams.every(
-        (stream) =>
-          stream.getAttribute("data-crosses-board") === "true" &&
-          stream.getAttribute("data-follows-hex-edges") === "true" &&
-          stream.getAttribute("data-reaches-board-edge") === "true",
-      ),
-    ).toBe(true);
     expect(container.querySelector(".deluxe-board-art")).toHaveAttribute(
       "data-art-finish",
-      "deluxe",
+      "deluxe-raster",
+    );
+    const artwork = container.querySelector(".board-artwork-image");
+    expect(artwork).toHaveAttribute(
+      "href",
+      expect.stringContaining("gettysburg-board-deluxe.png"),
+    );
+    expect(artwork).toHaveAttribute("x", String(BOARD_ARTWORK_BOUNDS.x));
+    expect(artwork).toHaveAttribute("y", String(BOARD_ARTWORK_BOUNDS.y));
+    expect(artwork).toHaveAttribute(
+      "width",
+      String(BOARD_ARTWORK_BOUNDS.width),
+    );
+    expect(artwork).toHaveAttribute(
+      "height",
+      String(BOARD_ARTWORK_BOUNDS.height),
+    );
+    expect(artwork).toHaveAttribute("preserveAspectRatio", "none");
+    expect(container.querySelector("[data-grid-presentation]")).toHaveAttribute(
+      "data-grid-presentation",
+      "interaction-only",
     );
     expect(container).not.toHaveTextContent(/TIME RECORD TRACK/i);
-    for (const route of STREAM_EDGE_ROUTES) {
-      expect(route.length).toBeGreaterThan(2);
-      expect(isBoardBoundaryPoint(route[0]!)).toBe(true);
-      expect(isBoardBoundaryPoint(route.at(-1)!)).toBe(true);
-      for (let index = 0; index < route.length - 1; index += 1) {
-        expect(isBoardHexEdgeSegment(route[index]!, route[index + 1]!)).toBe(
-          true,
-        );
-      }
-    }
-    const roads = [...container.querySelectorAll(".road-center")];
-    expect(roads).toHaveLength(8);
-    expect(
-      roads.every(
-        (road) => road.getAttribute("data-reaches-board-edge") === "true",
-      ),
-    ).toBe(true);
-    expect(container.querySelector("#board-play-field")).toBeInTheDocument();
-    expect(
-      container.querySelectorAll(".woodland-cluster").length,
-    ).toBeGreaterThan(40);
-    expect(container.querySelector(".board-landmarks")).toHaveTextContent(
-      "GETTYSBURG",
-    );
   });
 
   it("draws a combat link between adjacent hostile counters", () => {

@@ -503,186 +503,22 @@ summary {
 
 .hex {
   fill: transparent;
-  stroke: #4f492b;
+  stroke: transparent;
   stroke-width: 1.1;
   cursor: crosshair;
   transition: filter 100ms ease;
 }
 
-.hex:hover {
+.hex:hover,
+.hex:focus-visible {
   fill: rgb(244 224 129 / 24%);
-}
-
-.board-paper {
-  fill: url("#board-paper-pattern");
-}
-
-.board-paper-patina {
-  fill: url("#board-paper-patina");
-}
-
-.board-feature-layer {
-  pointer-events: none;
-}
-
-.board-feature-layer path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.hill-wash ellipse {
-  fill: #b6543d;
-  opacity: 0.29;
-}
-
-.hill-wash path {
-  stroke: #7c3e34;
-  stroke-width: 1.55;
-  opacity: 0.52;
-}
-
-.rough-hill-wash ellipse {
-  fill: #7d4854;
-  opacity: 0.36;
-}
-
-.rough-hill-wash path {
-  stroke: #57343d;
-  stroke-width: 1.75;
-  opacity: 0.62;
-}
-
-.cultivated-fields path {
-  stroke: #4f6d40;
-  stroke-dasharray: 1 3.5;
-  stroke-width: 2.6;
-  opacity: 0.64;
-}
-
-.woodland-underpainting {
-  fill: #285239;
-  opacity: 0.32;
-}
-
-.woodland-underpainting-secondary {
-  fill: #173d2d;
-  opacity: 0.25;
-}
-
-.map-tree-crown {
-  stroke: #153325;
-  stroke-width: 0.9;
-}
-
-.map-tree-conifer {
-  stroke-linejoin: round;
-}
-
-.tree-tone-0 .map-tree-crown {
-  fill: #174735;
-}
-
-.tree-tone-1 .map-tree-crown {
-  fill: #286049;
-}
-
-.tree-tone-2 .map-tree-crown {
-  fill: #477854;
-}
-
-.map-tree-shadow {
-  stroke: #102d21;
-  stroke-width: 1.1;
-  opacity: 0.7;
-}
-
-.map-tree-trunk {
-  stroke: #765c34;
-  stroke-width: 1.4;
-  opacity: 0.72;
-}
-
-.town-landscape ellipse {
-  fill: #9d543e;
-  opacity: 0.32;
-}
-
-.town-street {
-  stroke: #e3bd72;
-  stroke-width: 4.8;
-  opacity: 0.94;
-}
-
-.town-building {
-  stroke: #3f2b25;
-  stroke-width: 0.95;
-}
-
-.building-tone-0 {
-  fill: #543a32;
-}
-
-.building-tone-1 {
-  fill: #e0bf7d;
-}
-
-.building-tone-2 {
-  fill: #9d523e;
-}
-
-.road-edge {
-  stroke: #793f35;
-  stroke-width: 4.6;
-  opacity: 0.46;
-}
-
-.road-center {
-  stroke: #ce694d;
-  stroke-width: 1.9;
-  opacity: 0.9;
-}
-
-.railroad-edge {
-  stroke: #3d302d;
-  stroke-width: 4;
-  opacity: 0.82;
-}
-
-.railroad-ties {
-  stroke: #ad6649;
-  stroke-dasharray: 1 5;
+  stroke: #f4e081;
   stroke-width: 2;
 }
 
-.stream-bank {
-  stroke: #14516e;
-  stroke-width: 9.5;
-  opacity: 0.94;
-}
-
-.stream-water {
-  stroke: #258aaf;
-  stroke-width: 6.2;
-}
-
-.stream-highlight {
-  stroke: #b7e8e4;
-  stroke-width: 1.45;
-  opacity: 0.86;
-}
-
-.terrain-label {
-  fill: #2f2819;
-  font-family: Georgia, "Times New Roman", serif;
-  font-size: 7.4px;
-  font-style: italic;
-  font-weight: 800;
-  letter-spacing: 0.35px;
-  paint-order: stroke;
-  stroke: rgb(231 207 119 / 82%);
-  stroke-width: 2.1px;
-  text-anchor: middle;
+.board-artwork-image {
+  pointer-events: none;
+  image-rendering: auto;
 }
 
 .hex-label {

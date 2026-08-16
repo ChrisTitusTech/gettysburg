@@ -17,6 +17,37 @@ approving owner. A checksum denylist can block a known byte-for-byte regression;
 it cannot establish provenance or permission for renamed, modified, or newly
 created content.
 
+## Approved repository artwork
+
+The following clean-room presentation asset is intentionally tracked. It is not
+a supplied scan and does not contain bytes copied from the local-only reference
+files.
+
+| File | Creator and derivation | Permission and attribution | Approval | Dimensions/bytes | SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| `apps/web/src/assets/gettysburg-board-deluxe.png` | OpenAI built-in image generation, iteratively directed from the project's original procedural board and owner-authored terrain mock | Owner-approved for this project; no attribution requirement specified | ChrisTitusTech, 2026-08-16 | 1658 x 949 PNG; 2,988,216 bytes | `f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91` |
+
+The approved revision supplies presentation only. Authoritative coordinates,
+movement, combat, and future terrain modifiers remain typed independently of
+the pixels.
+
+### Artwork generation record
+
+The owner directed an iterative built-in image-generation and editing process.
+The visual brief called for a 231-hex, hand-painted Gettysburg landscape with
+edge-to-edge roads and streams, rocky Round Tops, southern woods, named
+landmarks, no Time Record Track, and no center-bottom A/B markers. The protected
+`gameboard.jpg` was used as a private visual/geographic reference at the owner's
+request; subsequent edits used generated board variants and the owner's
+`mock.png` paint-over. Neither reference file is embedded in or tracked beside
+the approved PNG. The final selected bytes came from the generated revision
+named `exec-6d2c04a2-841a-46ff-aaec-61b75b54a6d3.png`, and the owner explicitly
+approved that exact revision for the cleanup pull request on 2026-08-16.
+
+The committed asset is original generated presentation artwork rather than a
+reproduction of the scan. This is a project provenance record, not a legal
+opinion about the underlying historical subject, place names, or game rules.
+
 ## Verified inventory
 
 The metadata and hashes below were verified on 2026-08-15 (America/Chicago).
@@ -31,6 +62,7 @@ binary files.
 | `OOP-Union.pdf` | PDF 1.4 | 1 US Letter page | 290,844 | `9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681` |
 | `OOP-Confederate.pdf` | PDF 1.4 | 1 US Letter page | 234,927 | `dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290` |
 | `gettysburg-battle-manual_OCR.pdf` | PDF 1.4 | 10 US Letter pages | 1,459,481 | `115f1d120aa6912847f7f2ffb694e86ec02f42f549f9341683ecfc3888162bbb` |
+| `mock.png` | Owner paint-over PNG | 1658 x 949 | 2,917,458 | `a1203ab38885b702f0e2d2e5df1bd931ae3ae3bdde5a8cc8b7b5ac668123bd15` |
 
 `OOP` is retained in the supplied filenames even though the documents function
 as orders of battle. Renaming is deferred to avoid breaking provenance.
@@ -127,8 +159,13 @@ Run:
 
 ```bash
 set -euo pipefail
+printf '%s  %s\n' \
+  f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91 \
+  apps/web/src/assets/gettysburg-board-deluxe.png | sha256sum --check --strict
+git ls-files --error-unmatch \
+  apps/web/src/assets/gettysburg-board-deluxe.png >/dev/null
 file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
-  gettysburg-battle-manual_OCR.pdf
+  gettysburg-battle-manual_OCR.pdf mock.png
 sha256sum --check --strict <<'EOF'
 feb21385186ed2c94822dc7e23e4da53eff8d61b63e8f12e76717408467b0d4e  gameboard.jpg
 7901bb1f3551e4ca456e3beb8b07c8262dbf9ff79ae8bae08d68d569cf312ffe  Rules1.pdf
@@ -136,6 +173,7 @@ a31a2db5dc39e98b199e6942546b1901d82cf0ccfe0865982de0a40ef4f19381  Rules2.pdf
 9de209125c5c9c320a25f127f837b1f4ecbe045d27146e0014427e050c6cb681  OOP-Union.pdf
 dc5ea54eb0a86fd7ef2131a20f6cfd1c00f97dad548e5b2b2d96f8b36ffcc290  OOP-Confederate.pdf
 115f1d120aa6912847f7f2ffb694e86ec02f42f549f9341683ecfc3888162bbb  gettysburg-battle-manual_OCR.pdf
+a1203ab38885b702f0e2d2e5df1bd931ae3ae3bdde5a8cc8b7b5ac668123bd15  mock.png
 EOF
 identify gameboard.jpg
 pdfinfo Rules1.pdf
@@ -143,9 +181,10 @@ pdfinfo Rules2.pdf
 pdfinfo OOP-Union.pdf
 pdfinfo OOP-Confederate.pdf
 pdfinfo gettysburg-battle-manual_OCR.pdf
+identify mock.png
 for asset in \
   gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
-  gettysburg-battle-manual_OCR.pdf; do
+  gettysburg-battle-manual_OCR.pdf mock.png; do
   git check-ignore -q -- "$asset" || {
     echo "Not ignored: $asset" >&2
     exit 1

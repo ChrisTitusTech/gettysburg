@@ -164,17 +164,17 @@ recorded below; no implementation or local-validation failure remains.
     with local-source provenance and tests. The newly supplied Battle Manual is
     ignored, hashed, visually reviewed, and not committed. The owner approved
     deriving reduced combat values as half the full value rounded up; combat-one
-    counters are one-step units eliminated by their first loss. The client has an
-    original vector terrain presentation based on the local board reference,
-    including woods, hills, roads, streams, town, and landmark layers; these are
-    deliberately not used as rules data until that review. The artwork now uses
-    selected deluxe hand-drawn paper, ink, and watercolor landscape beneath the
-    transparent play grid, so woods and elevation cross hex edges naturally.
-    Streams are continuous boundary-to-boundary chains of actual hex sides;
-    every road and railroad also reaches the clipped outer board edge instead of
-    stopping mid-map. The separate Time Record Track and center-bottom A/B entry
-    markers are intentionally omitted. The owner confirmed that I5, J5, and J6
-    do not receive hill artwork. The typed
+    counters are one-step units eliminated by their first loss. The client uses
+    the owner-approved original deluxe raster board beneath the transparent,
+    calibrated 231-hex interaction grid. Its hand-painted woods, hills, roads,
+    streams, town, and landmarks remain presentation-only and are deliberately
+    not used as rules data until the per-hex terrain review. The painted streams
+    visually follow the hex-grid landscape and reach the board boundaries, while
+    exact edge topology remains deferred to typed Phase 3 data. The separate Time
+    Record Track and center-bottom A/B entry markers are intentionally omitted.
+    The owner selected this exact artwork revision for the cleanup PR; its
+    provenance, dimensions, and checksum are recorded in the source-asset ledger.
+    The typed
     terrain fields stay explicitly unavailable because Phase 2 combat is
     unit-factor-only; reviewed per-hex terrain enforcement remains Phase 3 work.
 - [x] Implement the 24-turn rules-light tabletop workflow and server dice.

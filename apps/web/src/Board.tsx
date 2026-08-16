@@ -709,7 +709,10 @@ export function Board({
           <g aria-hidden="true">
             <BoardTerrain />
           </g>
-          <g aria-label="Board destinations">
+          <g
+            aria-label="Board destinations"
+            data-grid-presentation="interaction-only"
+          >
             {FIXTURE_HEXES.map((hex) => (
               <polygon
                 aria-label={
