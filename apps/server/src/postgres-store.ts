@@ -174,10 +174,13 @@ export class PostgresGameService implements GameService {
       .filter((name) => /^\d+.*\.sql$/.test(name))
       .sort();
     const client = await this.#pool.connect();
+    let lockAcquired = false;
+    let operationError: unknown;
     try {
       await client.query(
         "SELECT pg_advisory_lock(hashtext('gettysburg-schema-migrations'))",
       );
+      lockAcquired = true;
       for (const filename of filenames) {
         await client.query(
           await readFile(join(migrationsDirectory, filename), "utf8"),
@@ -190,12 +193,22 @@ export class PostgresGameService implements GameService {
         "INSERT INTO service_state(singleton, snapshot) VALUES (true, $1::jsonb) ON CONFLICT DO NOTHING",
         [JSON.stringify(initial)],
       );
-    } finally {
-      await client.query(
-        "SELECT pg_advisory_unlock(hashtext('gettysburg-schema-migrations'))",
-      );
-      client.release();
+    } catch (error) {
+      operationError = error;
     }
+    let unlockError: unknown;
+    if (lockAcquired) {
+      try {
+        await client.query(
+          "SELECT pg_advisory_unlock(hashtext('gettysburg-schema-migrations'))",
+        );
+      } catch (error) {
+        unlockError = error;
+      }
+    }
+    client.release(unlockError instanceof Error ? unlockError : undefined);
+    if (operationError !== undefined) throw operationError;
+    if (unlockError !== undefined) throw unlockError;
   }
 
   async close(): Promise<void> {
@@ -345,6 +358,7 @@ export class PostgresGameService implements GameService {
 
   async #mutate<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
     const client = await this.#pool.connect();
+    let released = false;
     try {
       await client.query("BEGIN");
       const result = await client.query<{ snapshot: GameServiceSnapshot }>(
@@ -367,10 +381,19 @@ export class PostgresGameService implements GameService {
       await client.query("COMMIT");
       return value;
     } catch (error) {
-      await client.query("ROLLBACK");
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        client.release(
+          rollbackError instanceof Error
+            ? rollbackError
+            : new Error("PostgreSQL rollback failed"),
+        );
+        released = true;
+      }
       throw error;
     } finally {
-      client.release();
+      if (!released) client.release();
     }
   }
 

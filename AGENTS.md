@@ -66,7 +66,11 @@ inputs are present. This is not a clean-clone or CI requirement:
 ```bash
 sha256sum gameboard.jpg Rules1.pdf Rules2.pdf \
   OOP-Union.pdf OOP-Confederate.pdf gettysburg-battle-manual_OCR.pdf
-git check-ignore gameboard.jpg Rules1.pdf Rules2.pdf \
+for asset in gameboard.jpg Rules1.pdf Rules2.pdf \
+  OOP-Union.pdf OOP-Confederate.pdf gettysburg-battle-manual_OCR.pdf; do
+  ! git ls-files --error-unmatch -- "$asset" >/dev/null 2>&1
+done
+git check-ignore --no-index gameboard.jpg Rules1.pdf Rules2.pdf \
   OOP-Union.pdf OOP-Confederate.pdf gettysburg-battle-manual_OCR.pdf
 ```
 

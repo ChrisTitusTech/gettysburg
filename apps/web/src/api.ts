@@ -27,23 +27,55 @@ interface ApiErrorBody {
   readonly message?: string;
 }
 
+const REQUEST_TIMEOUT_MS = 15_000;
+
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    credentials: "same-origin",
-    headers: {
-      ...(init?.body === undefined
-        ? {}
-        : { "content-type": "application/json" }),
-      ...init?.headers,
-    },
-  });
-  const body = (await response.json()) as T & ApiErrorBody;
+  const controller = new AbortController();
+  const timeout = setTimeout(
+    () =>
+      controller.abort(new DOMException("Request timed out", "TimeoutError")),
+    REQUEST_TIMEOUT_MS,
+  );
+  const abortFromCaller = () => controller.abort(init?.signal?.reason);
+  if (init?.signal?.aborted === true) abortFromCaller();
+  else init?.signal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  let response: Response;
+  let text: string;
+  try {
+    response = await fetch(url, {
+      ...init,
+      credentials: "same-origin",
+      headers: {
+        ...(init?.body === undefined
+          ? {}
+          : { "content-type": "application/json" }),
+        ...init?.headers,
+      },
+      signal: controller.signal,
+    });
+    text = await response.text();
+  } finally {
+    clearTimeout(timeout);
+    init?.signal?.removeEventListener("abort", abortFromCaller);
+  }
+  let body: (T & ApiErrorBody) | undefined;
+  try {
+    body = text === "" ? undefined : (JSON.parse(text) as T & ApiErrorBody);
+  } catch {
+    body = undefined;
+  }
   if (!response.ok) {
     throw new Error(
-      body.message ?? body.error ?? `Request failed (${response.status})`,
+      body?.message ??
+        body?.error ??
+        (text.trim() === ""
+          ? `Request failed (${response.status})`
+          : text.trim().slice(0, 200)),
     );
   }
+  if (body === undefined)
+    throw new Error("Server returned an invalid response.");
   return body;
 }
 
@@ -64,8 +96,14 @@ export function claimInvitation(
   });
 }
 
-export function resumeGame(gameId: string): Promise<SessionResponse> {
-  return jsonRequest(`/api/games/${encodeURIComponent(gameId)}`);
+export function resumeGame(
+  gameId: string,
+  signal?: AbortSignal,
+): Promise<SessionResponse> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}`,
+    signal === undefined ? undefined : { signal },
+  );
 }
 
 export interface HostCommandResponse {

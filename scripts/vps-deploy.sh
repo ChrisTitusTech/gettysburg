@@ -16,6 +16,7 @@ readonly rollback_root="${service_root}/backups/deploy-${timestamp}"
 candidate_revision=""
 candidate_image_id=""
 previous_caddy=""
+service_uid=""
 readonly -a quadlet_files=(
 	gettysburg.network
 	gettysburg-db.volume
@@ -31,8 +32,8 @@ readonly -a systemd_files=(
 run_user() {
 	runuser -u "${service_user}" -- env \
 		HOME="${service_root}" \
-		XDG_RUNTIME_DIR=/run/user/1000 \
-		DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+		XDG_RUNTIME_DIR="/run/user/${service_uid}" \
+		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${service_uid}/bus" \
 		"$@"
 }
 
@@ -84,6 +85,8 @@ if [[ "$(id -u)" -ne 0 ]]; then
 	printf 'Run this deployment script as root.\n' >&2
 	exit 1
 fi
+service_uid="$(id -u "${service_user}")"
+readonly service_uid
 for command in caddy curl git install openssl runuser sed sha256sum systemctl; do
 	command -v "${command}" >/dev/null
 done
@@ -187,9 +190,11 @@ if [[ "${running_image_id}" != "${candidate_image_id}" ]]; then
 		"${running_image_id}" "${candidate_image_id}" >&2
 	false
 fi
-if [[ "$(run_user podman exec gettysburg-app node \
-	--input-type=module -e 'process.stdout.write(String(process.getuid()))')" == 0 ]]; then
-	printf 'The application container is running as root.\n' >&2
+app_uid="$(run_user podman exec gettysburg-app node \
+	--input-type=module -e 'process.stdout.write(String(process.getuid()))')"
+if [[ ! "${app_uid}" =~ ^[1-9][0-9]*$ ]]; then
+	printf 'The application container reported uid %s.\n' \
+		"${app_uid:-<empty>}" >&2
 	false
 fi
 

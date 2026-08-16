@@ -342,6 +342,10 @@ export type CommandErrorCode =
   | "already_entered"
   | "command_id_conflict"
   | "combat_invalid"
+  | "game_deleted"
+  | "game_not_found"
+  | "game_purged"
+  | "internal_error"
   | "invalid_hex"
   | "invalid_payload"
   | "movement_exceeded"
@@ -352,6 +356,7 @@ export type CommandErrorCode =
   | "stale_version"
   | "unauthorized"
   | "unit_not_found"
+  | "version_unavailable"
   | "wrong_seat";
 
 export interface CommandFailure {

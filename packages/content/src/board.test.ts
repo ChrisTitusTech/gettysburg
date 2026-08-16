@@ -6,6 +6,7 @@ import {
   HEX_RADIUS,
   coordinateToPoint,
   hexPolygonPoints,
+  isFixtureCoordinate,
   pointToCoordinate,
 } from "./board";
 
@@ -24,6 +25,25 @@ describe("fixture board calibration", () => {
 
   it("returns no coordinate outside every hit target", () => {
     expect(pointToCoordinate({ x: -HEX_RADIUS, y: -HEX_RADIUS })).toBeNull();
+  });
+
+  it("rejects the circular gap outside an edge hex polygon", () => {
+    const center = coordinateToPoint("A1");
+    expect(
+      pointToCoordinate({
+        x: center.x + HEX_RADIUS * 0.8,
+        y: center.y - HEX_RADIUS * 0.6,
+      }),
+    ).toBeNull();
+  });
+
+  it.each([
+    ["A1", true],
+    ["A12", false],
+    ["V1", false],
+    ["not-a-coordinate", false],
+  ] as const)("validates fixture coordinate %s", (coordinate, expected) => {
+    expect(isFixtureCoordinate(coordinate)).toBe(expected);
   });
 
   it("keeps edge coordinates inside the SVG view box", () => {

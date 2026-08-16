@@ -5,7 +5,6 @@ readonly dump_file="${1:-}"
 readonly suffix="${RANDOM}-$$"
 readonly container_name="gettysburg-restore-test-${suffix}"
 readonly volume_name="gettysburg-restore-test-${suffix}"
-readonly network_name="gettysburg"
 
 cleanup() {
 	podman rm --force "${container_name}" >/dev/null 2>&1 || true
@@ -29,7 +28,7 @@ test -f "${ledger_watermark_file}"
 podman volume create "${volume_name}" >/dev/null
 podman run --detach \
 	--name "${container_name}" \
-	--network "${network_name}" \
+	--network none \
 	--read-only \
 	--tmpfs /run/postgresql \
 	--tmpfs /tmp \
@@ -62,16 +61,27 @@ podman exec --interactive "${container_name}" pg_restore \
 	--no-owner \
 	--no-privileges <"${dump_file}"
 
-podman exec "${container_name}" psql \
+restored_counts="$(podman exec "${container_name}" psql \
 	--username=gettysburg \
 	--dbname=gettysburg \
 	--tuples-only \
 	--no-align \
-	--command="SELECT count(*) || ':' || coalesce(max(event_sequence), 0) || ':' || coalesce(max(state_version), 0) || ':' || (SELECT coalesce(max(position), 0) FROM deletion_ledger) FROM games;"
-restored_watermark="$(podman exec "${container_name}" psql \
+	--command="SELECT count(*) || ':' || coalesce(max(event_sequence), 0) || ':' || coalesce(max(state_version), 0) FROM games;" | tr -d '[:space:]')"
+ledger_table="$(podman exec "${container_name}" psql \
 	--username=gettysburg \
 	--dbname=gettysburg \
 	--tuples-only \
 	--no-align \
-	--command='SELECT coalesce(max(position), 0) FROM deletion_ledger;' | tr -d '[:space:]')"
+	--command="SELECT coalesce(to_regclass('public.deletion_ledger')::text, '');" | tr -d '[:space:]')"
+if [[ "${ledger_table}" == "deletion_ledger" ]]; then
+	restored_watermark="$(podman exec "${container_name}" psql \
+		--username=gettysburg \
+		--dbname=gettysburg \
+		--tuples-only \
+		--no-align \
+		--command='SELECT coalesce(max(position), 0) FROM deletion_ledger;' | tr -d '[:space:]')"
+else
+	restored_watermark=0
+fi
+printf '%s:%s\n' "${restored_counts}" "${restored_watermark}"
 test "${restored_watermark}" = "$(<"${ledger_watermark_file}")"

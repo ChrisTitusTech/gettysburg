@@ -77,9 +77,16 @@ export function pointToCoordinate(point: BoardPoint): HexCoordinate | null {
     }
   }
 
-  return closest !== undefined && closestDistance <= HEX_RADIUS
-    ? closest.coordinate
-    : null;
+  if (closest === undefined || closestDistance > HEX_RADIUS) return null;
+
+  const deltaX = Math.abs(point.x - closest.point.x);
+  const deltaY = Math.abs(point.y - closest.point.y);
+  const verticalRadius = (Math.sqrt(3) * HEX_RADIUS) / 2;
+  const insideHex =
+    deltaX <= HEX_RADIUS &&
+    deltaY <= verticalRadius &&
+    Math.sqrt(3) * deltaX + deltaY <= Math.sqrt(3) * HEX_RADIUS;
+  return insideHex ? closest.coordinate : null;
 }
 
 export function isFixtureCoordinate(value: string): value is HexCoordinate {

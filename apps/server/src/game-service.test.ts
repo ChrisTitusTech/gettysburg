@@ -83,12 +83,14 @@ function hostCommand(
 }
 
 function expectServiceError(action: () => unknown, code: string) {
-  expect(action).toThrowError(ServiceError);
+  let thrown: unknown;
   try {
     action();
   } catch (error) {
-    expect(error).toMatchObject({ code });
+    thrown = error;
   }
+  expect(thrown).toBeInstanceOf(ServiceError);
+  expect(thrown).toMatchObject({ code });
 }
 
 describe("canonical command input", () => {

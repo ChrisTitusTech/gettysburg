@@ -21,9 +21,17 @@ export class GameEventBus {
     const listeners = this.#managementListeners.get(gameId) ?? new Set();
     listeners.add(listener);
     this.#managementListeners.set(gameId, listeners);
+    let disposed = false;
     return () => {
+      if (disposed) return;
+      disposed = true;
       listeners.delete(listener);
-      if (listeners.size === 0) this.#managementListeners.delete(gameId);
+      if (
+        listeners.size === 0 &&
+        this.#managementListeners.get(gameId) === listeners
+      ) {
+        this.#managementListeners.delete(gameId);
+      }
     };
   }
 }

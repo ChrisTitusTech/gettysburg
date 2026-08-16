@@ -5,8 +5,8 @@
 Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
 at `https://gettysburg.christitus.com` as of 2026-08-15. The local
 PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. Source
-fidelity, off-host deletion-ledger recovery, independent review, exact-head CI,
-and owner-controlled acceptance gates below remain open; the phase is not marked
+fidelity, off-host deletion-ledger recovery, built-in review, exact-head CI, and
+owner-controlled acceptance gates below remain open; the phase is not marked
 complete while any is unresolved.
 
 PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
@@ -223,9 +223,9 @@ recorded below; no implementation or local-validation failure remains.
     non-root application UID/GID, image-revision label, public WebSocket origin,
     two independent browser sessions, application restart/resume, PostgreSQL
     restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
-    pass. Backup `/srv/gettysburg/backups/20260816T004348Z` restored two deleted
-    test games at event sequence 5/state version 4 with ledger watermark 0 and
-    verified strict checksums. The original Caddy placeholder and failed
+    pass. Backup `/srv/gettysburg/backups/20260816T005329Z` restored six deleted
+    test games at event sequence 48/state version 47 with ledger watermark 0
+    and verified strict checksums. The original Caddy placeholder and failed
     candidate units were restored after each pre-acceptance deployment failure.
 - [ ] Complete a full two-player Phase 2 acceptance game.
   - Status: Real two-browser create/join/reject/reconnect workflows pass locally
@@ -233,10 +233,12 @@ recorded below; no implementation or local-validation failure remains.
     public two-browser run completed all 47 authoritative transitions through
     turn 24, reached the completed state at version 47, captured
     `test-results/phase-2-live/live-full-game-complete.png`, and deleted its test
-    game through the confirmed host workflow. A human-played 24-turn game,
-    independent review, and exact-head CI remain unobserved. The built-in Codex
-    review command twice exited into a delegated review without returning its
-    required direct verdict; this tooling failure is not treated as approval.
+    game through the confirmed host workflow. CodeRabbit reviewed the complete
+    Phase 2 diff, its validated findings were addressed, and the focused
+    remediation re-review returned zero findings. A human-played 24-turn game
+    and exact-head CI remain unobserved. The built-in Codex review command twice
+    exited into a delegated review without returning its required direct verdict;
+    this tooling failure is not treated as approval.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown

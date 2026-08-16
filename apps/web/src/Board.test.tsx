@@ -120,7 +120,7 @@ describe("Board", () => {
   it("supports keyboard counter selection and a board-hex destination", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();
-    const { container } = render(
+    render(
       <Board
         onMove={onMove}
         seat="union"
@@ -132,7 +132,11 @@ describe("Board", () => {
     });
     counter.focus();
     await user.keyboard("{Enter}");
-    fireEvent.click(container.querySelector('[data-coordinate="Q7"]')!);
+    const destination = screen.getByRole("button", {
+      name: "Move selected counters to Q7",
+    });
+    destination.focus();
+    await user.keyboard("{Enter}");
 
     expect(onMove).toHaveBeenCalledWith(["fixture-union-1"], "Q7");
     expect(screen.queryByLabelText("Destination coordinate")).toBeNull();

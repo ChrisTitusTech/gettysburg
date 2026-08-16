@@ -18,6 +18,10 @@ if [[ "$(id -un)" != "gettysburg" ]]; then
 fi
 
 install -d -m 0700 "${backup_root}" "${backup_dir}"
+cleanup_failed_backup() {
+	rm -rf -- "${backup_dir}"
+}
+trap cleanup_failed_backup ERR
 podman container exists "${container_name}"
 podman exec "${container_name}" pg_dump \
 	--username=gettysburg \
@@ -48,4 +52,5 @@ fi
 grep -Eq '^[0-9]+$' "${ledger_watermark_file}"
 sha256sum "${dump_file}" "${ledger_watermark_file}" >"${dump_file}.sha256"
 chmod 0600 "${dump_file}" "${dump_file}.sha256" "${ledger_watermark_file}"
+trap - ERR
 printf '%s\n' "${backup_dir}"

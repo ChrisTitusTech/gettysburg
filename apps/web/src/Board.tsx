@@ -598,7 +598,6 @@ export function Board({
             dragStart.current = null;
             finishUnitDrag();
           }}
-          role="img"
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
         >
           <rect
@@ -608,15 +607,32 @@ export function Board({
           />
           <g aria-hidden="true">
             <BoardTerrain />
+          </g>
+          <g aria-label="Board destinations">
             {FIXTURE_HEXES.map((hex) => (
               <polygon
+                aria-label={
+                  selectedUnit === undefined
+                    ? undefined
+                    : `Move selected counters to ${hex.coordinate}`
+                }
                 className={`hex terrain-${presentationTerrain(hex.coordinate)}`}
                 data-coordinate={hex.coordinate}
                 key={hex.coordinate}
                 onClick={() => moveSelected(hex.coordinate)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    moveSelected(hex.coordinate);
+                  }
+                }}
                 points={hexPolygonPoints(hex.point)}
+                role={selectedUnit === undefined ? undefined : "button"}
+                tabIndex={selectedUnit === undefined ? -1 : 0}
               />
             ))}
+          </g>
+          <g aria-hidden="true">
             {FIXTURE_HEXES.map((hex) => (
               <text
                 className="hex-label"

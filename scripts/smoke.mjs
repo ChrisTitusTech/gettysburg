@@ -88,7 +88,11 @@ async function stop(runningChild) {
   if (process.platform === "win32") {
     child.kill("SIGTERM");
   } else {
-    process.kill(-child.pid, "SIGTERM");
+    try {
+      process.kill(-child.pid, "SIGTERM");
+    } catch (error) {
+      if (error?.code !== "ESRCH") throw error;
+    }
   }
 
   await Promise.race([
@@ -100,7 +104,11 @@ async function stop(runningChild) {
     if (process.platform === "win32") {
       child.kill("SIGKILL");
     } else {
-      process.kill(-child.pid, "SIGKILL");
+      try {
+        process.kill(-child.pid, "SIGKILL");
+      } catch (error) {
+        if (error?.code !== "ESRCH") throw error;
+      }
     }
   }
 }

@@ -7,6 +7,8 @@ import type {
   UnitState,
 } from "./protocol.js";
 
+const MAX_EXACT_COVER_VERTICES = 20;
+
 export interface CombatOpportunity {
   readonly attacker_hexes: readonly HexCoordinate[];
   readonly attacker_modifier: number;
@@ -296,11 +298,60 @@ function separateOpportunity(
   };
 
   const allVertices = (1n << BigInt(vertices.length)) - 1n;
-  return (
-    solve(allVertices)
-      ?.map((candidate) => candidate.opportunity)
-      .sort((left, right) => compareText(left.id, right.id)) ?? []
-  );
+  const hasCandidateForEveryVertex = (remaining: bigint): boolean => {
+    for (let index = 0; index < vertices.length; index += 1) {
+      const vertexMask = 1n << BigInt(index);
+      if ((remaining & vertexMask) === 0n) continue;
+      if (
+        !indexedCandidates.some(
+          (candidate) =>
+            (candidate.mask & vertexMask) !== 0n &&
+            (candidate.mask & remaining) === candidate.mask,
+        )
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+  const bitCount = (mask: bigint): number => {
+    let count = 0;
+    for (let value = mask; value !== 0n; value >>= 1n) {
+      if ((value & 1n) !== 0n) count += 1;
+    }
+    return count;
+  };
+  const solveGreedily = () => {
+    let remaining = allVertices;
+    const selected: (typeof indexedCandidates)[number][] = [];
+    while (remaining !== 0n) {
+      const choice = indexedCandidates
+        .filter(
+          (candidate) =>
+            (candidate.mask & remaining) === candidate.mask &&
+            hasCandidateForEveryVertex(remaining ^ candidate.mask),
+        )
+        .sort((left, right) => {
+          const sizeDifference = bitCount(right.mask) - bitCount(left.mask);
+          return (
+            sizeDifference ||
+            compareText(left.opportunity.id, right.opportunity.id)
+          );
+        })[0];
+      if (choice === undefined) return null;
+      selected.push(choice);
+      remaining ^= choice.mask;
+    }
+    return selected;
+  };
+  const solution =
+    vertices.length <= MAX_EXACT_COVER_VERTICES
+      ? solve(allVertices)
+      : solveGreedily();
+  if (solution === null) return [opportunity];
+  return solution
+    .map((candidate) => candidate.opportunity)
+    .sort((left, right) => compareText(left.id, right.id));
 }
 
 export function combatOpportunities(
@@ -371,7 +422,7 @@ export function combatOpportunities(
     });
   }
 
-  return opportunities.sort((left, right) => left.id.localeCompare(right.id));
+  return opportunities.sort((left, right) => compareText(left.id, right.id));
 }
 
 /**

@@ -29,12 +29,13 @@ the current local candidate implements the Phase 2 rules-light tabletop in
 - PostgreSQL for durable games and action logs
 - Caddy in front of rootless Podman Quadlet services on the VPS
 
-The Phase 2 implementation provides all 82 source-card counters, 24 turns,
-reinforcement entry, automatic two-die combat results using verified unit
-factors, objective and casualty scoring, PostgreSQL state/actions/snapshots,
-restart-safe browser
-sessions, and a non-root production-shaped local container path. Remaining
-source and publication gates are recorded in `TASKS.md`.
+The Phase 2 implementation provides the 82 available source-card counter fronts,
+24 turns, reinforcement entry, automatic two-die combat results using verified
+unit factors, objective and casualty scoring, PostgreSQL
+state/actions/snapshots, restart-safe browser sessions, and a non-root
+production-shaped local container path. Complete reduced-strength counter backs
+and reviewed per-hex terrain rules data remain source-fidelity gates in
+`TASKS.md`.
 
 ## Development
 
@@ -49,7 +50,7 @@ pnpm typecheck
 pnpm test
 pnpm build
 pnpm smoke
-pnpm exec playwright install chromium
+pnpm exec playwright install --with-deps chromium
 pnpm browser:acceptance
 pnpm container:smoke
 ```

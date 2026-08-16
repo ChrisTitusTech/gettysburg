@@ -47,6 +47,14 @@ export async function startPostgres(options = {}) {
   args.push("docker.io/library/postgres:18.1-alpine");
   run(engine, args);
 
+  const remove = () => {
+    try {
+      run(engine, ["rm", "--force", name], { stdio: "ignore" });
+    } catch {
+      // Preserve the original validation error.
+    }
+  };
+
   const deadline = Date.now() + 30_000;
   let ready = false;
   while (Date.now() < deadline) {
@@ -58,23 +66,22 @@ export async function startPostgres(options = {}) {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
   }
-  if (!ready) throw new Error("PostgreSQL test service did not become ready");
+  if (!ready) {
+    remove();
+    throw new Error("PostgreSQL test service did not become ready");
+  }
 
   const mapping = run(engine, ["port", name, "5432/tcp"]);
   const port = /:(\d+)\s*$/.exec(mapping)?.[1];
-  if (port === undefined)
+  if (port === undefined) {
+    remove();
     throw new Error(`Could not parse PostgreSQL port: ${mapping}`);
+  }
   return {
     connectionString: `postgresql://${user}@127.0.0.1:${port}/${database}`,
     containerConnectionString: `postgresql://${user}@${name}:5432/${database}`,
     engine,
     name,
-    stop() {
-      try {
-        run(engine, ["rm", "--force", name], { stdio: "ignore" });
-      } catch {
-        // Preserve the original validation error.
-      }
-    },
+    stop: remove,
   };
 }

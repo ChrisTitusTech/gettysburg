@@ -152,6 +152,73 @@ describe("combat discovery", () => {
     ]);
   });
 
+  it("bounds separation work for a long alternating contact line", () => {
+    const coordinates = [
+      "A1",
+      "B1",
+      "C1",
+      "D1",
+      "E1",
+      "F1",
+      "G1",
+      "H1",
+      "I1",
+      "J1",
+      "K1",
+      "L1",
+      "M1",
+      "N1",
+      "O1",
+      "P1",
+      "Q1",
+      "R1",
+      "S1",
+      "T1",
+      "U1",
+      "U2",
+      "T2",
+      "S2",
+      "R2",
+      "Q2",
+    ] as const;
+    const units = Object.fromEntries(
+      coordinates.map((coordinate, index) => [
+        `unit-${index}`,
+        unit(
+          `unit-${index}`,
+          index % 2 === 0 ? "confederate" : "union",
+          coordinate,
+          1,
+        ),
+      ]),
+    );
+
+    const started = performance.now();
+    const skirmishes = combatSkirmishes(state(units), "confederate");
+    expect(performance.now() - started).toBeLessThan(250);
+    expect(
+      skirmishes.flatMap((skirmish) => [
+        ...skirmish.attackers,
+        ...skirmish.defenders,
+      ]),
+    ).toHaveLength(coordinates.length);
+    expect(
+      new Set(
+        skirmishes.flatMap((skirmish) => [
+          ...skirmish.attackers,
+          ...skirmish.defenders,
+        ]),
+      ).size,
+    ).toBe(coordinates.length);
+    expect(
+      skirmishes.every(
+        (skirmish) =>
+          skirmish.attacker_hexes.length === 1 ||
+          skirmish.defender_hexes.length === 1,
+      ),
+    ).toBe(true);
+  });
+
   it("caps printed combat-factor modifiers at ten", () => {
     const current = state({
       first: unit("first", "confederate", "A1", 6),

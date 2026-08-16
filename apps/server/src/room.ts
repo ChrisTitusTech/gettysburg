@@ -17,9 +17,17 @@ export interface GameRoomOptions {
 type GameRoomConstructor = new () => Room;
 
 function failure(error: ServiceError): CommandFailure {
+  const preservedCodes = new Set<CommandFailure["error"]>([
+    "game_deleted",
+    "game_not_found",
+    "game_purged",
+    "version_unavailable",
+  ]);
   return {
     current_version: 0,
-    error: "unauthorized",
+    error: preservedCodes.has(error.code as CommandFailure["error"])
+      ? (error.code as CommandFailure["error"])
+      : "unauthorized",
     message: error.message,
     ok: false,
   };
@@ -76,7 +84,13 @@ export function createGettysburgRoom(
               client.send("commandResult", failure(error));
               return;
             }
-            throw error;
+            console.error("Unexpected authoritative room command failure.");
+            client.send("commandResult", {
+              current_version: 0,
+              error: "internal_error",
+              message: "The command could not be completed.",
+              ok: false,
+            } satisfies CommandFailure);
           }
         });
       }

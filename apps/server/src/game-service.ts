@@ -2,6 +2,7 @@ import {
   createCipheriv,
   createDecipheriv,
   createHash,
+  createHmac,
   randomBytes,
   randomInt,
   randomUUID,
@@ -278,23 +279,36 @@ function hashesEqual(left: string, right: string): boolean {
   );
 }
 
-function sealInvitationSecret(key: Uint8Array, secret: string): string {
+function invitationSealKey(pepper: Uint8Array): Buffer {
+  return createHmac("sha256", pepper)
+    .update("gettysburg:invitation-seal:v2", "utf8")
+    .digest();
+}
+
+function sealInvitationSecret(pepper: Uint8Array, secret: string): string {
   const nonce = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key, nonce);
+  const cipher = createCipheriv(
+    "aes-256-gcm",
+    invitationSealKey(pepper),
+    nonce,
+  );
   const ciphertext = Buffer.concat([
     cipher.update(secret, "utf8"),
     cipher.final(),
   ]);
-  return Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]).toString(
-    "base64url",
-  );
+  return `v2.${Buffer.concat([nonce, cipher.getAuthTag(), ciphertext]).toString("base64url")}`;
 }
 
-function openInvitationSecret(key: Uint8Array, sealed: string): string {
-  const bytes = Buffer.from(sealed, "base64url");
+function openInvitationSecret(pepper: Uint8Array, sealed: string): string {
+  const versioned = sealed.startsWith("v2.");
+  const bytes = Buffer.from(versioned ? sealed.slice(3) : sealed, "base64url");
   if (bytes.byteLength < 29)
     throw new Error("Invalid sealed invitation secret");
-  const decipher = createDecipheriv("aes-256-gcm", key, bytes.subarray(0, 12));
+  const decipher = createDecipheriv(
+    "aes-256-gcm",
+    versioned ? invitationSealKey(pepper) : pepper,
+    bytes.subarray(0, 12),
+  );
   decipher.setAuthTag(bytes.subarray(12, 28));
   return Buffer.concat([
     decipher.update(bytes.subarray(28)),
@@ -1040,16 +1054,23 @@ export class InMemoryGameService {
           target.revokedAt === null &&
           target.expiresAt > this.#now()
         ) {
-          return {
-            ...structuredClone(previous.result),
-            invitation: {
-              lookup_id: previous.invitationLookupId,
-              secret: openInvitationSecret(
-                this.#pepper,
-                previous.sealedInvitationSecret,
-              ),
-            },
-          };
+          try {
+            return {
+              ...structuredClone(previous.result),
+              invitation: {
+                lookup_id: previous.invitationLookupId,
+                secret: openInvitationSecret(
+                  this.#pepper,
+                  previous.sealedInvitationSecret,
+                ),
+              },
+            };
+          } catch {
+            throw new ServiceError(
+              "invitation_unavailable",
+              "The stored invitation secret is unavailable.",
+            );
+          }
         }
       }
       return structuredClone(previous.result);

@@ -95,6 +95,10 @@ export function configureHttpApplication(
   const { gameService, readiness, staticDirectory } = options;
   application.disable("x-powered-by");
   application.use((_request, response, next) => {
+    response.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; object-src 'none'",
+    );
     response.setHeader("Referrer-Policy", "no-referrer");
     response.setHeader("X-Content-Type-Options", "nosniff");
     next();

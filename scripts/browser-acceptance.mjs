@@ -166,6 +166,7 @@ async function runScenario(browser, origin, options) {
   };
   const hostContext = await browser.newContext(contextOptions);
   let opponentContext = await browser.newContext(contextOptions);
+  let restartedUnionContext;
   const hostPage = await hostContext.newPage();
   let opponentPage = await opponentContext.newPage();
   watchPage(hostPage, issues);
@@ -234,7 +235,7 @@ async function runScenario(browser, origin, options) {
     } else {
       await opponentContext.close();
     }
-    const restartedUnionContext = await browser.newContext({
+    restartedUnionContext = await browser.newContext({
       ...contextOptions,
       storageState: restartState,
     });
@@ -288,13 +289,13 @@ async function runScenario(browser, origin, options) {
       .getByRole("heading", { name: "Gettysburg" })
       .waitFor();
     assert.deepEqual(issues, []);
-    if (options.hostName === "Union") await restartedUnionContext.close();
   } catch (error) {
     throw new Error(
       `${options.label} browser scenario failed${issues.length === 0 ? "" : `; browser issues: ${issues.join(" | ")}`}`,
       { cause: error },
     );
   } finally {
+    await restartedUnionContext?.close().catch(() => {});
     await hostContext.close().catch(() => {});
     await opponentContext.close().catch(() => {});
   }

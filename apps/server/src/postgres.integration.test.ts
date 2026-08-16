@@ -14,6 +14,16 @@ postgres("PostgreSQL durability", () => {
   let administration: Pool;
 
   beforeAll(async () => {
+    const target = new URL(connectionString!);
+    const allowedHosts = new Set(["127.0.0.1", "::1", "localhost"]);
+    if (
+      target.pathname !== "/gettysburg_test" ||
+      !allowedHosts.has(target.hostname)
+    ) {
+      throw new Error(
+        "PostgreSQL integration tests require a local gettysburg_test database",
+      );
+    }
     administration = new Pool({ connectionString });
     await administration.query("DROP SCHEMA public CASCADE");
     await administration.query("CREATE SCHEMA public");
@@ -114,20 +124,25 @@ postgres("PostgreSQL durability", () => {
       CREATE TRIGGER reject_gettysburg_action BEFORE INSERT ON actions
       FOR EACH ROW EXECUTE FUNCTION gettysburg_reject_action();
     `);
-    await expect(
-      service.executeCommand(authorization, {
-        command_id: "33333333-3333-4333-8333-333333333333",
-        command_name: "endPhase",
-        expected_version: 0,
-        game_id: created.gameId,
-        payload: {},
-        schema: COMMAND_SCHEMA_VERSION,
-      }),
-    ).rejects.toThrow("injected action failure");
-    await administration.query(
-      "DROP TRIGGER reject_gettysburg_action ON actions",
-    );
-    await administration.query("DROP FUNCTION gettysburg_reject_action()");
+    try {
+      await expect(
+        service.executeCommand(authorization, {
+          command_id: "33333333-3333-4333-8333-333333333333",
+          command_name: "endPhase",
+          expected_version: 0,
+          game_id: created.gameId,
+          payload: {},
+          schema: COMMAND_SCHEMA_VERSION,
+        }),
+      ).rejects.toThrow("injected action failure");
+    } finally {
+      await administration.query(
+        "DROP TRIGGER IF EXISTS reject_gettysburg_action ON actions",
+      );
+      await administration.query(
+        "DROP FUNCTION IF EXISTS gettysburg_reject_action()",
+      );
+    }
 
     expect(await service.getGameState(created.gameId)).toMatchObject({
       event_sequence: 0,
