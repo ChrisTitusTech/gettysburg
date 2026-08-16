@@ -550,6 +550,7 @@ export function Board({
     if (event.button !== 0) return;
     const target = event.target as Element;
     if (target.closest(".counter") !== null) return;
+    if (target.closest(".advance-decline-target") !== null) return;
     if (selectedUnitId !== null && target.closest(".hex") !== null) return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = {

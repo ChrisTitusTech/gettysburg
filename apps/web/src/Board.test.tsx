@@ -683,7 +683,7 @@ describe("Board", () => {
     );
   });
 
-  it("drag-advances a stack, Ctrl-advances one, and drag-declines", () => {
+  it("drag-advances a stack, Ctrl-advances one, and declines by drag or pointer click", async () => {
     const combatId = "33333333-3333-4333-8333-333333333333";
     const advanceState: GameState = {
       ...state,
@@ -807,6 +807,12 @@ describe("Board", () => {
     const tray = third.container.querySelector(
       ".advance-decline-target",
     ) as SVGGElement;
+    const board = third.container.querySelector(".board-svg") as SVGSVGElement;
+    const setPointerCapture = vi.fn();
+    Object.defineProperty(board, "setPointerCapture", {
+      configurable: true,
+      value: setPointerCapture,
+    });
     const trayPoint = prepareBoardPoint(third.container, {
       x: Number(tray.dataset.declineX) + Number(tray.dataset.declineWidth) / 2,
       y: Number(tray.dataset.declineY) + Number(tray.dataset.declineHeight) / 2,
@@ -843,7 +849,11 @@ describe("Board", () => {
       null,
     );
     declineAdvance.mockClear();
-    fireEvent.click(tray);
+    const user = userEvent.setup();
+    await user.pointer({ keys: "[MouseLeft]", target: thirdCounter });
+    setPointerCapture.mockClear();
+    await user.pointer({ keys: "[MouseLeft]", target: tray });
+    expect(setPointerCapture).not.toHaveBeenCalled();
     expect(declineAdvance).toHaveBeenCalledWith(
       combatId,
       ["fixture-confederate-1", "fixture-general"],
