@@ -219,9 +219,11 @@ scripts/vps-recovery.sh purge-deleted
 ```
 
 The Quadlets are under `ops/quadlet/`; they run both containers rootlessly with
-all capabilities dropped, read-only root filesystems, private named volumes,
-and an internal network. The PostgreSQL and Node base images are pinned by
-digest. Secrets are created outside Git under
+read-only root filesystems, private named volumes, and an internal network. The
+application drops all capabilities. PostgreSQL drops the defaults and restores
+only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
+entrypoint needs to initialize the named volume and become the database user.
+The PostgreSQL and Node base images are pinned by digest. Secrets are created outside Git under
 `/srv/gettysburg/.config/gettysburg/` with mode 0600. The deployment script
 records the exact Git revision and application image ID beside the pre-change
 rollback material.

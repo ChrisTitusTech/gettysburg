@@ -2,6 +2,7 @@ services:
   db:
     image: docker.io/library/postgres@sha256:d326bec58d3de8d239df60475941522342723934a2598ae59a0281f077681462
     environment:
+      PGDATA: /var/lib/postgresql/data/pgdata
       POSTGRES_DB: gettysburg
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: gettysburg

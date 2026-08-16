@@ -34,11 +34,17 @@ podman run --detach \
 	--tmpfs /run/postgresql \
 	--tmpfs /tmp \
 	--cap-drop ALL \
+	--cap-add CHOWN \
+	--cap-add DAC_OVERRIDE \
+	--cap-add FOWNER \
+	--cap-add SETGID \
+	--cap-add SETUID \
 	--security-opt no-new-privileges \
 	--volume "${volume_name}:/var/lib/postgresql/data" \
 	--env POSTGRES_DB=gettysburg \
 	--env POSTGRES_USER=gettysburg \
 	--env POSTGRES_HOST_AUTH_METHOD=trust \
+	--env PGDATA=/var/lib/postgresql/data/pgdata \
 	docker.io/library/postgres@sha256:d326bec58d3de8d239df60475941522342723934a2598ae59a0281f077681462 >/dev/null
 
 for _ in {1..60}; do
