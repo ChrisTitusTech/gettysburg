@@ -46,10 +46,11 @@ app_volume_mountpoint="$(podman volume inspect \
 	--format '{{.Mountpoint}}' "${app_volume_name}")"
 readonly app_volume_mountpoint
 readonly pepper_plaintext="${app_volume_mountpoint}/credential-pepper"
-test -s "${pepper_plaintext}"
-grep -Eq '^[A-Za-z0-9_-]{43}$' "${pepper_plaintext}"
-age --encrypt --recipients-file "${recipient_file}" \
-	--output "${pepper_encrypted}" "${pepper_plaintext}"
+podman unshare test -s "${pepper_plaintext}"
+podman unshare grep -Eq '^[A-Za-z0-9_-]{43}$' "${pepper_plaintext}"
+podman unshare cat "${pepper_plaintext}" |
+	age --encrypt --recipients-file "${recipient_file}" \
+		--output "${pepper_encrypted}"
 
 podman exec "${container_name}" pg_dump \
 	--username=gettysburg \
