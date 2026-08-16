@@ -41,6 +41,17 @@ run_user() (
 		"$@"
 )
 
+wait_for_database_health() {
+	for _ in {1..60}; do
+		if run_user podman healthcheck run gettysburg-db >/dev/null 2>&1; then
+			return 0
+		fi
+		sleep 1
+	done
+	printf 'Gettysburg PostgreSQL did not become healthy within 60 seconds.\n' >&2
+	return 1
+}
+
 restore_previous_files() {
 	run_user systemctl --user disable --now gettysburg-purge.timer || true
 	run_user systemctl --user stop gettysburg-app.service gettysburg-db.service \
@@ -114,8 +125,7 @@ if [[ ! -d "${source_root}/.git" ]]; then
 	printf '%s is not a Git checkout.\n' "${source_root}" >&2
 	exit 1
 fi
-if ! git -C "${source_root}" diff --quiet ||
-	! git -C "${source_root}" diff --cached --quiet; then
+if [[ -n "$(git -C "${source_root}" status --porcelain=v1 --untracked-files=all)" ]]; then
 	printf 'The deployment checkout must be clean.\n' >&2
 	exit 1
 fi
@@ -192,8 +202,16 @@ install -o root -g root -m 0644 "${maintenance_caddy}" "${caddy_file}"
 systemctl reload caddy
 run_user systemctl --user stop gettysburg-app.service
 
-if run_user podman container exists gettysburg-db &&
-	run_user podman inspect --format '{{.State.Running}}' gettysburg-db | grep -qx true; then
+if run_user podman volume exists gettysburg-db-data; then
+	if ! run_user podman container exists gettysburg-db; then
+		printf 'Persistent database data exists without a backup-capable container.\n' >&2
+		exit 1
+	fi
+	if ! run_user podman inspect --format '{{.State.Running}}' gettysburg-db |
+		grep -qx true; then
+		run_user podman start gettysburg-db >/dev/null
+		wait_for_database_health
+	fi
 	run_user "${source_root}/scripts/vps-backup.sh" >/dev/null
 fi
 run_user systemctl --user stop gettysburg-db.service \
@@ -218,13 +236,7 @@ done
 
 run_user systemctl --user daemon-reload
 run_user systemctl --user start gettysburg-db.service
-for _ in {1..60}; do
-	if run_user podman healthcheck run gettysburg-db >/dev/null 2>&1; then
-		break
-	fi
-	sleep 1
-done
-run_user podman healthcheck run gettysburg-db >/dev/null
+wait_for_database_health
 run_user systemctl --user restart gettysburg-app.service
 
 for _ in {1..60}; do

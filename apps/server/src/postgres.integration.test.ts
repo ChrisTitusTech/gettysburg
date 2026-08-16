@@ -40,7 +40,14 @@ postgres("PostgreSQL durability", () => {
     });
     await first.migrate();
     await first.migrate();
-    const created = await first.createGame("union");
+    const creationId = randomUUID();
+    const creationCredential = "A".repeat(43);
+    const created = await first.createGame(
+      "union",
+      undefined,
+      creationId,
+      creationCredential,
+    );
     const authorization = await first.authenticate(
       created.credential,
       created.gameId,
@@ -69,6 +76,21 @@ postgres("PostgreSQL durability", () => {
       pepper,
     });
     await restarted.migrate();
+    expect(
+      await restarted.createGame(
+        "union",
+        undefined,
+        creationId,
+        creationCredential,
+      ),
+    ).toMatchObject({
+      credential: created.credential,
+      gameId: created.gameId,
+      invitation: created.invitation,
+      seat: created.seat,
+      sessionId: created.sessionId,
+      state: { version: 1 },
+    });
     const resumedAuthorization = await restarted.authenticate(
       created.credential,
       created.gameId,

@@ -19,7 +19,13 @@ describe("API requests", () => {
       ),
     );
 
-    await expect(createGame("union")).rejects.toThrow("Upstream unavailable");
+    await expect(
+      createGame(
+        "union",
+        "11111111-1111-4111-8111-111111111111",
+        "A".repeat(43),
+      ),
+    ).rejects.toThrow("Upstream unavailable");
   });
 
   it.each(["null", "[]", "true", '"text"'])(
@@ -30,9 +36,13 @@ describe("API requests", () => {
         vi.fn().mockResolvedValue(new Response(body, { status: 200 })),
       );
 
-      await expect(createGame("union")).rejects.toThrow(
-        "Server returned an invalid response.",
-      );
+      await expect(
+        createGame(
+          "union",
+          "11111111-1111-4111-8111-111111111111",
+          "A".repeat(43),
+        ),
+      ).rejects.toThrow("Server returned an invalid response.");
     },
   );
 
@@ -51,7 +61,13 @@ describe("API requests", () => {
       }),
     );
 
-    const timedOut = expect(createGame("union")).rejects.toMatchObject({
+    const timedOut = expect(
+      createGame(
+        "union",
+        "11111111-1111-4111-8111-111111111111",
+        "A".repeat(43),
+      ),
+    ).rejects.toMatchObject({
       name: "TimeoutError",
     });
     await vi.advanceTimersByTimeAsync(15_000);
@@ -78,7 +94,13 @@ describe("API requests", () => {
       }),
     );
 
-    const timedOut = expect(createGame("union")).rejects.toMatchObject({
+    const timedOut = expect(
+      createGame(
+        "union",
+        "11111111-1111-4111-8111-111111111111",
+        "A".repeat(43),
+      ),
+    ).rejects.toMatchObject({
       name: "TimeoutError",
     });
     await vi.advanceTimersByTimeAsync(15_000);

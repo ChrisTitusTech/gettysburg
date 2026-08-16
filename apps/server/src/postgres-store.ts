@@ -14,11 +14,13 @@ import {
   type HostAuthorization,
   type HostManagementResult,
   type HostRecoveryClaimResult,
+  type RecoveryExport,
   type RecoveryIssueResult,
   type StoredAction,
 } from "./game-service.js";
 import type {
   CommandResult,
+  AuditEvent,
   GameState,
   ManagementEvent,
   Side,
@@ -51,21 +53,29 @@ export interface GameService {
     requestedSeat?: Side;
     secret: string;
   }): Promise<ClaimResult>;
-  claimSeatRecovery(input: {
-    claimId?: string;
-    credential?: string;
-    lookupId: string;
-    secret: string;
-  }): Promise<ClaimResult>;
-  claimHostRecovery(input: {
-    claimId?: string;
-    credential?: string;
-    lookupId: string;
-    secret: string;
-  }): Promise<HostRecoveryClaimResult>;
+  claimSeatRecovery(
+    input: {
+      claimId?: string;
+      credential?: string;
+      lookupId: string;
+      secret: string;
+    },
+    options?: { afterCommit?: (event: AuditEvent) => void },
+  ): Promise<ClaimResult>;
+  claimHostRecovery(
+    input: {
+      claimId?: string;
+      credential?: string;
+      lookupId: string;
+      secret: string;
+    },
+    options?: { afterCommit?: (event: AuditEvent) => void },
+  ): Promise<HostRecoveryClaimResult>;
   createGame(
     side: Side,
     existingCredential?: string,
+    creationId?: string,
+    creationCredential?: string,
   ): Promise<CreateGameResult>;
   executeCommand(
     authorization: GameAuthorization,
@@ -84,6 +94,10 @@ export interface GameService {
   getDeletionLedger(): Promise<readonly DeletionReceipt[]>;
   getAuthorizedState(authorization: GameAuthorization): Promise<GameState>;
   getGameState(gameId: string): Promise<GameState>;
+  getRecoveryExport(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<RecoveryExport>;
   issueSeatRecovery(
     gameId: string,
     side: Side,
@@ -114,8 +128,9 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async claimHostRecovery(
     input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    return this.service.claimHostRecovery(input);
+    return this.service.claimHostRecovery(input, options);
   }
   async canRetryTerminalDelete(
     credential: string | undefined,
@@ -131,11 +146,22 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async claimSeatRecovery(
     input: Parameters<InMemoryGameService["claimSeatRecovery"]>[0],
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    return this.service.claimSeatRecovery(input);
+    return this.service.claimSeatRecovery(input, options);
   }
-  async createGame(side: Side, credential?: string) {
-    return this.service.createGame(side, credential);
+  async createGame(
+    side: Side,
+    credential?: string,
+    creationId?: string,
+    creationCredential?: string,
+  ) {
+    return this.service.createGame(
+      side,
+      credential,
+      creationId,
+      creationCredential,
+    );
   }
   async executeCommand(
     authorization: GameAuthorization,
@@ -165,6 +191,9 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async getGameState(gameId: string) {
     return this.service.getGameState(gameId);
+  }
+  async getRecoveryExport(credential: string | undefined, gameId: string) {
+    return this.service.getRecoveryExport(credential, gameId);
   }
   async issueSeatRecovery(
     gameId: string,
@@ -358,8 +387,21 @@ export class PostgresGameService implements GameService {
 
   async claimHostRecovery(
     input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    return this.#mutate((service) => service.claimHostRecovery(input));
+    const execution = await this.#mutate((service) => {
+      let committedEvent: AuditEvent | undefined;
+      const result = service.claimHostRecovery(input, {
+        afterCommit: (event) => {
+          committedEvent = event;
+        },
+      });
+      return { committedEvent, result };
+    });
+    if (execution.committedEvent !== undefined) {
+      options.afterCommit?.(execution.committedEvent);
+    }
+    return execution.result;
   }
 
   async claimInvitation(
@@ -370,13 +412,36 @@ export class PostgresGameService implements GameService {
 
   async claimSeatRecovery(
     input: Parameters<InMemoryGameService["claimSeatRecovery"]>[0],
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    return this.#mutate((service) => service.claimSeatRecovery(input));
+    const execution = await this.#mutate((service) => {
+      let committedEvent: AuditEvent | undefined;
+      const result = service.claimSeatRecovery(input, {
+        afterCommit: (event) => {
+          committedEvent = event;
+        },
+      });
+      return { committedEvent, result };
+    });
+    if (execution.committedEvent !== undefined) {
+      options.afterCommit?.(execution.committedEvent);
+    }
+    return execution.result;
   }
 
-  async createGame(side: Side, existingCredential?: string) {
+  async createGame(
+    side: Side,
+    existingCredential?: string,
+    creationId?: string,
+    creationCredential?: string,
+  ) {
     return this.#mutate((service) =>
-      service.createGame(side, existingCredential),
+      service.createGame(
+        side,
+        existingCredential,
+        creationId,
+        creationCredential,
+      ),
     );
   }
 
@@ -429,6 +494,11 @@ export class PostgresGameService implements GameService {
 
   async getGameState(gameId: string) {
     return this.#read((service) => service.getGameState(gameId));
+  }
+  async getRecoveryExport(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.getRecoveryExport(credential, gameId),
+    );
   }
 
   async issueSeatRecovery(

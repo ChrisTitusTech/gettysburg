@@ -4,6 +4,7 @@ import {
   acceptManagementEvent,
   COMMAND_SCHEMA_VERSION,
   type CommandResult,
+  type AuditEvent,
   type ActionEvent,
   type EventCursor,
   type GameState,
@@ -52,6 +53,14 @@ function humanSide(side: Side): string {
   return side === "union" ? "Union" : "Confederate";
 }
 
+function createBrowserCredential(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
+}
+
 function actionEntries(events: readonly ActionEvent[]): string[] {
   return [...events]
     .reverse()
@@ -97,6 +106,8 @@ export function App({
   const roomReference = useRef<Room | null>(null);
   const eventCursorReference = useRef<EventCursor | null>(null);
   const hostCommandIdsReference = useRef(new Map<string, string>());
+  const creationIdReference = useRef(crypto.randomUUID());
+  const creationCredentialReference = useRef(createBrowserCredential());
   const invitationClaimIdReference = useRef(crypto.randomUUID());
   const recoveryClaimIdReference = useRef(crypto.randomUUID());
   const requestedGameId = gameIdFromLocation();
@@ -281,6 +292,22 @@ export function App({
           [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
         );
       });
+      connectedRoom.onMessage<AuditEvent>("auditEvent", (event) => {
+        const cursor = eventCursorReference.current;
+        if (cursor === null) return;
+        const accepted = acceptManagementEvent(cursor, event);
+        if (!accepted.ok) {
+          setError(
+            "An event delivery gap was detected; restoring current state.",
+          );
+          void refreshAuthoritativeState();
+          return;
+        }
+        eventCursorReference.current = accepted.cursor;
+        setActionLog((entries) =>
+          [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
+        );
+      });
       connectedRoom.onError((_code, message) => {
         setError(message ?? "The multiplayer connection reported an error.");
       });
@@ -337,17 +364,49 @@ export function App({
     payload: Record<string, unknown>,
   ) {
     if (activeGame === null) throw new Error("No active game.");
-    const commandId =
-      hostCommandIdsReference.current.get(operationKey) ?? crypto.randomUUID();
+    const previousCommandId = hostCommandIdsReference.current.get(operationKey);
+    const commandId = previousCommandId ?? crypto.randomUUID();
     hostCommandIdsReference.current.set(operationKey, commandId);
     try {
+      const applySession = (session: SessionResponse) => {
+        eventCursorReference.current = {
+          event_sequence: session.state.event_sequence,
+          state_version: session.state.version,
+        };
+        setActionLog(actionEntries(session.action_log));
+        setActiveInvitations(session.active_invitations);
+        setActiveInvitationLookupId(
+          session.active_invitations[0]?.lookup_id ?? null,
+        );
+        setActiveGame((current) =>
+          current === null ? current : { ...current, ...session },
+        );
+      };
+      let currentSession: SessionResponse = activeGame;
+      const terminalDeleteRetry =
+        commandName === "deleteGame" && previousCommandId !== undefined;
+      if (!terminalDeleteRetry) {
+        const refreshed = await resumeGame(activeGame.game_id);
+        if (!refreshed.is_host) {
+          throw new Error("Host authorization is no longer active.");
+        }
+        currentSession = refreshed;
+        applySession(refreshed);
+      }
       const result = await sendHostCommand(
         activeGame.game_id,
-        activeGame.state.version,
+        currentSession.state.version,
         commandName,
         payload,
         commandId,
       );
+      if (commandName !== "deleteGame") {
+        const synchronized = await resumeGame(activeGame.game_id);
+        if (!synchronized.is_host) {
+          throw new Error("Host authorization is no longer active.");
+        }
+        applySession(synchronized);
+      }
       hostCommandIdsReference.current.delete(operationKey);
       return result;
     } catch (commandError) {
@@ -362,7 +421,13 @@ export function App({
     setIsBusy(true);
     setError(null);
     try {
-      const created = await createGame(seat);
+      const created = await createGame(
+        seat,
+        creationIdReference.current,
+        creationCredentialReference.current,
+      );
+      creationIdReference.current = crypto.randomUUID();
+      creationCredentialReference.current = createBrowserCredential();
       setActiveInvitationLookupId(created.invitation.lookup_id);
       enterGame(
         created,

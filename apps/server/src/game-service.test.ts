@@ -544,6 +544,45 @@ describe("in-memory game lifecycle", () => {
     );
   });
 
+  it("replays a client-identified game creation without duplicating state", () => {
+    const service = new InMemoryGameService();
+    const creationId = randomUUID();
+    const creationCredential = "A".repeat(43);
+    const first = service.createGame(
+      "union",
+      undefined,
+      creationId,
+      creationCredential,
+    );
+    const replay = service.createGame(
+      "union",
+      undefined,
+      creationId,
+      creationCredential,
+    );
+
+    expect(replay).toEqual(first);
+    expect(service.exportSnapshot().games).toHaveLength(1);
+    expectServiceError(
+      () => service.createGame("union", undefined, creationId),
+      "unauthorized",
+    );
+  });
+
+  it("renews the persisted session when reusing its browser credential", () => {
+    let now = Date.UTC(2026, 7, 16);
+    const service = new InMemoryGameService({ now: () => now });
+    const first = service.createGame("union");
+    const initialExpiry = service.exportSnapshot().sessions[0]!.expiresAt;
+    now += 24 * 60 * 60 * 1_000;
+
+    service.createGame("confederate", first.credential);
+
+    expect(service.exportSnapshot().sessions[0]!.expiresAt).toBe(
+      initialExpiry + 24 * 60 * 60 * 1_000,
+    );
+  });
+
   it("prevents one browser session from claiming both sides", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("confederate");

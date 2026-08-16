@@ -2,17 +2,26 @@ import { type AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createHttpApplication } from "./http.js";
+import {
+  type GameServiceSnapshot,
+  InMemoryGameService,
+} from "./game-service.js";
+import { InMemoryAsyncGameService } from "./postgres-store.js";
 
 async function withServer(
   isReady: boolean | (() => boolean),
   assertion: (origin: string) => Promise<void>,
+  gameService?: InMemoryAsyncGameService,
 ) {
-  const app = createHttpApplication({
-    isReady: () => (typeof isReady === "function" ? isReady() : isReady),
-  });
+  const app = createHttpApplication(
+    {
+      isReady: () => (typeof isReady === "function" ? isReady() : isReady),
+    },
+    gameService,
+  );
   const server = app.listen(0, "127.0.0.1");
 
   await new Promise<void>((resolve, reject) => {
@@ -79,9 +88,72 @@ describe("service health", () => {
       });
     });
   });
+
+  it("falls back to 503 when recovery export fails while readiness is closed", async () => {
+    const service = new InMemoryAsyncGameService();
+    vi.spyOn(service, "getRecoveryExport").mockRejectedValue(
+      new Error("database unavailable"),
+    );
+    await withServer(
+      false,
+      async (origin) => {
+        const response = await fetch(
+          `${origin}/api/games/11111111-1111-4111-8111-111111111111/export`,
+        );
+        expect(response.status).toBe(503);
+        expect(await response.json()).toEqual({
+          error: "service_unavailable",
+        });
+      },
+      service,
+    );
+  });
 });
 
 describe("HTTP game lifecycle", () => {
+  it("rejects a malformed creation id distinctly from the seat", async () => {
+    await withServer(true, async (origin) => {
+      const response = await fetch(`${origin}/api/games`, {
+        body: JSON.stringify({ creation_id: "bad", seat: "union" }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toEqual({ error: "invalid_creation_id" });
+    });
+  });
+
+  it("replays game creation after a lost response", async () => {
+    const service = new InMemoryAsyncGameService();
+    await withServer(
+      true,
+      async (origin) => {
+        const creationId = "11111111-1111-4111-8111-111111111111";
+        const create = () =>
+          fetch(`${origin}/api/games`, {
+            body: JSON.stringify({
+              creation_credential: "A".repeat(43),
+              creation_id: creationId,
+              seat: "union",
+            }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          });
+        const first = await create();
+        const firstBody = await first.json();
+        const replay = await create();
+
+        expect(replay.status).toBe(201);
+        expect(await replay.json()).toEqual(firstBody);
+        expect(replay.headers.get("set-cookie")).toBe(
+          first.headers.get("set-cookie"),
+        );
+        expect(service.service.exportSnapshot().games).toHaveLength(1);
+      },
+      service,
+    );
+  });
+
   it("creates a game with a hardened browser-session cookie", async () => {
     await withServer(true, async (origin) => {
       const response = await fetch(`${origin}/api/games`, {
@@ -311,6 +383,58 @@ describe("HTTP game lifecycle", () => {
         });
         expect(differentDelete.status).toBe(503);
       },
+    );
+  });
+
+  it("allows authenticated recovery export while version readiness is closed", async () => {
+    const pepper = new Uint8Array(32).fill(7);
+    const original = new InMemoryGameService({ pepper });
+    const created = original.createGame("union");
+    const snapshot = original.exportSnapshot();
+    const unavailableSnapshot: GameServiceSnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(([gameId, game]) => [
+        gameId,
+        {
+          ...game,
+          state: {
+            ...game.state,
+            ruleset_version: "unavailable-ruleset",
+          },
+        },
+      ]),
+    };
+    const service = new InMemoryAsyncGameService(
+      new InMemoryGameService({ pepper, snapshot: unavailableSnapshot }),
+    );
+    await withServer(
+      false,
+      async (origin) => {
+        const response = await fetch(
+          `${origin}/api/games/${created.gameId}/export`,
+          {
+            headers: {
+              cookie: `__Host-gettysburg-session=${created.credential}`,
+            },
+          },
+        );
+        expect(response.status).toBe(200);
+        expect(await response.json()).toMatchObject({
+          action_log: [],
+          snapshot_metadata: {
+            content_revision: expect.any(String),
+            game_id: created.gameId,
+            ruleset_version: "unavailable-ruleset",
+            state_version: 0,
+          },
+        });
+
+        const unauthorized = await fetch(
+          `${origin}/api/games/${created.gameId}/export`,
+        );
+        expect(unauthorized.status).toBe(401);
+      },
+      service,
     );
   });
 });

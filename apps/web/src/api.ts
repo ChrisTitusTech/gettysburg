@@ -119,9 +119,17 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   return body;
 }
 
-export function createGame(seat: Side): Promise<CreateGameResponse> {
+export function createGame(
+  seat: Side,
+  creationId: string,
+  creationCredential: string,
+): Promise<CreateGameResponse> {
   return jsonRequest("/api/games", {
-    body: JSON.stringify({ seat }),
+    body: JSON.stringify({
+      creation_credential: creationCredential,
+      creation_id: creationId,
+      seat,
+    }),
     method: "POST",
   });
 }

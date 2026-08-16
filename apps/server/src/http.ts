@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
-import type { ActionEvent } from "@gettysburg/game";
+import type { ActionEvent, AuditEvent } from "@gettysburg/game";
 import { parseCookie, stringifySetCookie } from "cookie";
 import express, {
   type Application,
@@ -12,6 +12,7 @@ import express, {
 } from "express";
 
 import { ServiceError, type ServiceErrorCode } from "./game-service.js";
+import { isCanonicalCredential } from "./credentials.js";
 import type { GameEventBus } from "./event-bus.js";
 import {
   InMemoryAsyncGameService,
@@ -98,6 +99,8 @@ function errorStatus(code: ServiceErrorCode): number {
     case "game_deleted":
     case "game_purged":
       return 410;
+    case "creation_conflict":
+    case "creation_unavailable":
     case "invitation_unavailable":
     case "recovery_unavailable":
     case "seat_unavailable":
@@ -152,6 +155,15 @@ export function configureHttpApplication(
 
   application.use("/api", async (_request, response, next) => {
     try {
+      const exportMatch = _request.path.match(/^\/games\/([^/]+)\/export$/i);
+      if (
+        _request.method === "GET" &&
+        exportMatch?.[1] !== undefined &&
+        UUID_PATTERN.test(exportMatch[1])
+      ) {
+        next();
+        return;
+      }
       if (!(await readiness.isReady())) {
         const gameIdMatch = _request.path.match(
           /^\/games\/([0-9a-f-]+)\/host-commands$/i,
@@ -184,14 +196,40 @@ export function configureHttpApplication(
   application.post("/api/games", async (request, response, next) => {
     try {
       const seat = request.body?.seat;
+      const suppliedCreationId = request.body?.creation_id;
+      const suppliedCreationCredential = request.body?.creation_credential;
       if (seat !== "confederate" && seat !== "union") {
         response.status(400).json({ error: "invalid_seat" });
         return;
       }
+      if (
+        suppliedCreationId !== undefined &&
+        (typeof suppliedCreationId !== "string" ||
+          !UUID_PATTERN.test(suppliedCreationId))
+      ) {
+        response.status(400).json({ error: "invalid_creation_id" });
+        return;
+      }
+      if (
+        suppliedCreationCredential !== undefined &&
+        (typeof suppliedCreationCredential !== "string" ||
+          !isCanonicalCredential(suppliedCreationCredential))
+      ) {
+        response.status(400).json({ error: "invalid_creation_credential" });
+        return;
+      }
+      const creationId =
+        typeof suppliedCreationId === "string"
+          ? suppliedCreationId
+          : randomUUID();
 
       const result = await gameService.createGame(
         seat,
         readSessionCredential(request),
+        creationId,
+        typeof suppliedCreationCredential === "string"
+          ? suppliedCreationCredential
+          : undefined,
       );
       setSessionCookie(response, result.credential);
       response.status(201).json({
@@ -273,15 +311,25 @@ export function configureHttpApplication(
         }
 
         const credential = readSessionCredential(request);
-        const result = await gameService.claimSeatRecovery({
-          claimId:
-            typeof suppliedClaimId === "string"
-              ? suppliedClaimId
-              : randomUUID(),
-          ...(credential === undefined ? {} : { credential }),
-          lookupId: request.params.lookupId ?? "",
-          secret,
-        });
+        let auditEvent: AuditEvent | undefined;
+        const result = await gameService.claimSeatRecovery(
+          {
+            claimId:
+              typeof suppliedClaimId === "string"
+                ? suppliedClaimId
+                : randomUUID(),
+            ...(credential === undefined ? {} : { credential }),
+            lookupId: request.params.lookupId ?? "",
+            secret,
+          },
+          { afterCommit: (event) => (auditEvent = event) },
+        );
+        if (auditEvent !== undefined) {
+          options.eventBus?.publishAudit(result.gameId, {
+            event: auditEvent,
+            revokedSeat: result.seat,
+          });
+        }
         setSessionCookie(response, result.credential);
         response.status(200).json({
           action_log: await actionLog(gameService, result.gameId),
@@ -311,15 +359,22 @@ export function configureHttpApplication(
           return;
         }
         const credential = readSessionCredential(request);
-        const result = await gameService.claimHostRecovery({
-          claimId:
-            typeof suppliedClaimId === "string"
-              ? suppliedClaimId
-              : randomUUID(),
-          ...(credential === undefined ? {} : { credential }),
-          lookupId: request.params.lookupId ?? "",
-          secret,
-        });
+        let auditEvent: AuditEvent | undefined;
+        const result = await gameService.claimHostRecovery(
+          {
+            claimId:
+              typeof suppliedClaimId === "string"
+                ? suppliedClaimId
+                : randomUUID(),
+            ...(credential === undefined ? {} : { credential }),
+            lookupId: request.params.lookupId ?? "",
+            secret,
+          },
+          { afterCommit: (event) => (auditEvent = event) },
+        );
+        if (auditEvent !== undefined) {
+          options.eventBus?.publishAudit(result.gameId, { event: auditEvent });
+        }
         setSessionCookie(response, result.credential);
         response.status(200).json({
           action_log: await actionLog(gameService, result.gameId),
@@ -408,6 +463,35 @@ export function configureHttpApplication(
       next(error);
     }
   });
+
+  application.get(
+    "/api/games/:gameId/export",
+    async (request, response, next) => {
+      try {
+        response
+          .status(200)
+          .json(
+            await gameService.getRecoveryExport(
+              readSessionCredential(request),
+              request.params.gameId ?? "",
+            ),
+          );
+      } catch (error) {
+        if (!(error instanceof ServiceError)) {
+          try {
+            if (!(await readiness.isReady())) {
+              response.status(503).json({ error: "service_unavailable" });
+              return;
+            }
+          } catch {
+            response.status(503).json({ error: "service_unavailable" });
+            return;
+          }
+        }
+        next(error);
+      }
+    },
+  );
 
   if (staticDirectory !== undefined && existsSync(staticDirectory)) {
     const absoluteStaticDirectory = resolve(staticDirectory);

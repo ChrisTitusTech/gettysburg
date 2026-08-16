@@ -47,6 +47,7 @@ export function createGettysburgRoom(
     // remains one client per seat and all broadcasts stay in one room.
     override maxClients = 4;
     #gameId = "";
+    #unsubscribeAudit: (() => void) | undefined;
     #unsubscribeManagement: (() => void) | undefined;
 
     override async onCreate(options: GameRoomOptions): Promise<void> {
@@ -56,6 +57,22 @@ export function createGettysburgRoom(
       this.#unsubscribeManagement = eventBus?.subscribeManagement(
         this.#gameId,
         (event: ManagementEvent) => this.broadcast("managementEvent", event),
+      );
+      this.#unsubscribeAudit = eventBus?.subscribeAudit(
+        this.#gameId,
+        ({ event, revokedSeat }) => {
+          if (revokedSeat !== undefined) {
+            for (const client of [...this.clients]) {
+              if (
+                (client.auth as GameAuthorization | undefined)?.side ===
+                revokedSeat
+              ) {
+                client.leave(4001);
+              }
+            }
+          }
+          this.broadcast("auditEvent", event);
+        },
       );
 
       const commandNames: readonly GameplayCommandName[] = [
@@ -112,6 +129,7 @@ export function createGettysburgRoom(
     }
 
     override onDispose(): void {
+      this.#unsubscribeAudit?.();
       this.#unsubscribeManagement?.();
     }
 

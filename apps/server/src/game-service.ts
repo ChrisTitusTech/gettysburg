@@ -26,6 +26,7 @@ import {
   toCommandSuccess,
   type CommandFailure,
   type CommandResult,
+  type AuditEvent,
   type GameState,
   type GameplayCommand,
   type HexCoordinate,
@@ -140,6 +141,14 @@ interface GameRecord {
       readonly result: CommandResult;
     }
   >;
+  readonly creation?: {
+    readonly creationId: string;
+    readonly invitationLookupId: string;
+    readonly sealedCredential: string;
+    sealedInvitationSecret?: string;
+    readonly sessionId: string;
+    readonly side: Side;
+  };
   deletedAt: number | null;
   deletedBy: string | null;
   readonly hostCommandResults: Map<
@@ -171,6 +180,14 @@ export interface GameServiceSnapshot {
           readonly result: CommandResult;
         },
       ][];
+      readonly creation?: {
+        readonly creationId: string;
+        readonly invitationLookupId: string;
+        readonly sealedCredential: string;
+        readonly sealedInvitationSecret?: string;
+        readonly sessionId: string;
+        readonly side: Side;
+      };
       readonly deletedAt?: number | null;
       readonly deletedBy?: string | null;
       readonly hostCommandResults?: readonly [
@@ -251,8 +268,21 @@ export interface HostRecoveryClaimResult extends SessionResult {
   readonly gameId: string;
 }
 
+export interface RecoveryExport {
+  readonly action_log: readonly StoredAction[];
+  readonly snapshot_metadata: {
+    readonly content_revision: string;
+    readonly event_sequence: number;
+    readonly game_id: string;
+    readonly ruleset_version: string;
+    readonly state_version: number;
+  };
+}
+
 export type ServiceErrorCode =
   | "credential_invalid"
+  | "creation_conflict"
+  | "creation_unavailable"
   | "game_deleted"
   | "game_not_found"
   | "game_purged"
@@ -626,6 +656,9 @@ export class InMemoryGameService {
         this.#games.set(gameId, {
           actions: [...savedActions],
           commandResults: new Map(structuredClone(game.commandResults)),
+          ...(game.creation === undefined
+            ? {}
+            : { creation: structuredClone(game.creation) }),
           deletedAt: game.deletedAt ?? null,
           deletedBy: game.deletedBy ?? null,
           hostCommandResults: new Map(
@@ -669,6 +702,7 @@ export class InMemoryGameService {
         {
           actions: game.actions,
           commandResults: [...game.commandResults],
+          ...(game.creation === undefined ? {} : { creation: game.creation }),
           deletedAt: game.deletedAt,
           deletedBy: game.deletedBy,
           hostCommandResults: [...game.hostCommandResults],
@@ -853,8 +887,87 @@ export class InMemoryGameService {
     ]);
   }
 
-  createGame(side: Side, existingCredential?: string): CreateGameResult {
-    const session = this.#resolveOrCreateSession(existingCredential);
+  createGame(
+    side: Side,
+    existingCredential?: string,
+    creationId: string = randomUUID(),
+    creationCredential?: string,
+  ): CreateGameResult {
+    const replay = [...this.#games.values()].find(
+      (game) => game.creation?.creationId === creationId,
+    );
+    if (replay?.creation !== undefined) {
+      if (replay.creation.side !== side) {
+        throw new ServiceError(
+          "creation_conflict",
+          "Creation identifier was already used for another seat.",
+        );
+      }
+      const suppliedSession =
+        this.#findSession(existingCredential) ??
+        this.#findSession(creationCredential);
+      if (suppliedSession?.id !== replay.creation.sessionId) {
+        throw new ServiceError(
+          "unauthorized",
+          "Creation identifier belongs to another browser session.",
+        );
+      }
+      const invitation = this.#invitations.get(
+        replay.creation.invitationLookupId,
+      );
+      if (
+        invitation === undefined ||
+        invitation.claimedAt !== null ||
+        invitation.revokedAt !== null ||
+        invitation.expiresAt <= this.#now() ||
+        replay.creation.sealedInvitationSecret === undefined
+      ) {
+        throw new ServiceError(
+          "creation_unavailable",
+          "The original game creation result is no longer available.",
+        );
+      }
+      let credential: string;
+      let invitationSecret: string;
+      try {
+        credential = openInvitationSecret(
+          this.#pepper,
+          replay.creation.sealedCredential,
+        );
+        invitationSecret = openInvitationSecret(
+          this.#pepper,
+          replay.creation.sealedInvitationSecret,
+        );
+      } catch {
+        throw new ServiceError(
+          "creation_unavailable",
+          "The original game creation credentials are unavailable.",
+        );
+      }
+      const session = this.#findSession(credential);
+      if (session?.id !== replay.creation.sessionId) {
+        throw new ServiceError(
+          "creation_unavailable",
+          "The original browser session is no longer available.",
+        );
+      }
+      return {
+        credential,
+        gameId: replay.state.game_id,
+        invitation: {
+          lookup_id: invitation.lookupId,
+          secret: invitationSecret,
+        },
+        seat: side,
+        sessionId: session.id,
+        state: cloneState(replay.state),
+      };
+    }
+
+    const session = this.#resolveOrCreateSession(
+      existingCredential,
+      creationCredential,
+    );
     const gameId = randomUUID();
     const state: GameState = {
       active_side: "union",
@@ -904,9 +1017,24 @@ export class InMemoryGameService {
       },
     };
 
+    const invitation = this.#createInvitation(gameId, otherSide(side));
     this.#games.set(gameId, {
       actions: [],
       commandResults: new Map(),
+      creation: {
+        creationId,
+        invitationLookupId: invitation.lookup_id,
+        sealedCredential: sealInvitationSecret(
+          this.#pepper,
+          session.credential,
+        ),
+        sealedInvitationSecret: sealInvitationSecret(
+          this.#pepper,
+          invitation.secret,
+        ),
+        sessionId: session.sessionId,
+        side,
+      },
       deletedAt: null,
       deletedBy: null,
       hostCommandResults: new Map(),
@@ -931,7 +1059,7 @@ export class InMemoryGameService {
     return {
       ...session,
       gameId,
-      invitation: this.#createInvitation(gameId, otherSide(side)),
+      invitation,
       seat: side,
       state: cloneState(state),
     };
@@ -1739,12 +1867,15 @@ export class InMemoryGameService {
     return { lookup_id: lookupId, secret };
   }
 
-  claimSeatRecovery(input: {
-    claimId?: string;
-    credential?: string;
-    lookupId: string;
-    secret: string;
-  }): ClaimResult {
+  claimSeatRecovery(
+    input: {
+      claimId?: string;
+      credential?: string;
+      lookupId: string;
+      secret: string;
+    },
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
+  ): ClaimResult {
     const grant = this.#recoveryGrants.get(input.lookupId);
     const now = this.#now();
     if (
@@ -1859,28 +1990,11 @@ export class InMemoryGameService {
     });
 
     const game = this.#requireGame(grant.gameId);
-    game.state = {
-      ...game.state,
-      event_sequence: game.state.event_sequence + 1,
-    };
-    game.actions.push({
-      authorizingId: grant.operatorIdentity,
-      authorizingType: "operator",
-      authorizingVersion: 1,
-      canonicalRequestHash: null,
-      canonicalizationVersion: null,
-      commandId: null,
-      commandName: null,
-      contentRevision: game.state.content_revision,
-      expectedVersion: game.state.version,
-      kind: "operator_audit",
-      operatorRequestId: randomUUID(),
-      payload: null,
-      result: null,
-      resultingVersion: game.state.version,
-      sequence: game.state.event_sequence,
-      rulesetVersion: game.state.ruleset_version,
-    });
+    const event = this.#appendOperatorAudit(
+      grant.gameId,
+      grant.operatorIdentity,
+    );
+    options.afterCommit?.(event);
 
     return {
       ...session,
@@ -1926,12 +2040,15 @@ export class InMemoryGameService {
     return { lookup_id: lookupId, secret };
   }
 
-  claimHostRecovery(input: {
-    claimId?: string;
-    credential?: string;
-    lookupId: string;
-    secret: string;
-  }): HostRecoveryClaimResult {
+  claimHostRecovery(
+    input: {
+      claimId?: string;
+      credential?: string;
+      lookupId: string;
+      secret: string;
+    },
+    options: { afterCommit?: (event: AuditEvent) => void } = {},
+  ): HostRecoveryClaimResult {
     const grant = this.#recoveryGrants.get(input.lookupId);
     const now = this.#now();
     if (
@@ -2012,7 +2129,11 @@ export class InMemoryGameService {
       sessionId: session.sessionId,
       version: oldBinding.version + 1,
     });
-    this.#appendOperatorAudit(grant.gameId, grant.operatorIdentity);
+    const event = this.#appendOperatorAudit(
+      grant.gameId,
+      grant.operatorIdentity,
+    );
+    options.afterCommit?.(event);
     return { ...session, gameId: grant.gameId };
   }
 
@@ -2027,6 +2148,41 @@ export class InMemoryGameService {
 
   getActions(gameId: string): readonly StoredAction[] {
     return structuredClone(this.#requireGame(gameId).actions);
+  }
+
+  getRecoveryExport(
+    credential: string | undefined,
+    gameId: string,
+  ): RecoveryExport {
+    const game = this.#requireGame(gameId);
+    if (game.deletedAt !== null) {
+      throw new ServiceError("game_deleted", "Game has been deleted.");
+    }
+    const session = this.#findSession(credential);
+    if (
+      session === undefined ||
+      ![...this.#hostBindings, ...this.#seatBindings].some(
+        (binding) =>
+          binding.gameId === gameId &&
+          binding.sessionId === session.id &&
+          binding.revokedAt === null,
+      )
+    ) {
+      throw new ServiceError(
+        "unauthorized",
+        "A valid game binding is required for recovery export.",
+      );
+    }
+    return structuredClone({
+      action_log: game.actions,
+      snapshot_metadata: {
+        content_revision: game.state.content_revision,
+        event_sequence: game.state.event_sequence,
+        game_id: game.state.game_id,
+        ruleset_version: game.state.ruleset_version,
+        state_version: game.state.version,
+      },
+    });
   }
 
   getActiveInvitations(
@@ -2098,8 +2254,9 @@ export class InMemoryGameService {
     }
   }
 
-  #appendOperatorAudit(gameId: string, operatorIdentity: string): void {
+  #appendOperatorAudit(gameId: string, operatorIdentity: string): AuditEvent {
     const game = this.#requireActiveGame(gameId);
+    const commandId = randomUUID();
     game.state = {
       ...game.state,
       event_sequence: game.state.event_sequence + 1,
@@ -2115,13 +2272,21 @@ export class InMemoryGameService {
       contentRevision: game.state.content_revision,
       expectedVersion: game.state.version,
       kind: "operator_audit",
-      operatorRequestId: randomUUID(),
+      operatorRequestId: commandId,
       payload: null,
       result: null,
       resultingVersion: game.state.version,
       sequence: game.state.event_sequence,
       rulesetVersion: game.state.ruleset_version,
     });
+    return {
+      command_id: commandId,
+      command_name: "operatorRecovery",
+      event_sequence: game.state.event_sequence,
+      kind: "operator_audit",
+      state_version: game.state.version,
+      summary: "Operator recovery completed",
+    };
   }
 
   #assertAuthorization(authorization: GameAuthorization): void {
@@ -2180,6 +2345,9 @@ export class InMemoryGameService {
 
   #destroyInvitationSecret(lookupId: string): void {
     for (const game of this.#games.values()) {
+      if (game.creation?.invitationLookupId === lookupId) {
+        delete game.creation.sealedInvitationSecret;
+      }
       for (const record of game.hostCommandResults.values()) {
         if (record.invitationLookupId === lookupId) {
           delete record.sealedInvitationSecret;
@@ -2242,13 +2410,32 @@ export class InMemoryGameService {
     return game;
   }
 
-  #resolveOrCreateSession(credential: string | undefined): SessionResult {
-    const existing = this.#findSession(credential);
-    if (existing !== undefined && credential !== undefined) {
-      return { credential, sessionId: existing.id };
+  #resolveOrCreateSession(
+    credential: string | undefined,
+    requestedCredential?: string,
+  ): SessionResult {
+    if (
+      requestedCredential !== undefined &&
+      !isCanonicalCredential(requestedCredential)
+    ) {
+      throw new ServiceError(
+        "credential_invalid",
+        "Browser credential is invalid.",
+      );
+    }
+    const effectiveCredential = credential ?? requestedCredential;
+    const existing = this.#findSession(effectiveCredential);
+    if (existing !== undefined && effectiveCredential !== undefined) {
+      const renewed = {
+        ...existing,
+        expiresAt: this.#now() + SESSION_LIFETIME_MS,
+      };
+      this.#sessionsByHash.set(renewed.credentialHash, renewed);
+      this.#sessionsById.set(renewed.id, renewed);
+      return { credential: effectiveCredential, sessionId: renewed.id };
     }
 
-    const createdCredential = generateCredential();
+    const createdCredential = requestedCredential ?? generateCredential();
     const session: BrowserSession = {
       credentialHash: credentialVerifier(
         this.#pepper,
