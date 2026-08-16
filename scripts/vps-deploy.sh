@@ -45,7 +45,9 @@ restore_previous_files() {
 	run_user systemctl --user disable --now gettysburg-purge.timer || true
 	run_user systemctl --user stop gettysburg-app.service gettysburg-db.service \
 		gettysburg-network.service || true
-	run_user podman network rm gettysburg >/dev/null 2>&1 || true
+	if run_user podman network exists gettysburg; then
+		run_user podman network rm gettysburg >/dev/null
+	fi
 	for filename in "${quadlet_files[@]}"; do
 		if [[ -f "${rollback_root}/quadlet/${filename}" ]]; then
 			install -o "${service_user}" -g "${service_user}" -m 0600 \
@@ -196,7 +198,9 @@ if run_user podman container exists gettysburg-db &&
 fi
 run_user systemctl --user stop gettysburg-db.service \
 	gettysburg-network.service
-run_user podman network rm gettysburg >/dev/null 2>&1 || true
+if run_user podman network exists gettysburg; then
+	run_user podman network rm gettysburg >/dev/null
+fi
 
 for filename in "${quadlet_files[@]:0:4}"; do
 	install -o "${service_user}" -g "${service_user}" -m 0600 \
