@@ -21,8 +21,9 @@ point-in-time baseline and must be refreshed before a production change.
 | Kernel | `7.0.0-29-generic` |
 | Time | UTC, NTP synchronized |
 
-DNS resolves the domain to the public IPv4. Caddy redirects HTTP to HTTPS,
-serves the current placeholder over HTTP/2, and returns `ok` at `/healthz`.
+DNS resolves the domain to the public IPv4. Caddy redirects HTTP to HTTPS and
+proxies the Phase 2 rootless staging application over HTTP/2. Public `/healthz`
+and PostgreSQL-backed `/readyz` passed after deployment.
 The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
@@ -142,9 +143,9 @@ network=netavark
 graph=/srv/gettysburg/.local/share/containers/storage
 ```
 
-The rootless build/run path and a temporary Quadlet boot test passed. The smoke
-container and unit were removed, leaving no application containers or Quadlet
-files after validation.
+The rootless build/run path and the persistent Phase 2 Quadlets pass. The
+application and PostgreSQL containers are managed by the lingering `gettysburg`
+user manager; the application process runs as UID/GID 1000:1000.
 
 Persistent layout:
 
@@ -164,7 +165,7 @@ image, Quadlet file, command line, or project documentation.
 
 Caddy 2.11.4 is installed from the official package repository and runs as an
 enabled host service. Its configuration is `/etc/caddy/Caddyfile`. The current
-site is a readiness placeholder.
+site proxies the accepted Phase 2 staging revision to `127.0.0.1:3000`.
 
 The intended production flow is:
 
@@ -223,10 +224,10 @@ read-only root filesystems, private named volumes, and an internal network. The
 application drops all capabilities. PostgreSQL drops the defaults and restores
 only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
 entrypoint needs to initialize the named volume and become the database user.
-The PostgreSQL and Node base images are pinned by digest. Secrets are created outside Git under
-`/srv/gettysburg/.config/gettysburg/` with mode 0600. The deployment script
-records the exact Git revision and application image ID beside the pre-change
-rollback material.
+The PostgreSQL and Node base images are pinned by digest. Secrets are created
+outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The
+deployment script records the exact Git revision and application image ID beside
+the pre-change rollback material.
 The user timer in `ops/systemd/` runs the 30-day hard-purge job daily. Each dump
 records and verifies the database deletion-ledger watermark. Off-host encrypted
 backup and deletion-ledger replication still require an owner-selected remote
@@ -255,15 +256,15 @@ Existing host-configuration backups:
 - `/root/vps-bootstrap-backups/Caddyfile.package-default-20260815T025031Z`
 - `/root/ssh-config-backups/00-skysilk.conf.disabled-20260815T025031Z`
 
-These are local rollback artifacts, not application backups. Before production,
-add scheduled PostgreSQL dumps and persistent-volume backups under
-`/srv/gettysburg/backups`, copy encrypted backups off-host, set retention, and
-prove restore. A backup is not accepted until a restore has been verified.
+These are local rollback artifacts, not application backups. Phase 2 backup
+`/srv/gettysburg/backups/20260816T004348Z` passed strict checksum verification
+and an isolated rootless restore. Before production, schedule PostgreSQL dumps,
+copy encrypted backups and the deletion ledger off-host, and enforce retention.
+A backup is not accepted until a restore has been verified.
 
 ## Host-baseline verification commands
 
-This is a host-only audit of the current placeholder and does not accept an
-application release. Run:
+This is a host-only audit of the current staging deployment. Run:
 
 ```bash
 ssh gettysburg

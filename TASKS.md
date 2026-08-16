@@ -2,9 +2,10 @@
 
 ## Current phase: Phase 2 digital-tabletop MVP
 
-Phase 2 local implementation is active on `codex/phase-2-tabletop` as of
-2026-08-15. The local PostgreSQL/Caddy stack is available at
-`http://127.0.0.1:8080`. Source fidelity, host lifecycle, publication, staging,
+Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
+at `https://gettysburg.christitus.com` as of 2026-08-15. The local
+PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. Source
+fidelity, off-host deletion-ledger recovery, independent review, exact-head CI,
 and owner-controlled acceptance gates below remain open; the phase is not marked
 complete while any is unresolved.
 
@@ -215,22 +216,27 @@ recorded below; no implementation or local-validation failure remains.
     advance only the shared event cursor. Remaining work is off-host ledger
     replication and fail-closed restore synchronization; this task stays open
     until those SPEC contracts pass their integration tests.
-- [ ] Deploy and restore-test the private staging service on the VPS.
-  - Status: The local rootless-shaped compose path, migration readiness,
-    application restart, backup, and restore pass. Rootless Quadlet, Caddy,
-    fail-closed deploy/rollback, backup, isolated restore-test, and local recovery
-    scripts are implemented. Their Bash/static checks pass, and the actual VPS
-    Caddy and Quadlet generators accept the candidate files. The live host remains
-    on its healthy placeholder because the deployment script correctly refuses
-    this unpublished dirty checkout. Follow-up: publish an exact reviewed commit,
-    then deploy it and verify the public domain, WebSocket, two-client,
-    restart/resume, and backup/restore gates.
+- [x] Deploy and restore-test the private staging service on the VPS.
+  - Status: Rootless Quadlet services run the exact published revision recorded
+    by the image label and deployment rollback record behind host Caddy at
+    `https://gettysburg.christitus.com`. Local/public health and readiness,
+    non-root application UID/GID, image-revision label, public WebSocket origin,
+    two independent browser sessions, application restart/resume, PostgreSQL
+    restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
+    pass. Backup `/srv/gettysburg/backups/20260816T004348Z` restored two deleted
+    test games at event sequence 5/state version 4 with ledger watermark 0 and
+    verified strict checksums. The original Caddy placeholder and failed
+    candidate units were restored after each pre-acceptance deployment failure.
 - [ ] Complete a full two-player Phase 2 acceptance game.
-  - Status: Automated two-seat turn-24 completion passes, and real two-browser
-    create/join/reject/reconnect workflows pass at 1440 x 900 and 1024 x 768 with
-    refreshed evidence in `test-results/phase-2`. A human two-player 24-turn game,
-    independent review, and exact-head CI remain unobserved. CodeRabbit is skipped
-    if slow or rate-limited per owner direction and cannot block progress.
+  - Status: Real two-browser create/join/reject/reconnect workflows pass locally
+    and through public HTTPS/WebSockets at 1440 x 900 and 1024 x 768. A separate
+    public two-browser run completed all 47 authoritative transitions through
+    turn 24, reached the completed state at version 47, captured
+    `test-results/phase-2-live/live-full-game-complete.png`, and deleted its test
+    game through the confirmed host workflow. A human-played 24-turn game,
+    independent review, and exact-head CI remain unobserved. The built-in Codex
+    review command twice exited into a delegated review without returning its
+    required direct verdict; this tooling failure is not treated as approval.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown

@@ -281,6 +281,12 @@ async function runScenario(browser, origin, options) {
         .getByRole("button", { name: /Reynolds, G6/ })
         .waitFor();
     }
+    const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;
+    cleanupHostPage.once("dialog", (dialog) => dialog.accept());
+    await cleanupHostPage.getByRole("button", { name: "Delete game" }).click();
+    await cleanupHostPage
+      .getByRole("heading", { name: "Gettysburg" })
+      .waitFor();
     assert.deepEqual(issues, []);
     if (options.hostName === "Union") await restartedUnionContext.close();
   } catch (error) {
@@ -294,28 +300,90 @@ async function runScenario(browser, origin, options) {
   }
 }
 
+async function runFullGame(browser, origin) {
+  const issues = [];
+  const contextOptions = { viewport: { height: 900, width: 1440 } };
+  const unionContext = await browser.newContext(contextOptions);
+  const confederateContext = await browser.newContext(contextOptions);
+  const unionPage = await unionContext.newPage();
+  const confederatePage = await confederateContext.newPage();
+  watchPage(unionPage, issues);
+  watchPage(confederatePage, issues);
+
+  try {
+    await unionPage.goto(origin);
+    await unionPage.getByRole("button", { name: "Host as Union" }).click();
+    const invitation = await unionPage
+      .getByLabel("One-time invitation URL")
+      .inputValue();
+    await confederatePage.goto(invitation);
+    await confederatePage.getByRole("button", { name: "Claim seat" }).click();
+    await Promise.all(
+      [unionPage, confederatePage].map((page) =>
+        page.getByText("connected", { exact: true }).waitFor(),
+      ),
+    );
+
+    for (let version = 1; version <= 47; version += 1) {
+      const activePage = version % 2 === 1 ? unionPage : confederatePage;
+      await activePage
+        .getByRole("button", { name: /^End (movement|combat) phase$/ })
+        .click();
+      await Promise.all(
+        [unionPage, confederatePage].map((page) =>
+          waitForVersion(page, version),
+        ),
+      );
+    }
+
+    await Promise.all(
+      [unionPage, confederatePage].map((page) =>
+        page.getByRole("heading", { name: /Turn 24 · completed/ }).waitFor(),
+      ),
+    );
+    await unionPage.locator("main").screenshot({
+      path: resolve(evidenceDirectory, "live-full-game-complete.png"),
+    });
+    unionPage.once("dialog", (dialog) => dialog.accept());
+    await unionPage.getByRole("button", { name: "Delete game" }).click();
+    await unionPage.getByRole("heading", { name: "Gettysburg" }).waitFor();
+    assert.deepEqual(issues, []);
+  } finally {
+    await unionContext.close().catch(() => {});
+    await confederateContext.close().catch(() => {});
+  }
+}
+
 await mkdir(evidenceDirectory, { recursive: true });
-const port = await reservePort();
-const origin = `http://127.0.0.1:${port}`;
-const postgres = await startPostgres();
-const runtimeDirectory = await mkdtemp(join(tmpdir(), "gettysburg-browser-"));
+const configuredOrigin = process.env.GETTYSBURG_ACCEPTANCE_ORIGIN;
+const port = configuredOrigin === undefined ? await reservePort() : undefined;
+const origin = configuredOrigin ?? `http://127.0.0.1:${port}`;
+const postgres =
+  configuredOrigin === undefined ? await startPostgres() : undefined;
+const runtimeDirectory =
+  configuredOrigin === undefined
+    ? await mkdtemp(join(tmpdir(), "gettysburg-browser-"))
+    : undefined;
 let output = "";
-const server = spawn(process.execPath, ["apps/server/dist/index.js"], {
-  env: {
-    ...process.env,
-    DATABASE_URL: postgres.connectionString,
-    GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
-      runtimeDirectory,
-      "credential-pepper",
-    ),
-    GETTYSBURG_SERVER_HOST: "127.0.0.1",
-    GETTYSBURG_SERVER_PORT: String(port),
-    GETTYSBURG_TRUSTED_ORIGIN: origin,
-  },
-  stdio: ["ignore", "pipe", "pipe"],
-});
-server.stdout.on("data", (chunk) => (output += String(chunk)));
-server.stderr.on("data", (chunk) => (output += String(chunk)));
+const server =
+  configuredOrigin === undefined
+    ? spawn(process.execPath, ["apps/server/dist/index.js"], {
+        env: {
+          ...process.env,
+          DATABASE_URL: postgres.connectionString,
+          GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+            runtimeDirectory,
+            "credential-pepper",
+          ),
+          GETTYSBURG_SERVER_HOST: "127.0.0.1",
+          GETTYSBURG_SERVER_PORT: String(port),
+          GETTYSBURG_TRUSTED_ORIGIN: origin,
+        },
+        stdio: ["ignore", "pipe", "pipe"],
+      })
+    : undefined;
+server?.stdout.on("data", (chunk) => (output += String(chunk)));
+server?.stderr.on("data", (chunk) => (output += String(chunk)));
 
 let browser;
 try {
@@ -335,6 +403,9 @@ try {
     opponentName: "Confederate",
     viewport: { height: 768, width: 1024 },
   });
+  if (process.env.GETTYSBURG_FULL_GAME === "true") {
+    await runFullGame(browser, origin);
+  }
   console.log(
     `Browser acceptance passed at desktop and tablet widths; evidence: ${evidenceDirectory}`,
   );
@@ -344,7 +415,8 @@ try {
   });
 } finally {
   await browser?.close();
-  await stopServer(server);
-  postgres.stop();
-  await rm(runtimeDirectory, { force: true, recursive: true });
+  if (server !== undefined) await stopServer(server);
+  postgres?.stop();
+  if (runtimeDirectory !== undefined)
+    await rm(runtimeDirectory, { force: true, recursive: true });
 }
