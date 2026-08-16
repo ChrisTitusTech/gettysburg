@@ -7,14 +7,17 @@ readonly source_root="${service_root}/src"
 readonly quadlet_root="${service_root}/.config/containers/systemd"
 readonly systemd_root="${service_root}/.config/systemd/user"
 readonly secret_root="${service_root}/.config/gettysburg"
+readonly readiness_root="${service_root}/.config/gettysburg-readiness"
 readonly caddy_file="/etc/caddy/Caddyfile"
 readonly public_origin="https://gettysburg.christitus.com"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly timestamp
 readonly rollback_root="${service_root}/backups/deploy-${timestamp}"
+readonly maintenance_caddy="${rollback_root}/Caddyfile.maintenance"
 
 candidate_revision=""
 candidate_image_id=""
+candidate_exposed=false
 previous_caddy=""
 service_uid=""
 readonly -a quadlet_files=(
@@ -76,6 +79,13 @@ restore_previous_files() {
 fail() {
 	local status=$?
 	trap - ERR
+	if [[ "${candidate_exposed}" == true ]]; then
+		printf 'Deployment failed after the candidate traffic switch; keeping the candidate and restoring maintenance mode instead of starting an older ruleset.\n' >&2
+		install -o root -g root -m 0644 "${maintenance_caddy}" "${caddy_file}" || true
+		caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null 2>&1 || true
+		systemctl reload caddy || true
+		exit "${status}"
+	fi
 	printf 'Deployment failed; restoring the previous units and Caddy configuration.\n' >&2
 	restore_previous_files
 	exit "${status}"
@@ -85,9 +95,14 @@ if [[ "$(id -u)" -ne 0 ]]; then
 	printf 'Run this deployment script as root.\n' >&2
 	exit 1
 fi
+if ! command -v age >/dev/null || ! command -v age-keygen >/dev/null; then
+	command -v apt-get >/dev/null
+	apt-get update
+	DEBIAN_FRONTEND=noninteractive apt-get install --yes age
+fi
 service_uid="$(id -u "${service_user}")"
 readonly service_uid
-for command in caddy curl git install openssl runuser sed sha256sum systemctl; do
+for command in age age-keygen caddy curl git install openssl runuser sed sha256sum systemctl; do
 	command -v "${command}" >/dev/null
 done
 if [[ ! -d "${source_root}/.git" ]]; then
@@ -103,6 +118,8 @@ fi
 candidate_revision="$(git -C "${source_root}" rev-parse --verify HEAD)"
 install -d -o "${service_user}" -g "${service_user}" -m 0700 \
 	"${quadlet_root}" "${systemd_root}" "${secret_root}" "${rollback_root}"
+install -d -o "${service_user}" -g "${service_user}" -m 0755 \
+	"${readiness_root}"
 install -d -m 0700 "${rollback_root}/quadlet" "${rollback_root}/systemd"
 
 for filename in "${quadlet_files[@]}"; do
@@ -133,6 +150,26 @@ if [[ ! -f "${secret_root}/postgres.env" ]]; then
 	chmod 0600 "${secret_root}/postgres.env" "${secret_root}/app.env"
 	unset database_password
 fi
+if [[ ! -f "${secret_root}/backup-age-identity" ]]; then
+	umask 077
+	age-keygen --output "${secret_root}/backup-age-identity" >/dev/null
+	chown "${service_user}:${service_user}" \
+		"${secret_root}/backup-age-identity"
+	chmod 0600 "${secret_root}/backup-age-identity"
+fi
+age-keygen -y "${secret_root}/backup-age-identity" \
+	>"${secret_root}/backup-age-recipient"
+chown "${service_user}:${service_user}" "${secret_root}/backup-age-recipient"
+chmod 0600 "${secret_root}/backup-age-recipient"
+if grep -q '^GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE=' \
+	"${secret_root}/app.env"; then
+	sed -i \
+		's|^GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE=.*$|GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE=/run/gettysburg-readiness/offhost-ledger-watermark|' \
+		"${secret_root}/app.env"
+else
+	printf 'GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE=/run/gettysburg-readiness/offhost-ledger-watermark\n' \
+		>>"${secret_root}/app.env"
+fi
 
 run_user podman build \
 	--label "org.opencontainers.image.revision=${candidate_revision}" \
@@ -141,6 +178,14 @@ run_user podman build \
 	"${source_root}"
 candidate_image_id="$(run_user podman image inspect \
 	--format '{{.Id}}' "localhost/gettysburg:${candidate_revision}")"
+
+printf '%s {\n\trespond "Deployment in progress" 503\n}\n' \
+	"${public_origin#https://}" >"${maintenance_caddy}"
+caddy fmt --overwrite "${maintenance_caddy}"
+caddy validate --config "${maintenance_caddy}" --adapter caddyfile >/dev/null
+install -o root -g root -m 0644 "${maintenance_caddy}" "${caddy_file}"
+systemctl reload caddy
+run_user systemctl --user stop gettysburg-app.service
 
 if run_user podman container exists gettysburg-db &&
 	run_user podman inspect --format '{{.State.Running}}' gettysburg-db | grep -qx true; then
@@ -171,6 +216,21 @@ for _ in {1..60}; do
 done
 run_user podman healthcheck run gettysburg-db >/dev/null
 run_user systemctl --user restart gettysburg-app.service
+
+for _ in {1..60}; do
+	if curl --fail --silent --show-error --max-time 3 \
+		http://127.0.0.1:3000/healthz >/dev/null 2>&1; then
+		break
+	fi
+	sleep 1
+done
+curl --fail --silent --show-error --max-time 5 \
+	http://127.0.0.1:3000/healthz >/dev/null
+if [[ ! -f "${readiness_root}/offhost-ledger-watermark" ]]; then
+	trap - ERR
+	printf 'The database and unready candidate are initialized in maintenance mode, but the off-host ledger acknowledgement is missing. Copy the generated age identity to the maintainer workstation, run scripts/offhost-backup.sh, and rerun deployment.\n' >&2
+	exit 3
+fi
 run_user systemctl --user enable --now gettysburg-purge.timer
 
 for _ in {1..60}; do
@@ -198,6 +258,7 @@ if [[ ! "${app_uid}" =~ ^[1-9][0-9]*$ ]]; then
 	false
 fi
 
+candidate_exposed=true
 install -o root -g root -m 0644 "${source_root}/ops/Caddyfile.vps" "${caddy_file}"
 caddy fmt --overwrite "${caddy_file}"
 caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null

@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily encrypted Gettysburg off-host backup
+
+[Timer]
+OnCalendar=daily
+Persistent=true
+RandomizedDelaySec=30m
+Unit=gettysburg-offhost-backup.service
+
+[Install]
+WantedBy=timers.target

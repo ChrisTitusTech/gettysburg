@@ -277,4 +277,51 @@ describe("Colyseus authoritative room", () => {
       version: 0,
     });
   });
+
+  it("blocks room joins and commands when readiness becomes unavailable", async () => {
+    const service = new InMemoryGameService();
+    const readiness = { available: true, isReady: () => readiness.available };
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness,
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const hostCookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const hostRoom = await new ColyseusClient(origin, {
+      headers: { cookie: hostCookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(hostRoom);
+
+    readiness.available = false;
+    const rejected = nextMessage<CommandResult>(hostRoom, "commandResult");
+    hostRoom.send("moveUnit", {
+      command_id: randomUUID(),
+      command_name: "moveUnit",
+      expected_version: 0,
+      game_id: created.game_id,
+      payload: { destination: "E3", unit_id: "u-wadsworth" },
+      schema: COMMAND_SCHEMA_VERSION,
+    });
+    await expect(rejected).resolves.toMatchObject({
+      error: "internal_error",
+      ok: false,
+    });
+    expect(service.getActions(created.game_id)).toHaveLength(0);
+
+    await expect(
+      new ColyseusClient(origin, {
+        headers: { cookie: hostCookie, origin },
+      }).joinOrCreate("game", { gameId: created.game_id }),
+    ).rejects.toThrow();
+  });
 });

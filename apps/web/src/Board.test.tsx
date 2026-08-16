@@ -163,6 +163,35 @@ describe("Board", () => {
     expect(screen.getByText(/full strength · 2 steps/)).toBeVisible();
   });
 
+  it("shows the reduced combat value consistently on the counter and inspector", async () => {
+    const reducedState: GameState = {
+      ...state,
+      active_side: "union",
+      ruleset_version: "phase-2-tabletop-v2",
+      units: {
+        ...state.units,
+        "fixture-union-1": {
+          ...state.units["fixture-union-1"]!,
+          reduced_combat: 2,
+          steps_remaining: 1,
+          strength: "reduced",
+        },
+      },
+    };
+    const { container } = render(
+      <Board onMove={vi.fn()} seat="union" state={reducedState} />,
+    );
+    const counter = container.querySelector('[data-unit-id="fixture-union-1"]');
+    expect(counter).toHaveAttribute("data-combat", "2");
+
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /Union fixture counter, P7, selectable/,
+      }),
+    );
+    expect(screen.getByText(/Combat 2 · Movement 5/)).toBeVisible();
+  });
+
   it("rejects a board destination beyond the selected movement allowance", async () => {
     const user = userEvent.setup();
     const onMove = vi.fn();

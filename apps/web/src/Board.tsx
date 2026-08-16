@@ -8,6 +8,7 @@ import {
 import {
   combatFactorModifier,
   combatOpportunities,
+  currentCombatValue,
   hexDistance,
   nightMovementPath,
   shortestHexPath,
@@ -117,6 +118,10 @@ export function Board({
   const svgReference = useRef<SVGSVGElement | null>(null);
   const selectedUnit =
     selectedUnitId === null ? undefined : state.units[selectedUnitId];
+  const selectedCombat =
+    selectedUnit === undefined
+      ? null
+      : currentCombatValue(selectedUnit, state.ruleset_version);
   const deployedUnits = Object.values(state.units).filter(
     (unit) => unit.location !== null && unit.status === "deployed",
   );
@@ -795,18 +800,22 @@ export function Board({
               const selected = selectedIds().includes(unit.id);
               const retreatRequired = retreatContext(unit.id) !== null;
               const advanceEligible = advanceContext(unit.id) !== null;
-              const factor = unitFactor(unit.combat, unit.movement);
+              const currentCombat = currentCombatValue(
+                unit,
+                state.ruleset_version,
+              );
+              const factor = unitFactor(currentCombat, unit.movement);
               const details =
-                unit.combat === null
+                currentCombat === null
                   ? `${unit.kind}, movement ${unit.movement}`
-                  : `${unit.kind}, combat ${unit.combat}, movement ${unit.movement}`;
+                  : `${unit.kind}, combat ${currentCombat}, movement ${unit.movement}`;
               return (
                 <g
                   key={unit.id}
                   aria-label={`${unit.label}, ${unit.location}${unit.side === seat ? ", selectable" : ""}, ${details}, ${unit.organization}`}
                   aria-pressed={selected}
                   className={`counter counter-${unit.side}${retreatRequired ? " retreat-required" : ""}${advanceEligible ? " advance-eligible" : ""}${selected ? " selected" : ""}${draggedPath === null ? "" : " dragging"}`}
-                  data-combat={unit.combat ?? ""}
+                  data-combat={currentCombat ?? ""}
                   data-movement={unit.movement}
                   data-unit-id={unit.id}
                   onClick={(event: MouseEvent<SVGGElement>) =>
@@ -877,9 +886,9 @@ export function Board({
                 {selectedUnit.location}
               </span>
               <span>
-                {selectedUnit.combat === null
+                {selectedCombat === null
                   ? `Movement ${selectedUnit.movement}`
-                  : `Combat ${selectedUnit.combat} · Movement ${selectedUnit.movement}`}
+                  : `Combat ${selectedCombat} · Movement ${selectedUnit.movement}`}
                 {selectedUnit.entry_turn === null
                   ? " · Initial setup"
                   : ` · Arrival turn ${selectedUnit.entry_turn}`}

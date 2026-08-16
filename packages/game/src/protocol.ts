@@ -2,7 +2,8 @@ import { z } from "zod";
 
 import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
-export const RULESET_VERSION = "phase-2-tabletop-v1";
+export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
+export const RULESET_VERSION = "phase-2-tabletop-v2";
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
 export type Side = "confederate" | "union";
@@ -22,6 +23,7 @@ export interface UnitState {
   readonly movement: number;
   readonly movement_spent?: number;
   readonly organization: string;
+  readonly reduced_combat?: number | null;
   readonly side: Side;
   readonly status: UnitStatus;
   readonly steps_remaining: number;

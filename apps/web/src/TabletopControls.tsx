@@ -5,7 +5,10 @@ import type {
   GameplayCommandName,
   Side,
 } from "@gettysburg/game";
-import { automaticCombatResolution } from "@gettysburg/game";
+import {
+  automaticCombatResolution,
+  currentCombatValue,
+} from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
 
 interface TabletopControlsProps {
@@ -311,9 +314,9 @@ export function TabletopControls({
                   <li key={unit.id}>
                     <span>
                       <strong>{unit.label}</strong> · {unit.kind} ·{" "}
-                      {unit.combat === null
+                      {currentCombatValue(unit, state.ruleset_version) === null
                         ? `Move ${unit.movement}`
-                        : `${unit.combat}-${unit.movement} combat-move`}{" "}
+                        : `${currentCombatValue(unit, state.ruleset_version)}-${unit.movement} combat-move`}{" "}
                       · {unit.organization} <code>{unit.id}</code>
                     </span>
                     {unit.entry_hexes.map((hex) => (
@@ -371,9 +374,9 @@ export function TabletopControls({
           {Object.values(state.units).map((unit) => (
             <span key={unit.id}>
               <code>{unit.id}</code> · {unit.label} · {unit.kind} ·{" "}
-              {unit.combat === null
+              {currentCombatValue(unit, state.ruleset_version) === null
                 ? `Move ${unit.movement}`
-                : `${unit.combat}-${unit.movement} combat-move`}{" "}
+                : `${currentCombatValue(unit, state.ruleset_version)}-${unit.movement} combat-move`}{" "}
               · {unit.organization} · {unit.side} · {unit.status}
               {unit.location === null ? "" : ` ${unit.location}`}
             </span>

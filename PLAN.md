@@ -111,16 +111,20 @@ is in `docs/operations/VPS.md`.
 
 ## Decision gates before full content implementation
 
-- Obtain complete counter fronts and reduced-strength backs.
-- Review the per-hex terrain transcription against the supplied board.
+- Obtain complete counter fronts. For the Phase 2 rules-light model, derive a
+  reduced combat factor by halving and rounding up; combat-one counters have one
+  step. Reduced-face artwork remains a later presentation input.
+- Review the per-hex terrain transcription against the supplied board before
+  Phase 3 terrain enforcement; it is deliberately unavailable to Phase 2 rules.
 - Decide whether optional rules are in scope.
 - Decide whether the supplied scans may be used beyond a private prototype or
   whether the release must use entirely original art and wording.
 
 The locally supplied Battle Manual now answers the Scenario Five setup, turn,
 night, objective, scoring, and victory questions for the rules-light Phase 2
-model. Phase 2 still cannot claim complete counter-state or terrain fidelity
-until the remaining gates are closed.
+model. The owner-approved reduced-value derivation closes the Phase 2 counter-
+state rule gate. Phase 2 does not claim reduced-face artwork or per-hex terrain
+fidelity; those remain later-phase inputs.
 
 ## Planning ranges
 

@@ -18,11 +18,11 @@ export interface ScenarioUnit {
   readonly label: string;
   readonly movement: number;
   readonly organization: string;
-  readonly reduced_combat: null;
+  readonly reduced_combat: number | null;
   readonly setup_hex: HexCoordinate | null;
   readonly side: Side;
   readonly source: "OOP-Confederate.pdf" | "OOP-Union.pdf";
-  readonly source_status: "counter-back-unavailable";
+  readonly source_status: "owner-approved-derived";
 }
 
 export type TerrainKind = "clear" | "hill" | "rough_hill" | "town" | "woods";

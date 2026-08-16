@@ -14,7 +14,7 @@ function gameState(patch: Partial<GameState> = {}): GameState {
     night: false,
     objectives: {},
     phase: "movement",
-    ruleset_version: "phase-2-tabletop-v1",
+    ruleset_version: "phase-2-tabletop-v2",
     turn: 1,
     units: {},
     version: 0,

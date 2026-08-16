@@ -20,6 +20,7 @@ import {
   gameplayCommandSchema,
   hostManagementCommandSchema,
   isHexCoordinate,
+  LEGACY_RULESET_VERSION,
   reduceGameplayCommand,
   RULESET_VERSION,
   toCommandSuccess,
@@ -121,7 +122,7 @@ export interface DeletionReceipt {
   readonly deletedAt: number;
   readonly gameId: string;
   readonly position: number;
-  readonly purgedAt: number;
+  readonly purgedAt: number | null;
 }
 
 interface GameRecord {
@@ -501,8 +502,26 @@ function normalizeSavedState(
   state: GameState,
   actions: readonly StoredAction[] = [],
 ): GameState {
+  const units = Object.fromEntries(
+    Object.entries(state.units).map(([unitId, unit]) => [
+      unitId,
+      unit.steps_remaining === undefined
+        ? {
+            ...unit,
+            steps_remaining:
+              unit.kind === "general" || unit.combat === 1
+                ? 1
+                : unit.strength === "reduced"
+                  ? 1
+                  : 2,
+          }
+        : unit,
+    ]),
+  );
   return normalizeCombatDragChoices(
-    normalizePendingRetreatStacks(normalizeEmptyConfederateOpening(state)),
+    normalizePendingRetreatStacks(
+      normalizeEmptyConfederateOpening({ ...state, units }),
+    ),
     actions,
   );
 }
@@ -512,6 +531,10 @@ interface GameVersionHandler {
 }
 
 const gameVersionRegistry = new Map<string, GameVersionHandler>([
+  [
+    `${LEGACY_RULESET_VERSION}\u0000${SCENARIO_CONTENT_REVISION}`,
+    { normalize: normalizeSavedState },
+  ],
   [
     `${RULESET_VERSION}\u0000${SCENARIO_CONTENT_REVISION}`,
     { normalize: normalizeSavedState },
@@ -666,32 +689,94 @@ export class InMemoryGameService {
     return structuredClone(this.#deletionLedger);
   }
 
-  purgeDeletedGames(): readonly DeletionReceipt[] {
-    const purgedAt = this.#now();
-    const receipts: DeletionReceipt[] = [];
-
-    for (const [gameId, game] of this.#games) {
+  synchronizeDeletionLedger(
+    externalReceipts: readonly DeletionReceipt[],
+  ): readonly DeletionReceipt[] {
+    if (externalReceipts.length < this.#deletionLedger.length) {
+      throw new Error("External deletion ledger is behind local state");
+    }
+    const gameDeletionStates = new Map<string, "deleted" | "purged">();
+    for (const [index, receipt] of externalReceipts.entries()) {
       if (
-        game.deletedAt === null ||
-        game.deletedAt + DELETION_RETENTION_MS > purgedAt
+        receipt.position !== index + 1 ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+          receipt.gameId,
+        ) ||
+        !Number.isSafeInteger(receipt.deletedAt) ||
+        (receipt.purgedAt !== null &&
+          !Number.isSafeInteger(receipt.purgedAt)) ||
+        receipt.deletedAt < 0 ||
+        (receipt.purgedAt !== null && receipt.purgedAt < receipt.deletedAt) ||
+        receipt.actor.trim() === ""
       ) {
-        continue;
+        throw new Error("External deletion ledger is invalid");
       }
-      const receipt: DeletionReceipt = {
-        actor: game.deletedBy ?? "unknown",
-        deletedAt: game.deletedAt,
-        gameId,
-        position: this.#deletionLedger.length + 1,
-        purgedAt,
-      };
-      this.#deletionLedger.push(receipt);
-      receipts.push(receipt);
-      this.#games.delete(gameId);
-      for (const [lookupId, invitation] of this.#invitations) {
-        if (invitation.gameId === gameId) this.#invitations.delete(lookupId);
+      const local = this.#deletionLedger[index];
+      const matchesLocal =
+        local !== undefined &&
+        local.actor === receipt.actor &&
+        local.deletedAt === receipt.deletedAt &&
+        local.gameId === receipt.gameId &&
+        local.position === receipt.position &&
+        local.purgedAt === receipt.purgedAt;
+      const priorState = gameDeletionStates.get(receipt.gameId);
+      if (
+        (receipt.purgedAt === null && priorState !== undefined) ||
+        (receipt.purgedAt !== null && priorState !== "deleted" && !matchesLocal)
+      ) {
+        throw new Error("External deletion ledger is invalid");
       }
-      for (const [lookupId, grant] of this.#recoveryGrants) {
-        if (grant.gameId === gameId) this.#recoveryGrants.delete(lookupId);
+      gameDeletionStates.set(
+        receipt.gameId,
+        receipt.purgedAt === null ? "deleted" : "purged",
+      );
+      if (local !== undefined && !matchesLocal) {
+        throw new Error("External deletion ledger conflicts with local state");
+      }
+    }
+
+    const applied: DeletionReceipt[] = [];
+    for (const receipt of externalReceipts.slice(this.#deletionLedger.length)) {
+      const cloned = structuredClone(receipt);
+      this.#deletionLedger.push(cloned);
+      applied.push(cloned);
+      const game = this.#games.get(receipt.gameId);
+      if (receipt.purgedAt === null) {
+        if (game !== undefined) {
+          game.deletedAt = receipt.deletedAt;
+          game.deletedBy = receipt.actor;
+        }
+        for (const binding of this.#hostBindings) {
+          if (binding.gameId === receipt.gameId && binding.revokedAt === null)
+            binding.revokedAt = receipt.deletedAt;
+        }
+        for (const binding of this.#seatBindings) {
+          if (binding.gameId === receipt.gameId && binding.revokedAt === null)
+            binding.revokedAt = receipt.deletedAt;
+        }
+        for (const invitation of this.#invitations.values()) {
+          if (
+            invitation.gameId === receipt.gameId &&
+            invitation.revokedAt === null
+          ) {
+            invitation.revokedAt = receipt.deletedAt;
+            this.#destroyInvitationSecret(invitation.lookupId);
+          }
+        }
+        for (const grant of this.#recoveryGrants.values()) {
+          if (grant.gameId === receipt.gameId && grant.revokedAt === null)
+            grant.revokedAt = receipt.deletedAt;
+        }
+      } else {
+        this.#games.delete(receipt.gameId);
+        for (const [lookupId, invitation] of this.#invitations) {
+          if (invitation.gameId === receipt.gameId)
+            this.#invitations.delete(lookupId);
+        }
+        for (const [lookupId, grant] of this.#recoveryGrants) {
+          if (grant.gameId === receipt.gameId)
+            this.#recoveryGrants.delete(lookupId);
+        }
       }
     }
 
@@ -716,8 +801,33 @@ export class InMemoryGameService {
         this.#sessionsByHash.delete(session.credentialHash);
       }
     }
+    return structuredClone(applied);
+  }
 
-    return structuredClone(receipts);
+  purgeDeletedGames(): readonly DeletionReceipt[] {
+    const purgedAt = this.#now();
+    const receipts: DeletionReceipt[] = [];
+
+    for (const [gameId, game] of this.#games) {
+      if (
+        game.deletedAt === null ||
+        game.deletedAt + DELETION_RETENTION_MS > purgedAt
+      ) {
+        continue;
+      }
+      const receipt: DeletionReceipt = {
+        actor: game.deletedBy ?? "unknown",
+        deletedAt: game.deletedAt,
+        gameId,
+        position: this.#deletionLedger.length + receipts.length + 1,
+        purgedAt,
+      };
+      receipts.push(receipt);
+    }
+    return this.synchronizeDeletionLedger([
+      ...this.#deletionLedger,
+      ...receipts,
+    ]);
   }
 
   createGame(side: Side, existingCredential?: string): CreateGameResult {
@@ -754,9 +864,11 @@ export class InMemoryGameService {
             location: unit.setup_hex,
             movement: unit.movement,
             organization: unit.organization,
+            reduced_combat: unit.reduced_combat,
             side: unit.side,
             status: unit.setup_hex === null ? "reinforcement" : "deployed",
-            steps_remaining: unit.kind === "general" ? 1 : 2,
+            steps_remaining:
+              unit.kind === "general" || unit.combat === 1 ? 1 : 2,
             strength: "full",
           },
         ]),
@@ -974,6 +1086,28 @@ export class InMemoryGameService {
     };
   }
 
+  canRetryTerminalDelete(
+    credential: string | undefined,
+    gameId: string,
+    commandId: string,
+  ): boolean {
+    try {
+      const game = this.#requireGame(gameId);
+      if (game.deletedAt === null) return false;
+      const authorization = this.authenticateHost(credential, gameId, {
+        terminalCommandId: commandId,
+      });
+      const previous = game.hostCommandResults.get(commandId);
+      return (
+        previous?.result.event.command_name === "deleteGame" &&
+        previous.authorizingBindingId === authorization.bindingId &&
+        previous.authorizingBindingVersion === authorization.bindingVersion
+      );
+    } catch {
+      return false;
+    }
+  }
+
   executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
@@ -1129,6 +1263,13 @@ export class InMemoryGameService {
         summary = "Game deleted";
         game.deletedAt = now;
         game.deletedBy = authorization.bindingId;
+        this.#deletionLedger.push({
+          actor: authorization.bindingId,
+          deletedAt: now,
+          gameId: authorization.gameId,
+          position: this.#deletionLedger.length + 1,
+          purgedAt: null,
+        });
         for (const binding of this.#seatBindings) {
           if (
             binding.gameId === authorization.gameId &&

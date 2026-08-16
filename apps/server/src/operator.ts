@@ -1,18 +1,27 @@
+import { readFile } from "node:fs/promises";
+
+import type { DeletionReceipt } from "./game-service.js";
 import { PostgresGameService } from "./postgres-store.js";
 import { loadCredentialPepper } from "./runtime-config.js";
 
-const [command, gameId, target, ...identityParts] = process.argv.slice(2);
+const arguments_ = process.argv.slice(2);
+const [command, gameId, target, ...identityParts] = arguments_;
 const operatorIdentity = [target, ...identityParts].join(" ").trim();
 
-if (
-  (command === "purge-deleted" && process.argv.slice(2).length !== 1) ||
-  (command !== "purge-deleted" &&
-    ((command !== "issue-host-recovery" && command !== "issue-seat-recovery") ||
-      gameId === undefined ||
-      operatorIdentity === ""))
-) {
+const valid =
+  ((command === "purge-deleted" || command === "export-deletion-ledger") &&
+    arguments_.length === 1) ||
+  (command === "sync-deletion-ledger" && arguments_.length === 2) ||
+  (command === "issue-host-recovery" &&
+    gameId !== undefined &&
+    operatorIdentity !== "") ||
+  (command === "issue-seat-recovery" &&
+    gameId !== undefined &&
+    target !== undefined &&
+    identityParts.join(" ").trim() !== "");
+if (!valid) {
   throw new Error(
-    "Usage: operator.js purge-deleted | issue-host-recovery GAME_ID OPERATOR_IDENTITY | issue-seat-recovery GAME_ID SIDE OPERATOR_IDENTITY",
+    "Usage: operator.js purge-deleted | export-deletion-ledger | sync-deletion-ledger JSON_PATH | issue-host-recovery GAME_ID OPERATOR_IDENTITY | issue-seat-recovery GAME_ID SIDE OPERATOR_IDENTITY",
   );
 }
 
@@ -36,6 +45,22 @@ try {
   if (command === "purge-deleted") {
     const receipts = await service.purgeDeletedGames();
     process.stdout.write(`${JSON.stringify({ purged: receipts })}\n`);
+  } else if (command === "export-deletion-ledger") {
+    process.stdout.write(
+      `${JSON.stringify({ receipts: await service.getDeletionLedger() })}\n`,
+    );
+  } else if (command === "sync-deletion-ledger") {
+    if (gameId === undefined) throw new Error("Ledger path is required");
+    const parsed = JSON.parse(await readFile(gameId, "utf8")) as {
+      receipts?: unknown;
+    };
+    if (!Array.isArray(parsed.receipts)) {
+      throw new Error("Deletion ledger must contain a receipts array");
+    }
+    const applied = await service.synchronizeDeletionLedger(
+      parsed.receipts as DeletionReceipt[],
+    );
+    process.stdout.write(`${JSON.stringify({ applied })}\n`);
   } else if (command === "issue-host-recovery") {
     if (gameId === undefined) throw new Error("Game ID is required");
     const grant = await service.issueHostRecovery(

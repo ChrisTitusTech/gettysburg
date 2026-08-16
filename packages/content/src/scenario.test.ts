@@ -23,8 +23,12 @@ describe("source-card scenario content", () => {
       }
       if (unit.setup_hex !== null)
         expect(coordinates.has(unit.setup_hex)).toBe(true);
-      expect(unit.reduced_combat).toBeNull();
-      expect(unit.source_status).toBe("counter-back-unavailable");
+      expect(unit.reduced_combat).toBe(
+        unit.combat === null || unit.combat === 1
+          ? null
+          : Math.ceil(unit.combat / 2),
+      );
+      expect(unit.source_status).toBe("owner-approved-derived");
     }
   });
 

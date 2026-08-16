@@ -128,8 +128,11 @@ an auditable action log.
 
 ### Dependencies and risks
 
-- Requires reviewed counter backs/reduced values, per-hex terrain, and remaining
-  optional-rule decisions for a complete fidelity claim.
+- Uses owner-approved derived reduced values: halve each full combat factor and
+  round up, with combat-one counters eliminated on their first loss. Reduced
+  face artwork, per-hex terrain modifiers, and optional-rule decisions remain
+  outside the Phase 2 rules-light fidelity claim and are Phase 3/publication
+  inputs.
 - Database migration and backup procedures must be ready before durable staging.
 - Supplied art remains private unless the rights decision allows its use.
 

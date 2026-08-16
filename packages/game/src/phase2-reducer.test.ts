@@ -50,7 +50,7 @@ function state(patch: Partial<GameState> = {}): GameState {
     night: false,
     objectives: {},
     phase: "movement",
-    ruleset_version: "phase-2-tabletop-v1",
+    ruleset_version: "phase-2-tabletop-v2",
     turn: 1,
     units: {},
     version: 0,
@@ -808,5 +808,53 @@ describe("automatic combat workflow", () => {
     expect(current.combats[combatId]?.status).toBe("resolved");
     expect(current.units.attacker?.location).toBe("B1");
     expect(current.units.attackerGeneral?.location).toBe("B1");
+  });
+
+  it("eliminates a combat-one counter on its first allocated loss", () => {
+    const oneStepUnits = {
+      attacker: unit("attacker", "confederate", "infantry", "A1", {
+        combat: 6,
+      }),
+      defender: unit("defender", "union", "infantry", "B1", {
+        combat: 1,
+        reduced_combat: null,
+        steps_remaining: 1,
+      }),
+    };
+    let current = accept(
+      state({ phase: "combat", units: oneStepUnits }),
+      "confederate",
+      command("declareCombat", {
+        attackers: ["attacker"],
+        combat_id: combatId,
+        defenders: ["defender"],
+      }),
+      { attacker: 6, defender: 1 },
+    );
+    current = accept(
+      current,
+      "confederate",
+      command("confirmCombatResult", { combat_id: combatId }, 1),
+    );
+    expect(current.combats[combatId]?.pending_choice).toMatchObject({
+      count: 1,
+      kind: "loss",
+      side: "union",
+    });
+    current = accept(
+      current,
+      "union",
+      command(
+        "allocateLoss",
+        { allocations: { defender: 1 }, combat_id: combatId },
+        2,
+      ),
+    );
+    expect(current.units.defender).toMatchObject({
+      location: null,
+      status: "eliminated",
+      steps_remaining: 0,
+      strength: "eliminated",
+    });
   });
 });

@@ -46,3 +46,31 @@ export async function loadCredentialPepper(options: {
     return decodePepper((await readFile(options.file, "utf8")).trim());
   }
 }
+
+export async function loadDeletionLedgerWatermark(
+  file: string,
+): Promise<number> {
+  const value = (await readFile(file, "utf8")).trim();
+  if (!/^(0|[1-9][0-9]*)$/.test(value)) {
+    throw new Error("Deletion-ledger watermark must be a nonnegative integer");
+  }
+  const watermark = Number(value);
+  if (!Number.isSafeInteger(watermark)) {
+    throw new Error("Deletion-ledger watermark exceeds the safe integer range");
+  }
+  return watermark;
+}
+
+export async function isDeletionLedgerAcknowledged(
+  file: string,
+  receipts: readonly { readonly position: number }[],
+): Promise<boolean> {
+  try {
+    return (
+      (await loadDeletionLedgerWatermark(file)) ===
+      (receipts.at(-1)?.position ?? 0)
+    );
+  } catch {
+    return false;
+  }
+}

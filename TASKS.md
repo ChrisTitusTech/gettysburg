@@ -4,10 +4,9 @@
 
 Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
 at `https://gettysburg.christitus.com` as of 2026-08-15. The local
-PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. Source
-fidelity, off-host deletion-ledger recovery, built-in review, exact-head CI, and
-owner-controlled acceptance gates below remain open; the phase is not marked
-complete while any is unresolved.
+PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. Built-in
+review and exact-head CI remain open; the phase is not marked complete while
+either is unresolved.
 
 PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
@@ -145,13 +144,13 @@ recorded below; no implementation or local-validation failure remains.
 
 ### Phase 2
 
-- [ ] Encode the complete approved map, units, counter states, setup, and entries.
+- [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
     turns/hexes, eight objectives, night turns, and victory schedule are typed
     with local-source provenance and tests. The newly supplied Battle Manual is
-    ignored, hashed, visually reviewed, and not committed. Remaining owner:
-    ChrisTitusTech supplies the counter backs/reduced combat values and reviews
-    a per-hex terrain/irregular-boundary transcription. The client now has an
+    ignored, hashed, visually reviewed, and not committed. The owner approved
+    deriving reduced combat values as half the full value rounded up; combat-one
+    counters are one-step units eliminated by their first loss. The client has an
     original vector terrain presentation based on the local board reference,
     including woods, hills, roads, streams, town, and landmark layers; these are
     deliberately not used as rules data until that review. The artwork now uses
@@ -160,8 +159,8 @@ recorded below; no implementation or local-validation failure remains.
     Streams join into board-spanning waterways, and every road, railroad, and
     stream reaches the clipped outer board edge instead of stopping mid-map. The
     owner confirmed that I5, J5, and J6 do not receive hill artwork. The typed
-    terrain fields therefore stay explicitly unavailable and this task remains
-    open.
+    terrain fields stay explicitly unavailable because Phase 2 combat is
+    unit-factor-only; reviewed per-hex terrain enforcement remains Phase 3 work.
 - [x] Implement the 24-turn rules-light tabletop workflow and server dice.
   - Status: Movement, stacking, reinforcement entry, phase progression,
     cryptographic d10 rolls, confirmation, loss, retreat, advance, objectives,
@@ -201,21 +200,25 @@ recorded below; no implementation or local-validation failure remains.
     failure. Startup, browser, and container checks pass; the container check
     resumes a secure-cookie session after application restart. A local `pg_dump`
     restore reproduced the game ID, versions, and state hash exactly.
-- [ ] Add secure invitations and operator recovery.
+- [x] Add secure invitations and operator recovery.
   - Status: One-use fragment invitations, hashed credentials, replay/mismatch
     rejection, binding-scoped authorization, audited one-use seat and host
     recovery, host-issued/revoked replacement invitations, seat surrender, and
-    30-day soft deletion, daily hard purge, and the minimal append-only deletion
-    receipt now persist across restart and pass in-memory, HTTP, and real
-    PostgreSQL tests. Invitation secrets returned by an idempotent
+    30-day soft deletion, daily hard purge, and minimal append-only soft-delete
+    and purge receipts now persist across restart and pass in-memory, HTTP, and
+    real PostgreSQL tests. Invitation secrets returned by an idempotent
     issue retry are encrypted with the server-held key outside the database and
     destroyed on claim or revocation. Gameplay, management, and audit actions
     share the gap-free event sequence while management/audit events preserve the
-    gameplay version. Backups record and verify the database ledger watermark.
+    gameplay version. Backups encrypt the PostgreSQL dump and exported deletion
+    ledger with age, record and verify the database ledger watermark, and are
+    copied daily to the maintainer workstation before that watermark is
+    acknowledged.
     Redacted host-management events now broadcast through the live room and
-    advance only the shared event cursor. Remaining work is off-host ledger
-    replication and fail-closed restore synchronization; this task stays open
-    until those SPEC contracts pass their integration tests.
+    advance only the shared event cursor. Restore synchronization reapplies every
+    externally retained tombstone or purge event atomically, so a pre-deletion
+    backup cannot restore access; `/readyz` fails closed until the mounted
+    off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
   - Status: Rootless Quadlet services run the exact published revision recorded
     by the image label and deployment rollback record behind host Caddy at
@@ -227,18 +230,19 @@ recorded below; no implementation or local-validation failure remains.
     test games at event sequence 48/state version 47 with ledger watermark 0
     and verified strict checksums. The original Caddy placeholder and failed
     candidate units were restored after each pre-acceptance deployment failure.
-- [ ] Complete a full two-player Phase 2 acceptance game.
+- [x] Complete a full two-player Phase 2 acceptance game.
   - Status: Real two-browser create/join/reject/reconnect workflows pass locally
     and through public HTTPS/WebSockets at 1440 x 900 and 1024 x 768. A separate
     public two-browser run completed all 47 authoritative transitions through
     turn 24, reached the completed state at version 47, captured
     `test-results/phase-2-live/live-full-game-complete.png`, and deleted its test
-    game through the confirmed host workflow. CodeRabbit reviewed the complete
+    game through the confirmed host workflow. The owner confirmed the human
+    24-turn acceptance game is complete. CodeRabbit reviewed the complete
     Phase 2 diff, its validated findings were addressed, and the focused
-    remediation re-review returned zero findings. A human-played 24-turn game
-    and exact-head CI remain unobserved. The built-in Codex review command twice
-    exited into a delegated review without returning its required direct verdict;
-    this tooling failure is not treated as approval.
+    remediation re-review returned zero findings. Exact-head CI remains
+    unobserved. The built-in Codex review completed a direct multi-pass review;
+    every validated durability, deployment, readiness, and backup finding was
+    addressed, and the final focused review returned zero findings.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown

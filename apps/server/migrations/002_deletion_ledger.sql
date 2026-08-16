@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS deletion_ledger (
   position bigint PRIMARY KEY CHECK (position > 0),
   game_id uuid NOT NULL UNIQUE,
   deleted_at timestamptz NOT NULL,
-  purged_at timestamptz NOT NULL,
+  purged_at timestamptz,
   actor text NOT NULL
 );
 

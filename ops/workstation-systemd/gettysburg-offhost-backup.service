@@ -1,0 +1,10 @@
+[Unit]
+Description=Copy an encrypted Gettysburg backup off the VPS
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=GETTYSBURG_CHECKOUT_ROOT=%h/github/gettysburg
+EnvironmentFile=-%h/.config/gettysburg/offhost-backup.env
+ExecStart=/usr/bin/env ${GETTYSBURG_CHECKOUT_ROOT}/scripts/offhost-backup.sh

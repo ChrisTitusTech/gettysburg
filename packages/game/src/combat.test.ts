@@ -1,10 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import type { GameState, Side, UnitState } from "./protocol";
+import {
+  LEGACY_RULESET_VERSION,
+  RULESET_VERSION,
+  type GameState,
+  type Side,
+  type UnitState,
+} from "./protocol";
 import {
   combatFactorModifier,
   combatOpportunities,
   combatSkirmishes,
+  currentCombatValue,
 } from "./combat";
 
 function unit(
@@ -40,7 +47,7 @@ function state(units: Record<string, UnitState>): GameState {
     night: false,
     objectives: {},
     phase: "combat",
-    ruleset_version: "phase-2-tabletop-v1",
+    ruleset_version: RULESET_VERSION,
     turn: 4,
     units,
     version: 0,
@@ -225,6 +232,38 @@ describe("combat discovery", () => {
       second: unit("second", "confederate", "A1", 5),
     });
     expect(combatFactorModifier(current, ["first", "second"])).toBe(10);
+  });
+
+  it.each([
+    [2, 1],
+    [3, 2],
+    [4, 2],
+    [5, 3],
+    [6, 3],
+  ] as const)("reduces combat %i to %i", (full, reduced) => {
+    const counter = {
+      ...unit("counter", "union", "A1", full),
+      reduced_combat: reduced,
+      steps_remaining: 1,
+      strength: "reduced" as const,
+    };
+    expect(currentCombatValue(counter, RULESET_VERSION)).toBe(reduced);
+    expect(currentCombatValue(counter, LEGACY_RULESET_VERSION)).toBe(full);
+  });
+
+  it("derives a missing reduced factor and preserves null or full values", () => {
+    const reduced = {
+      ...unit("reduced", "union", "A1", 3),
+      steps_remaining: 1,
+      strength: "reduced" as const,
+    };
+    expect(currentCombatValue(reduced, RULESET_VERSION)).toBe(2);
+    expect(
+      currentCombatValue(unit("general", "union", "A1", null), RULESET_VERSION),
+    ).toBeNull();
+    expect(
+      currentCombatValue(unit("full", "union", "A1", 3), RULESET_VERSION),
+    ).toBe(3);
   });
 
   it("removes every participant after a combat is declared", () => {

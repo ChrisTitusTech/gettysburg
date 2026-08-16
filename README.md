@@ -33,9 +33,10 @@ The Phase 2 implementation provides the 82 available source-card counter fronts,
 24 turns, reinforcement entry, automatic two-die combat results using verified
 unit factors, objective and casualty scoring, PostgreSQL
 state/actions/snapshots, restart-safe browser sessions, and a non-root
-production-shaped local container path. Complete reduced-strength counter backs
-and reviewed per-hex terrain rules data remain source-fidelity gates in
-`TASKS.md`.
+production-shaped local container path. Reduced combat factors are owner-approved
+derived values: halve the full factor and round up, while a combat-one counter
+has one step and is eliminated by its first loss. Per-hex terrain modifiers are
+explicitly deferred to Phase 3 and remain unavailable as rules data.
 
 ## Development
 

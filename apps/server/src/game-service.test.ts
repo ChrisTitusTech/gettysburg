@@ -6,6 +6,8 @@ import {
   type HexCoordinate,
   type HostManagementCommand,
   type MoveUnitCommand,
+  LEGACY_RULESET_VERSION,
+  type UnitState,
 } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
 
@@ -160,6 +162,24 @@ describe("in-memory game lifecycle", () => {
     });
   });
 
+  it("creates derived reduced factors and one-step combat-one counters", () => {
+    const service = new InMemoryGameService();
+    const game = service.createGame("union");
+    const state = service.getGameState(game.gameId);
+
+    expect(state.ruleset_version).toBe("phase-2-tabletop-v2");
+    expect(state.units["u-wadsworth"]).toMatchObject({
+      combat: 3,
+      reduced_combat: 2,
+      steps_remaining: 2,
+    });
+    expect(state.units["u-gamble"]).toMatchObject({
+      combat: 1,
+      reduced_combat: null,
+      steps_remaining: 1,
+    });
+  });
+
   it("upgrades a saved empty Confederate opening to Union movement", () => {
     const original = new InMemoryGameService();
     const game = original.createGame("confederate");
@@ -192,6 +212,43 @@ describe("in-memory game lifecycle", () => {
       phase: "movement",
       version: 1,
     });
+  });
+
+  it("backfills missing legacy unit steps before rules execute", () => {
+    const original = new InMemoryGameService();
+    const game = original.createGame("union");
+    const snapshot = original.exportSnapshot();
+    const wadsworth = snapshot.games[0]?.[1].state.units["u-wadsworth"];
+    if (wadsworth === undefined) throw new Error("Unit snapshot was not found");
+    const legacyWadsworth = Object.fromEntries(
+      Object.entries(wadsworth).filter(([key]) => key !== "steps_remaining"),
+    ) as UnitState;
+    const legacySnapshot = {
+      ...snapshot,
+      games: snapshot.games.map(
+        ([gameId, record]): (typeof snapshot.games)[number] => [
+          gameId,
+          gameId === game.gameId
+            ? {
+                ...record,
+                state: {
+                  ...record.state,
+                  ruleset_version: LEGACY_RULESET_VERSION,
+                  units: {
+                    ...record.state.units,
+                    "u-wadsworth": legacyWadsworth as UnitState,
+                  },
+                },
+              }
+            : record,
+        ],
+      ),
+    };
+
+    const restored = new InMemoryGameService({ snapshot: legacySnapshot });
+    expect(
+      restored.getGameState(game.gameId).units["u-wadsworth"]?.steps_remaining,
+    ).toBe(2);
   });
 
   it("upgrades a saved retreat choice to include its whole original stack", () => {
@@ -949,6 +1006,15 @@ describe("Phase 2 seat and host lifecycle", () => {
       authorization,
       hostCommand(deletedGame.gameId, 0, "deleteGame", { confirm: true }),
     );
+    expect(service.getDeletionLedger()).toEqual([
+      {
+        actor: authorization.bindingId,
+        deletedAt: now,
+        gameId: deletedGame.gameId,
+        position: 1,
+        purgedAt: null,
+      },
+    ]);
 
     expect(service.purgeDeletedGames()).toEqual([]);
     now += 30 * 24 * 60 * 60 * 1_000;
@@ -957,12 +1023,12 @@ describe("Phase 2 seat and host lifecycle", () => {
         actor: authorization.bindingId,
         deletedAt: Date.UTC(2026, 7, 15),
         gameId: deletedGame.gameId,
-        position: 1,
+        position: 2,
         purgedAt: now,
       },
     ]);
     expect(service.purgeDeletedGames()).toEqual([]);
-    expect(service.getDeletionLedger()).toHaveLength(1);
+    expect(service.getDeletionLedger()).toHaveLength(2);
     expectServiceError(
       () => service.getActions(deletedGame.gameId),
       "game_purged",
@@ -980,6 +1046,97 @@ describe("Phase 2 seat and host lifecycle", () => {
         .exportSnapshot()
         .hostBindings.some((binding) => binding.gameId === retainedGame.gameId),
     ).toBe(true);
+  });
+
+  it("reapplies an off-host deletion ledger after restoring an older snapshot", () => {
+    let now = Date.UTC(2026, 7, 15);
+    const primary = new InMemoryGameService({ now: () => now });
+    const deletedGame = primary.createGame("union");
+    const retainedGame = primary.createGame(
+      "confederate",
+      deletedGame.credential,
+    );
+    const authorization = primary.authenticateHost(
+      deletedGame.credential,
+      deletedGame.gameId,
+    );
+    primary.executeHostCommand(
+      authorization,
+      hostCommand(deletedGame.gameId, 0, "deleteGame", { confirm: true }),
+    );
+    const staleBackup = primary.exportSnapshot();
+    now += 31 * 24 * 60 * 60 * 1_000;
+    primary.purgeDeletedGames();
+    const ledger = primary.getDeletionLedger();
+
+    const restored = new InMemoryGameService({
+      now: () => now,
+      snapshot: staleBackup,
+    });
+    expect(restored.synchronizeDeletionLedger(ledger)).toEqual([ledger[1]]);
+    expectServiceError(
+      () => restored.getGameState(deletedGame.gameId),
+      "game_purged",
+    );
+    expect(restored.getGameState(retainedGame.gameId).game_id).toBe(
+      retainedGame.gameId,
+    );
+    expect(() =>
+      restored.synchronizeDeletionLedger([
+        { ...ledger[0]!, actor: "conflicting-operator" },
+        ledger[1]!,
+      ]),
+    ).toThrow(/conflicts/i);
+    const empty = new InMemoryGameService();
+    expect(() =>
+      empty.synchronizeDeletionLedger([{ ...ledger[1]!, position: 1 }]),
+    ).toThrow(/invalid/i);
+    expect(() =>
+      empty.synchronizeDeletionLedger([
+        ...ledger,
+        { ...ledger[1]!, position: 3 },
+      ]),
+    ).toThrow(/invalid/i);
+  });
+
+  it("reapplies a soft-deletion tombstone to a pre-deletion backup", () => {
+    const now = Date.UTC(2026, 7, 15);
+    const primary = new InMemoryGameService({ now: () => now });
+    const deletedGame = primary.createGame("union");
+    const retainedGame = primary.createGame(
+      "confederate",
+      deletedGame.credential,
+    );
+    const preDeletionBackup = primary.exportSnapshot();
+    const authorization = primary.authenticateHost(
+      deletedGame.credential,
+      deletedGame.gameId,
+    );
+    primary.executeHostCommand(
+      authorization,
+      hostCommand(deletedGame.gameId, 0, "deleteGame", { confirm: true }),
+    );
+
+    const restored = new InMemoryGameService({
+      now: () => now,
+      snapshot: preDeletionBackup,
+    });
+    expect(
+      restored.synchronizeDeletionLedger(primary.getDeletionLedger()),
+    ).toHaveLength(1);
+    expectServiceError(
+      () => restored.authenticate(deletedGame.credential, deletedGame.gameId),
+      "game_deleted",
+    );
+    expect(restored.getGameState(retainedGame.gameId).game_id).toBe(
+      retainedGame.gameId,
+    );
+    const retainedInvitation = restored
+      .exportSnapshot()
+      .invitations.find(
+        ([, invitation]) => invitation.gameId === deletedGame.gameId,
+      );
+    expect(retainedInvitation?.[1]).toMatchObject({ revokedAt: now });
   });
 
   it("rotates only one host binding through operator recovery", () => {

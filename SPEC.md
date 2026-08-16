@@ -379,6 +379,10 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   available. Per-hex hill, woods, and town modifiers remain excluded until the
   terrain transcription is reviewed, so the interface identifies the result as
   unit-factor-only rather than claiming complete Phase 3 terrain correctness.
+  A reduced counter contributes half its full combat factor rounded up. A
+  combat-one counter has no reduced step and is eliminated by its first
+  allocated loss. Saved Phase 2 v1 games retain their original combat behavior;
+  newly created games record and use the v2 rule.
   The server creates the first required loss or retreat choice.
   Once losses are allocated, it advances through each confirmed retreat and then
   offers advance only when a server-derived eligible attacker exists. With zero
@@ -481,22 +485,25 @@ restore.
 A shared `BrowserSession` and its hash remain only when another live game binding
 needs them; deleting one game never revokes unrelated bindings.
 
+Soft deletion immediately appends a minimal non-secret tombstone containing only
+game ID, deletion time, audit actor, a null purge time, and a monotonic position.
 After 30 days, a hard-delete job purges the game, Actions, Snapshots,
 HostBindings, SeatBindings, Invitations, RecoveryGrants, and service-managed
-exports. A minimal non-secret deletion receipt may retain only game ID, deletion
-time, purge time, and audit actor. These receipts form an append-only deletion
-ledger with a monotonic position, replicated off-host separately from restorable
-application backups and retained for at least 90 days, longer than the 35-day
-maximum backup age plus a seven-day restore-lag allowance. Every backup records
-its verified ledger watermark. Encrypted on-host and off-host backups use a
-maximum 35-day retention and are not selectively rewritten. Every restore,
-during soft deletion or after hard deletion, synchronizes the external ledger and
-applies every entry after the backup watermark before `/readyz` can pass or
-traffic can be enabled. A missing, invalid, unverifiable, or unsynchronized
-watermark fails closed. Previously downloaded user exports are outside server
-control and the export UI states that limitation. Tests prove a deleted game's
-old credentials cannot reconnect during soft deletion, after hard purge, or after
-restoring any retained backup, while unrelated bindings still work.
+exports, then appends the matching purge event with its purge time. These events
+form an append-only deletion ledger, replicated off-host separately from
+restorable application backups and retained for at least 90 days, longer than
+the 35-day maximum backup age plus a seven-day restore-lag allowance. Every
+backup records its verified ledger watermark. Encrypted on-host and off-host
+backups use a maximum 35-day retention and are not selectively rewritten. Every
+restore, during soft deletion or after hard deletion, synchronizes the external
+ledger and applies every entry after the backup watermark before `/readyz` can
+pass or traffic can be enabled. A soft tombstone makes restored game data
+inaccessible; its later purge event removes it. A missing, invalid, unverifiable,
+or unsynchronized watermark fails closed. Previously downloaded user exports are
+outside server control and the export UI states that limitation. Tests prove a
+deleted game's old credentials cannot reconnect during soft deletion, after hard
+purge, or after restoring any retained backup, while unrelated bindings still
+work.
 
 Accessibility targets for production are WCAG 2.2 AA for application controls,
 meaningful labels for counters and hexes, keyboard-operable dialogs and logs,
@@ -536,8 +543,9 @@ The server ships an append-only version registry keyed by the exact
 handler, validators, and immutable content bundle needed by that game; resume and
 replay use this registry and never current defaults. Deployment readiness fails
 if any active stored game references an unavailable pair: `/readyz` returns 503
-and blocks a rollout or traffic switch, but Caddy does not automatically remove
-the already-running process route. An affected authenticated game remains
+and blocks a rollout or traffic switch. Gameplay HTTP APIs, room admission, and
+room commands also fail closed while readiness is unavailable. An affected
+authenticated game remains
 available only for stored snapshot metadata and action-log export; mutation,
 resume, and interpreted replay return `version_unavailable` and never use current
 defaults. Recovery requires restoring the exact registry handler/content bundle
@@ -743,7 +751,8 @@ accepted when:
 ## Unresolved questions
 
 - What are the complete Battle Manual rules referenced by the two supplied pages?
-- What are the full and reduced faces for every counter?
+- What artwork, if any, should appear on reduced counter faces beyond the
+  owner-approved derived combat values?
 - What is the precise initial setup for each scenario?
 - How are objectives scored and victory determined?
 - Which optional rules, if any, are required?

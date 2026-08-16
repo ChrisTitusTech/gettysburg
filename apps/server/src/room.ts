@@ -7,7 +7,10 @@ import {
 
 import type { GameEventBus } from "./event-bus.js";
 import { ServiceError, type GameAuthorization } from "./game-service.js";
-import { readSessionCredentialFromCookieHeader } from "./http.js";
+import {
+  readSessionCredentialFromCookieHeader,
+  type ReadinessState,
+} from "./http.js";
 import type { GameService } from "./postgres-store.js";
 
 export interface GameRoomOptions {
@@ -35,6 +38,7 @@ function failure(error: ServiceError): CommandFailure {
 
 export function createGettysburgRoom(
   gameService: GameService,
+  readiness: ReadinessState,
   eventBus?: GameEventBus,
 ): GameRoomConstructor {
   return class GettysburgRoom extends Room {
@@ -69,6 +73,15 @@ export function createGettysburgRoom(
       for (const commandName of commandNames) {
         this.onMessage(commandName, async (client, message: unknown) => {
           try {
+            if (!(await readiness.isReady())) {
+              client.send("commandResult", {
+                current_version: 0,
+                error: "internal_error",
+                message: "The game service is temporarily unavailable.",
+                ok: false,
+              } satisfies CommandFailure);
+              return;
+            }
             const authorization = client.auth as GameAuthorization;
             const result = await gameService.executeCommand(
               authorization,
@@ -105,6 +118,9 @@ export function createGettysburgRoom(
       options: GameRoomOptions,
       context: AuthContext,
     ): Promise<GameAuthorization> {
+      if (!(await readiness.isReady())) {
+        throw new Error("The game service is temporarily unavailable.");
+      }
       if (options.gameId !== this.#gameId) {
         throw new ServiceError(
           "unauthorized",

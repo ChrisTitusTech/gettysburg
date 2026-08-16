@@ -68,7 +68,11 @@ This summary is not a replacement for source transcription or rule approval.
 The Union and Confederate pages identify units, organizations, combat/movement
 values, and scheduled entries used by the scenario. Phase 2 must transcribe them
 to typed content, verify every record against the scan, and preserve provenance.
-Counter back/reduced-state artwork is not fully represented by these pages.
+Counter back/reduced-state artwork is not fully represented by these pages. For
+the Phase 2 rules-light model, the owner approved deriving each reduced combat
+factor as half the front value rounded up. A combat-one counter instead has one
+step and is eliminated by its first loss. This decision supplies game data, not
+missing artwork.
 
 ### Battle Manual
 
@@ -86,14 +90,15 @@ counter backs.
 
 ## Missing or unresolved source inputs
 
-- Complete counter sheets including every full and reduced face
+- Complete counter sheets including every reduced-face artwork treatment
 - Optional rules and whether they are in scope
 - Reviewed per-hex terrain transcription for the irregular board
 - Rights or licensing basis for any public use of the supplied scans, names,
   artwork, or wording
 
-Fixture values may support the Phase 1 architecture slice, but must be visibly
-labelled and must not be presented as final game content.
+The approved formula may supply Phase 2 reduced combat data. Any remaining
+fixture values must be visibly labelled and must not be presented as final game
+content.
 
 ## Phase 1 interpretation and rights ledger
 

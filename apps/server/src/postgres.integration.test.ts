@@ -101,7 +101,7 @@ postgres("PostgreSQL durability", () => {
     expect(rows.rows[0]).toMatchObject({
       action_count: "1",
       content_revision: "gettysburg-source-cards-v1",
-      ruleset_version: "phase-2-tabletop-v1",
+      ruleset_version: "phase-2-tabletop-v2",
       snapshot_count: "2",
     });
     await restarted.close();
@@ -331,6 +331,11 @@ postgres("PostgreSQL durability", () => {
 
     const stored = await administration.query<{
       snapshot: {
+        deletionLedger: {
+          deletedAt: number;
+          gameId: string;
+          position: number;
+        }[];
         games: [string, { deletedAt: number | null }][];
       };
     }>("SELECT snapshot FROM service_state WHERE singleton = true");
@@ -340,9 +345,20 @@ postgres("PostgreSQL durability", () => {
     );
     if (record === undefined) throw new Error("Deleted game was not persisted");
     record[1].deletedAt = Date.now() - 31 * 24 * 60 * 60 * 1_000;
+    const deletionReceipt = expired.deletionLedger.find(
+      (receipt) => receipt.gameId === deletedGame.gameId,
+    );
+    if (deletionReceipt === undefined)
+      throw new Error("Deletion receipt was not persisted");
+    deletionReceipt.deletedAt = record[1].deletedAt;
+    const expectedPurgePosition = expired.deletionLedger.at(-1)!.position + 1;
     await administration.query(
       "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
       [JSON.stringify(expired)],
+    );
+    await administration.query(
+      "UPDATE deletion_ledger SET deleted_at = $1 WHERE game_id = $2::uuid AND purged_at IS NULL",
+      [new Date(record[1].deletedAt), deletedGame.gameId],
     );
 
     const purger = new PostgresGameService({
@@ -353,7 +369,7 @@ postgres("PostgreSQL durability", () => {
       {
         actor: authorization.bindingId,
         gameId: deletedGame.gameId,
-        position: 1,
+        position: expectedPurgePosition,
       },
     ]);
     await expect(purger.getActions(deletedGame.gameId)).rejects.toMatchObject({
@@ -362,7 +378,9 @@ postgres("PostgreSQL durability", () => {
     await expect(
       purger.authenticateHost(deletedGame.credential, retainedGame.gameId),
     ).resolves.toMatchObject({ gameId: retainedGame.gameId });
-    expect(await purger.getDeletionLedger()).toHaveLength(1);
+    expect(await purger.getDeletionLedger()).toHaveLength(
+      expectedPurgePosition,
+    );
     await purger.close();
 
     const persisted = await administration.query<{
@@ -383,7 +401,7 @@ postgres("PostgreSQL durability", () => {
     );
     expect(persisted.rows[0]).toEqual({
       game_count: "0",
-      ledger_count: "1",
+      ledger_count: "2",
       related_count: "0",
     });
   });
@@ -424,5 +442,167 @@ postgres("PostgreSQL durability", () => {
       "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
       [JSON.stringify(original)],
     );
+  });
+
+  it("backfills the deletion ledger for a legacy soft-deleted game", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const created = await service.createGame("union");
+    const authorization = await service.authenticateHost(
+      created.credential,
+      created.gameId,
+    );
+    await service.executeHostCommand(authorization, {
+      command_id: "77777777-7777-4777-8777-777777777777",
+      command_name: "deleteGame",
+      expected_version: 0,
+      game_id: created.gameId,
+      payload: { confirm: true },
+      schema: COMMAND_SCHEMA_VERSION,
+    });
+    const ledger = await service.getDeletionLedger();
+    const deletedReceipt = ledger.at(-1);
+    if (deletedReceipt === undefined)
+      throw new Error("Deletion receipt was not persisted");
+    await service.close();
+
+    const stored = await administration.query<{
+      snapshot: { deletionLedger: unknown[] };
+    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    const legacySnapshot = structuredClone(stored.rows[0]!.snapshot);
+    legacySnapshot.deletionLedger.pop();
+    await administration.query(
+      `UPDATE service_state
+       SET snapshot = $1::jsonb
+       WHERE singleton = true`,
+      [JSON.stringify(legacySnapshot)],
+    );
+    await administration.query(
+      "DELETE FROM deletion_ledger WHERE game_id = $1::uuid",
+      [created.gameId],
+    );
+
+    const upgraded = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await upgraded.migrate();
+    await expect(upgraded.getDeletionLedger()).resolves.toEqual(ledger);
+    await expect(upgraded.getGameState(created.gameId)).rejects.toMatchObject({
+      code: "game_deleted",
+    });
+    await upgraded.close();
+
+    const normalized = await administration.query<{
+      actor: string;
+      purged_at: Date | null;
+    }>(
+      "SELECT actor, purged_at FROM deletion_ledger WHERE game_id = $1::uuid",
+      [created.gameId],
+    );
+    expect(normalized.rows).toEqual([
+      { actor: deletedReceipt.actor, purged_at: null },
+    ]);
+  });
+
+  it("restores normalized ledger rows when the service snapshot is ahead", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const created = await service.createGame("confederate");
+    const authorization = await service.authenticateHost(
+      created.credential,
+      created.gameId,
+    );
+    await service.executeHostCommand(authorization, {
+      command_id: "66666666-6666-4666-8666-666666666666",
+      command_name: "deleteGame",
+      expected_version: 0,
+      game_id: created.gameId,
+      payload: { confirm: true },
+      schema: COMMAND_SCHEMA_VERSION,
+    });
+    const expectedLedger = await service.getDeletionLedger();
+    await service.close();
+    await administration.query(
+      "DELETE FROM deletion_ledger WHERE game_id = $1::uuid",
+      [created.gameId],
+    );
+
+    const reconciled = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await reconciled.migrate();
+    await expect(reconciled.getDeletionLedger()).resolves.toEqual(
+      expectedLedger,
+    );
+    await reconciled.close();
+    const normalized = await administration.query<{ count: string }>(
+      "SELECT count(*)::text AS count FROM deletion_ledger WHERE game_id = $1::uuid",
+      [created.gameId],
+    );
+    expect(normalized.rows[0]?.count).toBe("1");
+  });
+
+  it("persists an externally synchronized deletion receipt atomically", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const created = await service.createGame("union");
+    const existingLedger = await service.getDeletionLedger();
+    const deletionReceipt = {
+      actor: "off-host-recovery:test",
+      deletedAt: Date.UTC(2026, 7, 15),
+      gameId: created.gameId,
+      position: existingLedger.length + 1,
+      purgedAt: null,
+    };
+    const purgeReceipt = {
+      ...deletionReceipt,
+      position: existingLedger.length + 2,
+      purgedAt: Date.UTC(2026, 8, 15),
+    };
+
+    await expect(
+      service.synchronizeDeletionLedger([
+        ...existingLedger,
+        deletionReceipt,
+        purgeReceipt,
+      ]),
+    ).resolves.toEqual([deletionReceipt, purgeReceipt]);
+    await expect(service.getGameState(created.gameId)).rejects.toMatchObject({
+      code: "game_purged",
+    });
+    await service.close();
+
+    const persisted = await administration.query<{
+      game_count: string;
+      ledger_count: string;
+      related_count: string;
+    }>(
+      `SELECT
+         (SELECT count(*)::text FROM games WHERE id = $1) AS game_count,
+         (SELECT count(*)::text FROM deletion_ledger WHERE game_id = $1) AS ledger_count,
+         ((SELECT count(*) FROM actions WHERE game_id = $1) +
+          (SELECT count(*) FROM snapshots WHERE game_id = $1) +
+          (SELECT count(*) FROM host_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM seat_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM invitations WHERE game_id = $1) +
+          (SELECT count(*) FROM recovery_grants WHERE game_id = $1))::text AS related_count`,
+      [created.gameId],
+    );
+    expect(persisted.rows[0]).toEqual({
+      game_count: "0",
+      ledger_count: "2",
+      related_count: "0",
+    });
   });
 });

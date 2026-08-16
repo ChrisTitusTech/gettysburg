@@ -130,6 +130,36 @@ export function configureHttpApplication(
     }
   });
 
+  application.use("/api", async (_request, response, next) => {
+    try {
+      if (!(await readiness.isReady())) {
+        const gameIdMatch = _request.path.match(
+          /^\/games\/([0-9a-f-]+)\/host-commands$/i,
+        );
+        const commandId = _request.body?.command_id;
+        if (
+          _request.method === "POST" &&
+          gameIdMatch?.[1] !== undefined &&
+          _request.body?.command_name === "deleteGame" &&
+          typeof commandId === "string" &&
+          (await gameService.canRetryTerminalDelete(
+            readSessionCredential(_request),
+            gameIdMatch[1],
+            commandId,
+          ))
+        ) {
+          next();
+          return;
+        }
+        response.status(503).json({ error: "service_unavailable" });
+        return;
+      }
+      next();
+    } catch (error) {
+      next(error);
+    }
+  });
+
   application.post("/api/games", async (request, response, next) => {
     try {
       const seat = request.body?.seat;

@@ -36,7 +36,10 @@ export function createGettysburgServer(
     }),
   });
   gameServer
-    .define("game", createGettysburgRoom(options.gameService, eventBus))
+    .define(
+      "game",
+      createGettysburgRoom(options.gameService, options.readiness, eventBus),
+    )
     .filterBy(["gameId"]);
   return gameServer;
 }

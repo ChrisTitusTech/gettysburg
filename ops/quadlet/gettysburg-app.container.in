@@ -10,6 +10,7 @@ EnvironmentFile=/srv/gettysburg/.config/gettysburg/app.env
 Network=gettysburg.network
 PublishPort=127.0.0.1:3000:3000
 Volume=gettysburg-app.volume:/var/lib/gettysburg
+Volume=/srv/gettysburg/.config/gettysburg-readiness:/run/gettysburg-readiness:ro
 ReadOnly=true
 Tmpfs=/tmp
 NoNewPrivileges=true

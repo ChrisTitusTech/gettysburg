@@ -1,10 +1,11 @@
 import { adjacentHexes, type HexCoordinate } from "./coordinates.js";
-import type {
-  CombatConfirmation,
-  CombatState,
-  GameState,
-  Side,
-  UnitState,
+import {
+  RULESET_VERSION,
+  type CombatConfirmation,
+  type CombatState,
+  type GameState,
+  type Side,
+  type UnitState,
 } from "./protocol.js";
 
 const MAX_EXACT_COVER_VERTICES = 20;
@@ -27,6 +28,16 @@ export interface AutomaticCombatResolution {
   readonly margin: number;
 }
 
+export function currentCombatValue(
+  unit: UnitState,
+  rulesetVersion: string,
+): number | null {
+  if (unit.combat === null) return null;
+  return rulesetVersion === RULESET_VERSION && unit.strength === "reduced"
+    ? (unit.reduced_combat ?? Math.ceil(unit.combat / 2))
+    : unit.combat;
+}
+
 export function isCombatUnit(unit: UnitState): boolean {
   return (
     unit.kind !== "general" &&
@@ -41,7 +52,15 @@ export function combatFactorModifier(
 ): number {
   return Math.min(
     10,
-    unitIds.reduce((total, id) => total + (state.units[id]?.combat ?? 0), 0),
+    unitIds.reduce((total, id) => {
+      const unit = state.units[id];
+      return (
+        total +
+        (unit === undefined
+          ? 0
+          : (currentCombatValue(unit, state.ruleset_version) ?? 0))
+      );
+    }, 0),
   );
 }
 

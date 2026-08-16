@@ -32,11 +32,12 @@ function units(
         label,
         movement,
         organization,
-        reduced_combat: null,
+        reduced_combat:
+          combat === null || combat === 1 ? null : Math.ceil(combat / 2),
         setup_hex: turn === null ? hex : null,
         side,
         source,
-        source_status: "counter-back-unavailable",
+        source_status: "owner-approved-derived",
       }) satisfies ScenarioUnit,
   );
 }

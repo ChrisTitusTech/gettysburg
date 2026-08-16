@@ -7,10 +7,12 @@ import { describe, expect, it } from "vitest";
 import { createHttpApplication } from "./http.js";
 
 async function withServer(
-  isReady: boolean,
+  isReady: boolean | (() => boolean),
   assertion: (origin: string) => Promise<void>,
 ) {
-  const app = createHttpApplication({ isReady: () => isReady });
+  const app = createHttpApplication({
+    isReady: () => (typeof isReady === "function" ? isReady() : isReady),
+  });
   const server = app.listen(0, "127.0.0.1");
 
   await new Promise<void>((resolve, reject) => {
@@ -60,6 +62,21 @@ describe("service health", () => {
 
       expect(response.status).toBe(503);
       expect(await response.json()).toEqual({ status: "unavailable" });
+    });
+  });
+
+  it("blocks gameplay APIs when readiness is unavailable", async () => {
+    await withServer(false, async (origin) => {
+      const response = await fetch(`${origin}/api/games`, {
+        body: JSON.stringify({ seat: "union" }),
+        headers: { "content-type": "application/json" },
+        method: "POST",
+      });
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toEqual({
+        error: "service_unavailable",
+      });
     });
   });
 });
@@ -226,5 +243,53 @@ describe("HTTP game lifecycle", () => {
         ok: true,
       });
     });
+  });
+
+  it("allows only a stored terminal-delete retry while readiness is unavailable", async () => {
+    let ready = true;
+    await withServer(
+      () => ready,
+      async (origin) => {
+        const createResponse = await fetch(`${origin}/api/games`, {
+          body: JSON.stringify({ seat: "union" }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        });
+        const created = (await createResponse.json()) as { game_id: string };
+        const hostCookie = (
+          createResponse.headers.get("set-cookie") ?? ""
+        ).split(";", 1)[0]!;
+        const deletion = {
+          command_id: randomUUID(),
+          command_name: "deleteGame",
+          expected_version: 0,
+          game_id: created.game_id,
+          payload: { confirm: true },
+          schema: COMMAND_SCHEMA_VERSION,
+        } as const;
+        const request = (command: typeof deletion) =>
+          fetch(`${origin}/api/games/${created.game_id}/host-commands`, {
+            body: JSON.stringify(command),
+            headers: {
+              "content-type": "application/json",
+              cookie: hostCookie,
+            },
+            method: "POST",
+          });
+
+        const accepted = await request(deletion);
+        expect(accepted.status).toBe(200);
+        const acceptedBody = await accepted.json();
+        ready = false;
+        const retry = await request(deletion);
+        expect(retry.status).toBe(200);
+        expect(await retry.json()).toEqual(acceptedBody);
+        const differentDelete = await request({
+          ...deletion,
+          command_id: randomUUID(),
+        });
+        expect(differentDelete.status).toBe(503);
+      },
+    );
   });
 });

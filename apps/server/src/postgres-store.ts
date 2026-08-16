@@ -29,6 +29,11 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  canRetryTerminalDelete(
+    credential: string | undefined,
+    gameId: string,
+    commandId: string,
+  ): Promise<boolean>;
   authenticate(
     credential: string | undefined,
     gameId: string,
@@ -83,6 +88,9 @@ export interface GameService {
     operatorIdentity: string,
   ): Promise<RecoveryIssueResult>;
   purgeDeletedGames(): Promise<readonly DeletionReceipt[]>;
+  synchronizeDeletionLedger(
+    receipts: readonly DeletionReceipt[],
+  ): Promise<readonly DeletionReceipt[]>;
 }
 
 export class InMemoryAsyncGameService implements GameService {
@@ -102,6 +110,13 @@ export class InMemoryAsyncGameService implements GameService {
     input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
   ) {
     return this.service.claimHostRecovery(input);
+  }
+  async canRetryTerminalDelete(
+    credential: string | undefined,
+    gameId: string,
+    commandId: string,
+  ) {
+    return this.service.canRetryTerminalDelete(credential, gameId, commandId);
   }
   async claimInvitation(
     input: Parameters<InMemoryGameService["claimInvitation"]>[0],
@@ -155,6 +170,9 @@ export class InMemoryAsyncGameService implements GameService {
   async purgeDeletedGames() {
     return this.service.purgeDeletedGames();
   }
+  async synchronizeDeletionLedger(receipts: readonly DeletionReceipt[]) {
+    return this.service.synchronizeDeletionLedger(receipts);
+  }
 }
 
 export class PostgresGameService implements GameService {
@@ -193,6 +211,73 @@ export class PostgresGameService implements GameService {
         "INSERT INTO service_state(singleton, snapshot) VALUES (true, $1::jsonb) ON CONFLICT DO NOTHING",
         [JSON.stringify(initial)],
       );
+      await client.query("BEGIN");
+      try {
+        const storedState = await client.query<{
+          snapshot: GameServiceSnapshot;
+        }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
+        );
+        const snapshot = storedState.rows[0]?.snapshot;
+        if (snapshot !== undefined) {
+          const service = new InMemoryGameService({
+            pepper: this.#pepper,
+            snapshot,
+          });
+          const snapshotLedger = service.getDeletionLedger();
+          service.synchronizeDeletionLedger(snapshotLedger);
+          for (const receipt of snapshotLedger) {
+            await client.query(
+              `INSERT INTO deletion_ledger
+                (position, game_id, deleted_at, purged_at, actor)
+               VALUES ($1, $2::uuid, $3, $4, $5)
+               ON CONFLICT (position) DO NOTHING`,
+              [
+                receipt.position,
+                receipt.gameId,
+                new Date(receipt.deletedAt),
+                receipt.purgedAt === null ? null : new Date(receipt.purgedAt),
+                receipt.actor,
+              ],
+            );
+          }
+          const storedLedger = await client.query<{
+            actor: string;
+            deleted_at: string;
+            game_id: string;
+            position: string;
+            purged_at: string | null;
+          }>(
+            `SELECT actor,
+                    (extract(epoch FROM deleted_at) * 1000)::bigint::text AS deleted_at,
+                    game_id::text AS game_id,
+                    position::text,
+                    CASE WHEN purged_at IS NULL THEN NULL
+                      ELSE (extract(epoch FROM purged_at) * 1000)::bigint::text
+                    END AS purged_at
+             FROM deletion_ledger
+             ORDER BY position`,
+          );
+          const receipts = storedLedger.rows.map((row) => ({
+            actor: row.actor,
+            deletedAt: Number(row.deleted_at),
+            gameId: row.game_id,
+            position: Number(row.position),
+            purgedAt: row.purged_at === null ? null : Number(row.purged_at),
+          }));
+          const applied = service.synchronizeDeletionLedger(receipts);
+          if (applied.length > 0) {
+            await client.query(
+              "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
+              [JSON.stringify(service.exportSnapshot())],
+            );
+          }
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      }
     } catch (error) {
       operationError = error;
     }
@@ -215,6 +300,16 @@ export class PostgresGameService implements GameService {
     await this.#pool.end();
   }
 
+  async canRetryTerminalDelete(
+    credential: string | undefined,
+    gameId: string,
+    commandId: string,
+  ): Promise<boolean> {
+    return await this.#read((service) =>
+      service.canRetryTerminalDelete(credential, gameId, commandId),
+    );
+  }
+
   async isReady(): Promise<boolean> {
     try {
       const result = await this.#pool.query<{
@@ -222,13 +317,13 @@ export class PostgresGameService implements GameService {
         snapshot: GameServiceSnapshot;
       }>(
         `SELECT
-           (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2)) AS count,
+           (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2, 3)) AS count,
            snapshot
          FROM service_state WHERE singleton = true`,
       );
       const row = result.rows[0];
       return (
-        row?.count === "2" &&
+        row?.count === "3" &&
         new InMemoryGameService({
           pepper: this.#pepper,
           snapshot: row.snapshot,
@@ -344,6 +439,12 @@ export class PostgresGameService implements GameService {
     return this.#mutate((service) => service.purgeDeletedGames());
   }
 
+  async synchronizeDeletionLedger(receipts: readonly DeletionReceipt[]) {
+    return this.#mutate((service) =>
+      service.synchronizeDeletionLedger(receipts),
+    );
+  }
+
   async #read<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
     const result = await this.#pool.query<{ snapshot: GameServiceSnapshot }>(
       "SELECT snapshot FROM service_state WHERE singleton = true",
@@ -408,10 +509,11 @@ export class PostgresGameService implements GameService {
           receipt.position,
           receipt.gameId,
           new Date(receipt.deletedAt),
-          new Date(receipt.purgedAt),
+          receipt.purgedAt === null ? null : new Date(receipt.purgedAt),
           receipt.actor,
         ],
       );
+      if (receipt.purgedAt === null) continue;
       await client.query("DELETE FROM actions WHERE game_id = $1::uuid", [
         receipt.gameId,
       ]);

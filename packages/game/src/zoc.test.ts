@@ -40,7 +40,7 @@ function state(night: boolean): GameState {
     night,
     objectives: {},
     phase: "movement",
-    ruleset_version: "phase-2-tabletop-v1",
+    ruleset_version: "phase-2-tabletop-v2",
     turn: night ? 8 : 7,
     units: {
       attacker: unit("attacker", "confederate", "L6"),
