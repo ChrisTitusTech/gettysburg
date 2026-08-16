@@ -168,11 +168,13 @@ recorded below; no implementation or local-validation failure remains.
     original vector terrain presentation based on the local board reference,
     including woods, hills, roads, streams, town, and landmark layers; these are
     deliberately not used as rules data until that review. The artwork now uses
-    one continuous hand-drawn paper, ink, and watercolor landscape beneath the
+    selected deluxe hand-drawn paper, ink, and watercolor landscape beneath the
     transparent play grid, so woods and elevation cross hex edges naturally.
-    Streams join into board-spanning waterways, and every road, railroad, and
-    stream reaches the clipped outer board edge instead of stopping mid-map. The
-    owner confirmed that I5, J5, and J6 do not receive hill artwork. The typed
+    Streams are continuous boundary-to-boundary chains of actual hex sides;
+    every road and railroad also reaches the clipped outer board edge instead of
+    stopping mid-map. The separate Time Record Track and center-bottom A/B entry
+    markers are intentionally omitted. The owner confirmed that I5, J5, and J6
+    do not receive hill artwork. The typed
     terrain fields stay explicitly unavailable because Phase 2 combat is
     unit-factor-only; reviewed per-hex terrain enforcement remains Phase 3 work.
 - [x] Implement the 24-turn rules-light tabletop workflow and server dice.

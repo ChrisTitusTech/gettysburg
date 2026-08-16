@@ -9,6 +9,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { Board } from "./Board";
+import {
+  STREAM_EDGE_ROUTES,
+  isBoardBoundaryPoint,
+  isBoardHexEdgeSegment,
+} from "./BoardTerrain";
 
 const state: GameState = {
   active_side: "confederate",
@@ -884,9 +889,27 @@ describe("Board", () => {
     expect(streams).toHaveLength(2);
     expect(
       streams.every(
-        (stream) => stream.getAttribute("data-crosses-board") === "true",
+        (stream) =>
+          stream.getAttribute("data-crosses-board") === "true" &&
+          stream.getAttribute("data-follows-hex-edges") === "true" &&
+          stream.getAttribute("data-reaches-board-edge") === "true",
       ),
     ).toBe(true);
+    expect(container.querySelector(".deluxe-board-art")).toHaveAttribute(
+      "data-art-finish",
+      "deluxe",
+    );
+    expect(container).not.toHaveTextContent(/TIME RECORD TRACK/i);
+    for (const route of STREAM_EDGE_ROUTES) {
+      expect(route.length).toBeGreaterThan(2);
+      expect(isBoardBoundaryPoint(route[0]!)).toBe(true);
+      expect(isBoardBoundaryPoint(route.at(-1)!)).toBe(true);
+      for (let index = 0; index < route.length - 1; index += 1) {
+        expect(isBoardHexEdgeSegment(route[index]!, route[index + 1]!)).toBe(
+          true,
+        );
+      }
+    }
     const roads = [...container.querySelectorAll(".road-center")];
     expect(roads).toHaveLength(8);
     expect(

@@ -1,6 +1,7 @@
 import {
   BOARD_VIEW_BOX,
   FIXTURE_HEXES,
+  HEX_RADIUS,
   coordinateToPoint,
   hexPolygonPoints,
   type BoardPoint,
@@ -178,10 +179,226 @@ function pathThrough(points: readonly BoardPoint[]): string {
   return segments.join(" ");
 }
 
-// These routes deliberately begin or end outside the play field. The shared clip
-// trims them at the irregular board edge so water and transport lines never stop
-// abruptly in the middle of the landscape.
-const STREAMS: readonly (readonly BoardPoint[])[] = [
+function pathAlongEdges(points: readonly BoardPoint[]): string {
+  return points
+    .map(
+      (routePoint, index) =>
+        `${index === 0 ? "M" : "L"} ${routePoint.x} ${routePoint.y}`,
+    )
+    .join(" ");
+}
+
+function vertexKey(vertex: BoardPoint): string {
+  return `${vertex.x.toFixed(4)},${vertex.y.toFixed(4)}`;
+}
+
+function edgeKey(first: string, second: string): string {
+  return first < second ? `${first}|${second}` : `${second}|${first}`;
+}
+
+function hexVertices(center: BoardPoint): readonly BoardPoint[] {
+  return Array.from({ length: 6 }, (_, index) => {
+    const angle = (Math.PI / 180) * (60 * index);
+    return {
+      x: Number((center.x + HEX_RADIUS * Math.cos(angle)).toFixed(4)),
+      y: Number((center.y + HEX_RADIUS * Math.sin(angle)).toFixed(4)),
+    };
+  });
+}
+
+interface EdgeGraph {
+  readonly boundaryVertices: ReadonlySet<string>;
+  readonly edges: ReadonlySet<string>;
+  readonly neighbors: ReadonlyMap<string, ReadonlySet<string>>;
+  readonly vertices: ReadonlyMap<string, BoardPoint>;
+}
+
+function buildEdgeGraph(): EdgeGraph {
+  const edgeCounts = new Map<string, number>();
+  const edgeVertices = new Map<string, readonly [string, string]>();
+  const neighbors = new Map<string, Set<string>>();
+  const vertices = new Map<string, BoardPoint>();
+
+  for (const hex of FIXTURE_HEXES) {
+    const polygon = hexVertices(hex.point);
+    for (let index = 0; index < polygon.length; index += 1) {
+      const first = polygon[index];
+      const second = polygon[(index + 1) % polygon.length];
+      if (first === undefined || second === undefined) continue;
+      const firstKey = vertexKey(first);
+      const secondKey = vertexKey(second);
+      const segmentKey = edgeKey(firstKey, secondKey);
+      vertices.set(firstKey, first);
+      vertices.set(secondKey, second);
+      edgeCounts.set(segmentKey, (edgeCounts.get(segmentKey) ?? 0) + 1);
+      edgeVertices.set(segmentKey, [firstKey, secondKey]);
+      const firstNeighbors = neighbors.get(firstKey) ?? new Set<string>();
+      const secondNeighbors = neighbors.get(secondKey) ?? new Set<string>();
+      firstNeighbors.add(secondKey);
+      secondNeighbors.add(firstKey);
+      neighbors.set(firstKey, firstNeighbors);
+      neighbors.set(secondKey, secondNeighbors);
+    }
+  }
+
+  const boundaryVertices = new Set<string>();
+  for (const [segmentKey, count] of edgeCounts) {
+    if (count !== 1) continue;
+    const endpoints = edgeVertices.get(segmentKey);
+    if (endpoints === undefined) continue;
+    boundaryVertices.add(endpoints[0]);
+    boundaryVertices.add(endpoints[1]);
+  }
+
+  return {
+    boundaryVertices,
+    edges: new Set(edgeCounts.keys()),
+    neighbors,
+    vertices,
+  };
+}
+
+const BOARD_EDGE_GRAPH = buildEdgeGraph();
+
+function pointToSegmentDistance(
+  candidate: BoardPoint,
+  first: BoardPoint,
+  second: BoardPoint,
+): number {
+  const deltaX = second.x - first.x;
+  const deltaY = second.y - first.y;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  if (lengthSquared === 0) {
+    return Math.hypot(candidate.x - first.x, candidate.y - first.y);
+  }
+  const projection = Math.max(
+    0,
+    Math.min(
+      1,
+      ((candidate.x - first.x) * deltaX + (candidate.y - first.y) * deltaY) /
+        lengthSquared,
+    ),
+  );
+  return Math.hypot(
+    candidate.x - (first.x + projection * deltaX),
+    candidate.y - (first.y + projection * deltaY),
+  );
+}
+
+function distanceToGuide(
+  candidate: BoardPoint,
+  guide: readonly BoardPoint[],
+): number {
+  let closest = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < guide.length - 1; index += 1) {
+    const first = guide[index];
+    const second = guide[index + 1];
+    if (first === undefined || second === undefined) continue;
+    closest = Math.min(
+      closest,
+      pointToSegmentDistance(candidate, first, second),
+    );
+  }
+  return closest;
+}
+
+function nearestBoundaryVertex(target: BoardPoint): string {
+  let nearest = "";
+  let nearestDistance = Number.POSITIVE_INFINITY;
+  for (const key of BOARD_EDGE_GRAPH.boundaryVertices) {
+    const candidate = BOARD_EDGE_GRAPH.vertices.get(key);
+    if (candidate === undefined) continue;
+    const distance = Math.hypot(candidate.x - target.x, candidate.y - target.y);
+    if (distance < nearestDistance) {
+      nearest = key;
+      nearestDistance = distance;
+    }
+  }
+  return nearest;
+}
+
+export function isBoardHexEdgeSegment(
+  first: BoardPoint,
+  second: BoardPoint,
+): boolean {
+  return BOARD_EDGE_GRAPH.edges.has(
+    edgeKey(vertexKey(first), vertexKey(second)),
+  );
+}
+
+export function isBoardBoundaryPoint(candidate: BoardPoint): boolean {
+  return BOARD_EDGE_GRAPH.boundaryVertices.has(vertexKey(candidate));
+}
+
+export function routeAlongHexEdges(
+  guide: readonly BoardPoint[],
+): readonly BoardPoint[] {
+  const firstGuidePoint = guide[0];
+  const lastGuidePoint = guide.at(-1);
+  if (firstGuidePoint === undefined || lastGuidePoint === undefined) return [];
+
+  const start = nearestBoundaryVertex(firstGuidePoint);
+  const finish = nearestBoundaryVertex(lastGuidePoint);
+  const distances = new Map<string, number>([[start, 0]]);
+  const previous = new Map<string, string>();
+  const unvisited = new Set(BOARD_EDGE_GRAPH.vertices.keys());
+
+  while (unvisited.size > 0) {
+    let current = "";
+    let currentDistance = Number.POSITIVE_INFINITY;
+    for (const key of unvisited) {
+      const distance = distances.get(key) ?? Number.POSITIVE_INFINITY;
+      if (distance < currentDistance) {
+        current = key;
+        currentDistance = distance;
+      }
+    }
+    if (current === "" || current === finish) break;
+    unvisited.delete(current);
+    const currentPoint = BOARD_EDGE_GRAPH.vertices.get(current);
+    if (currentPoint === undefined) continue;
+
+    for (const neighbor of BOARD_EDGE_GRAPH.neighbors.get(current) ?? []) {
+      if (!unvisited.has(neighbor)) continue;
+      const neighborPoint = BOARD_EDGE_GRAPH.vertices.get(neighbor);
+      if (neighborPoint === undefined) continue;
+      const midpoint = {
+        x: (currentPoint.x + neighborPoint.x) / 2,
+        y: (currentPoint.y + neighborPoint.y) / 2,
+      };
+      const edgeLength = Math.hypot(
+        currentPoint.x - neighborPoint.x,
+        currentPoint.y - neighborPoint.y,
+      );
+      const candidateDistance =
+        currentDistance + edgeLength + distanceToGuide(midpoint, guide) * 0.9;
+      if (
+        candidateDistance <
+        (distances.get(neighbor) ?? Number.POSITIVE_INFINITY)
+      ) {
+        distances.set(neighbor, candidateDistance);
+        previous.set(neighbor, current);
+      }
+    }
+  }
+
+  if (!distances.has(finish)) return [];
+  const routeKeys = [finish];
+  while (routeKeys[0] !== start) {
+    const predecessor = previous.get(routeKeys[0]!);
+    if (predecessor === undefined) return [];
+    routeKeys.unshift(predecessor);
+  }
+  return routeKeys.flatMap((key) => {
+    const routePoint = BOARD_EDGE_GRAPH.vertices.get(key);
+    return routePoint === undefined ? [] : [routePoint];
+  });
+}
+
+// These loose guides describe the waterways' overall geography. They are snapped
+// onto the actual hex-edge graph below so every rendered segment follows a hex
+// side and both ends terminate at the board boundary.
+const STREAM_GUIDES: readonly (readonly BoardPoint[])[] = [
   [
     point("F1", 0, -120),
     point("F1"),
@@ -228,6 +445,8 @@ const STREAMS: readonly (readonly BoardPoint[])[] = [
     point("U8", 130, 8),
   ],
 ];
+
+export const STREAM_EDGE_ROUTES = STREAM_GUIDES.map(routeAlongHexEdges);
 
 const ROADS: readonly (readonly BoardPoint[])[] = [
   [
@@ -321,7 +540,7 @@ export function BoardTerrain() {
   const gettysburg = coordinateToPoint("O7");
 
   return (
-    <>
+    <g className="deluxe-board-art" data-art-finish="deluxe">
       <defs>
         <clipPath id="board-play-field">
           {FIXTURE_HEXES.map((hex) => (
@@ -337,25 +556,30 @@ export function BoardTerrain() {
           patternUnits="userSpaceOnUse"
           width="94"
         >
-          <rect fill="#c8bd69" height="86" width="94" />
+          <rect fill="#b9ad5b" height="86" width="94" />
           <path
             d="M4 18c13-3 24 3 37-1m14-8c8 2 19 0 30-4M7 61c15 3 27 1 39-2m12-8c10-3 20 0 31 5"
             fill="none"
-            opacity="0.13"
-            stroke="#716a38"
+            opacity="0.2"
+            stroke="#625d31"
             strokeLinecap="round"
             strokeWidth="0.8"
           />
           <path
             d="m18 34 4-1m24 34 6-1m18-32 3 1M5 80l5-1"
-            opacity="0.22"
-            stroke="#f2df91"
+            opacity="0.28"
+            stroke="#f5df88"
             strokeLinecap="round"
             strokeWidth="1.2"
           />
-          <circle cx="38" cy="43" fill="#625b31" opacity="0.13" r="0.8" />
-          <circle cx="83" cy="76" fill="#fff1aa" opacity="0.2" r="1.1" />
+          <circle cx="38" cy="43" fill="#554c28" opacity="0.18" r="0.8" />
+          <circle cx="83" cy="76" fill="#fff1aa" opacity="0.24" r="1.1" />
         </pattern>
+        <radialGradient id="board-paper-patina" r="72%">
+          <stop offset="0" stopColor="#f8dc80" stopOpacity="0.1" />
+          <stop offset="0.7" stopColor="#8f833f" stopOpacity="0.04" />
+          <stop offset="1" stopColor="#4c3c1e" stopOpacity="0.25" />
+        </radialGradient>
         <filter
           colorInterpolationFilters="sRGB"
           height="140%"
@@ -407,6 +631,11 @@ export function BoardTerrain() {
       <g clipPath="url(#board-play-field)">
         <rect
           className="board-paper"
+          height={BOARD_VIEW_BOX.height}
+          width={BOARD_VIEW_BOX.width}
+        />
+        <rect
+          className="board-paper-patina"
           height={BOARD_VIEW_BOX.height}
           width={BOARD_VIEW_BOX.width}
         />
@@ -493,7 +722,7 @@ export function BoardTerrain() {
                   ry={24 + (seed % 8)}
                 />
                 {TREE_OFFSETS.filter(
-                  (_, index) => (seed + index * 11) % 5 < 2,
+                  (_, index) => (seed + index * 11) % 5 < 3,
                 ).map((tree, index) => {
                   const shiftX = ((seed * (index + 3)) % 11) - 5;
                   const shiftY = ((seed * (index + 5)) % 9) - 4;
@@ -543,14 +772,20 @@ export function BoardTerrain() {
             [-21, -31],
             [12, -31],
             [39, -28],
+            [61, -24],
             [-52, -5],
             [-17, -7],
             [14, -8],
             [45, -4],
+            [65, 1],
             [-43, 22],
             [-12, 23],
             [18, 21],
             [45, 22],
+            [-57, 39],
+            [-25, 42],
+            [9, 40],
+            [37, 41],
           ].map(([x, y], index) => (
             <path
               className={`town-building building-tone-${index % 3}`}
@@ -583,19 +818,18 @@ export function BoardTerrain() {
           />
         </g>
 
-        <g
-          className="board-feature-layer board-streams"
-          filter="url(#terrain-line-wobble)"
-        >
-          {STREAMS.map((stream, index) => (
+        <g className="board-feature-layer board-streams">
+          {STREAM_EDGE_ROUTES.map((stream, index) => (
             <g key={index}>
-              <path className="stream-bank" d={pathThrough(stream)} />
+              <path className="stream-bank" d={pathAlongEdges(stream)} />
               <path
                 className="stream-water"
-                d={pathThrough(stream)}
+                d={pathAlongEdges(stream)}
                 data-crosses-board="true"
+                data-follows-hex-edges="true"
+                data-reaches-board-edge="true"
               />
-              <path className="stream-highlight" d={pathThrough(stream)} />
+              <path className="stream-highlight" d={pathAlongEdges(stream)} />
             </g>
           ))}
         </g>
@@ -616,6 +850,6 @@ export function BoardTerrain() {
           );
         })}
       </g>
-    </>
+    </g>
   );
 }
