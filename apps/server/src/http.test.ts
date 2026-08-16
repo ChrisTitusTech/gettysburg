@@ -125,7 +125,10 @@ describe("HTTP game lifecycle", () => {
       const claimResponse = await fetch(
         `${origin}/api/invitations/${created.invitation.lookup_id}/claim`,
         {
-          body: JSON.stringify({ secret: created.invitation.secret }),
+          body: JSON.stringify({
+            claim_id: "22222222-2222-4222-8222-222222222222",
+            secret: created.invitation.secret,
+          }),
           headers: { "content-type": "application/json" },
           method: "POST",
         },
@@ -149,7 +152,10 @@ describe("HTTP game lifecycle", () => {
       const replayResponse = await fetch(
         `${origin}/api/invitations/${created.invitation.lookup_id}/claim`,
         {
-          body: JSON.stringify({ secret: created.invitation.secret }),
+          body: JSON.stringify({
+            claim_id: "33333333-3333-4333-8333-333333333333",
+            secret: created.invitation.secret,
+          }),
           headers: { "content-type": "application/json" },
           method: "POST",
         },
@@ -224,6 +230,21 @@ describe("HTTP game lifecycle", () => {
       expect(await issueResponse.json()).toMatchObject({
         invitation: { secret: expect.any(String) },
         ok: true,
+      });
+
+      const resumedHost = await fetch(
+        `${origin}/api/games/${created.game_id}`,
+        { headers: { cookie: hostCookie } },
+      );
+      expect(await resumedHost.json()).toMatchObject({
+        action_log: [
+          { command_name: "revokeInvitation", kind: "host_management" },
+          { command_name: "issueInvitation", kind: "host_management" },
+        ],
+        active_invitations: [
+          { lookup_id: expect.any(String), seat: "confederate" },
+        ],
+        is_host: true,
       });
 
       const deleteResponse = await fetch(

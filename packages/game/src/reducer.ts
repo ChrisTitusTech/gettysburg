@@ -1,7 +1,7 @@
 import { adjacentHexes, hexDistance, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
 import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
-import { enemyZoneOfControl, nightMovementIsLegal } from "./zoc.js";
+import { enemyZoneOfControl, nightMovementPath } from "./zoc.js";
 import type {
   CombatState,
   CommandFailure,
@@ -151,20 +151,23 @@ function moveUnit(
   if (unit.status !== "deployed" || unit.location === null) {
     return failure(state, "phase_invalid", "Only deployed counters can move.");
   }
-  const distance = hexDistance(unit.location, destination);
+  const path = nightMovementPath(state, actorSide, unit.location, destination);
+  if (state.night && path.at(-1) !== destination) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Night movement must withdraw from and may not enter an enemy zone of control.",
+    );
+  }
+  const distance = state.night
+    ? path.length - 1
+    : hexDistance(unit.location, destination);
   const movementRemaining = unit.movement - (unit.movement_spent ?? 0);
   if (distance > movementRemaining) {
     return failure(
       state,
       "movement_exceeded",
-      `${unit.label} has ${movementRemaining} movement point${movementRemaining === 1 ? "" : "s"} remaining; ${destination} is ${distance} hexes away.`,
-    );
-  }
-  if (!nightMovementIsLegal(state, actorSide, unit.location, destination)) {
-    return failure(
-      state,
-      "phase_invalid",
-      "Night movement must withdraw from and may not enter an enemy zone of control.",
+      `${unit.label} has ${movementRemaining} movement point${movementRemaining === 1 ? "" : "s"} remaining; ${destination} ${state.night ? `requires ${distance} movement points by the safe night route` : `is ${distance} hexes away`}.`,
     );
   }
   if (!destinationCanAccept(state, unit, destination)) {
@@ -227,7 +230,17 @@ function moveStack(
       "Stack movement requires deployed counters in one hex.",
     );
   }
-  const distance = hexDistance(source, destination);
+  const path = nightMovementPath(state, actorSide, source, destination);
+  if (state.night && path.at(-1) !== destination) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Night movement must withdraw from and may not enter an enemy zone of control.",
+    );
+  }
+  const distance = state.night
+    ? path.length - 1
+    : hexDistance(source, destination);
   const limitingUnit = movers.find(
     (unit) => distance > unit.movement - (unit.movement_spent ?? 0),
   );
@@ -238,13 +251,6 @@ function moveStack(
       state,
       "movement_exceeded",
       `${limitingUnit.label} limits this stack to ${remaining} remaining movement point${remaining === 1 ? "" : "s"}.`,
-    );
-  }
-  if (!nightMovementIsLegal(state, actorSide, source, destination)) {
-    return failure(
-      state,
-      "phase_invalid",
-      "Night movement must withdraw from and may not enter an enemy zone of control.",
     );
   }
   if (!destinationCanAcceptUnits(state, movers, destination)) {

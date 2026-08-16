@@ -1,17 +1,50 @@
 import {
   COMMAND_SCHEMA_VERSION,
   type GameState,
-  type GameplayEvent,
+  type ActionEvent,
   type HostManagementCommandName,
   type ManagementEvent,
   type Side,
 } from "@gettysburg/game";
 
+export class ApiResponseError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+  ) {
+    super(message);
+    this.name = "ApiResponseError";
+  }
+}
+
+export function isRetryableApiError(error: unknown): boolean {
+  return !(
+    error instanceof ApiResponseError &&
+    error.status < 500 &&
+    error.status !== 408 &&
+    error.status !== 429
+  );
+}
+
+export function isDefinitiveResumeError(error: unknown): boolean {
+  return (
+    error instanceof ApiResponseError &&
+    ["game_deleted", "game_not_found", "game_purged", "unauthorized"].includes(
+      error.code ?? "",
+    )
+  );
+}
+
 export interface SessionResponse {
-  readonly action_log: readonly GameplayEvent[];
+  readonly action_log: readonly ActionEvent[];
+  readonly active_invitations: readonly {
+    readonly lookup_id: string;
+    readonly seat: Side;
+  }[];
   readonly game_id: string;
   readonly is_host: boolean;
-  readonly seat: Side;
+  readonly seat: Side | null;
   readonly state: GameState;
 }
 
@@ -66,12 +99,14 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
     body = undefined;
   }
   if (!response.ok) {
-    throw new Error(
+    throw new ApiResponseError(
       body?.message ??
         body?.error ??
         (text.trim() === ""
           ? `Request failed (${response.status})`
           : text.trim().slice(0, 200)),
+      response.status,
+      body?.error,
     );
   }
   if (
@@ -94,11 +129,34 @@ export function createGame(seat: Side): Promise<CreateGameResponse> {
 export function claimInvitation(
   lookupId: string,
   secret: string,
+  claimId: string,
 ): Promise<SessionResponse> {
   return jsonRequest(`/api/invitations/${encodeURIComponent(lookupId)}/claim`, {
-    body: JSON.stringify({ secret }),
+    body: JSON.stringify({ claim_id: claimId, secret }),
     method: "POST",
   });
+}
+
+export function claimSeatRecovery(
+  lookupId: string,
+  secret: string,
+  claimId: string,
+): Promise<SessionResponse> {
+  return jsonRequest(`/api/recovery/${encodeURIComponent(lookupId)}/claim`, {
+    body: JSON.stringify({ claim_id: claimId, secret }),
+    method: "POST",
+  });
+}
+
+export function claimHostRecovery(
+  lookupId: string,
+  secret: string,
+  claimId: string,
+): Promise<SessionResponse> {
+  return jsonRequest(
+    `/api/host-recovery/${encodeURIComponent(lookupId)}/claim`,
+    { body: JSON.stringify({ claim_id: claimId, secret }), method: "POST" },
+  );
 }
 
 export function resumeGame(
@@ -125,10 +183,11 @@ export function sendHostCommand(
   expectedVersion: number,
   commandName: HostManagementCommandName,
   payload: Record<string, unknown>,
+  commandId: string = crypto.randomUUID(),
 ): Promise<HostCommandResponse> {
   return jsonRequest(`/api/games/${encodeURIComponent(gameId)}/host-commands`, {
     body: JSON.stringify({
-      command_id: crypto.randomUUID(),
+      command_id: commandId,
       command_name: commandName,
       expected_version: expectedVersion,
       game_id: gameId,

@@ -2,7 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
-import { consumeInvitationFragment } from "./invitation";
+import { consumeSecretGrantFragment } from "./invitation";
 import "./styles.css";
 
 const rootElement = document.querySelector<HTMLDivElement>("#root");
@@ -14,10 +14,7 @@ if (rootElement === null) {
 createRoot(rootElement).render(
   <StrictMode>
     <App
-      initialInvitation={consumeInvitationFragment(
-        window.location,
-        window.history,
-      )}
+      initialGrant={consumeSecretGrantFragment(window.location, window.history)}
     />
   </StrictMode>,
 );

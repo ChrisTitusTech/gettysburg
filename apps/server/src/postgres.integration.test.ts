@@ -301,6 +301,17 @@ postgres("PostgreSQL durability", () => {
       deleted_at: expect.any(Date),
       status: "deleted",
     });
+    const credentials = await administration.query<{
+      bindings: string;
+      sessions: string;
+    }>(
+      `SELECT
+         ((SELECT count(*) FROM host_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM seat_bindings WHERE game_id = $1))::text AS bindings,
+         (SELECT count(*) FROM browser_sessions WHERE id = $2::uuid)::text AS sessions`,
+      [created.gameId, created.sessionId],
+    );
+    expect(credentials.rows[0]).toEqual({ bindings: "0", sessions: "0" });
     await restarted.close();
   });
 

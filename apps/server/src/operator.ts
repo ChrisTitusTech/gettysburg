@@ -67,7 +67,13 @@ try {
       gameId,
       [target, ...identityParts].join(" "),
     );
-    process.stdout.write(`${JSON.stringify({ ...grant, target: "host" })}\n`);
+    process.stdout.write(
+      `${JSON.stringify({
+        ...grant,
+        redemption_path: `/host-recovery/${grant.lookup_id}#${grant.secret}`,
+        target: "host",
+      })}\n`,
+    );
   } else {
     if (gameId === undefined) throw new Error("Game ID is required");
     if (target !== "confederate" && target !== "union") {
@@ -76,7 +82,13 @@ try {
     const seatIdentity = identityParts.join(" ").trim();
     if (seatIdentity === "") throw new Error("Operator identity is required");
     const grant = await service.issueSeatRecovery(gameId, target, seatIdentity);
-    process.stdout.write(`${JSON.stringify({ ...grant, target })}\n`);
+    process.stdout.write(
+      `${JSON.stringify({
+        ...grant,
+        redemption_path: `/recovery/${grant.lookup_id}#${grant.secret}`,
+        target,
+      })}\n`,
+    );
   }
 } finally {
   await service.close();

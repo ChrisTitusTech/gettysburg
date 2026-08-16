@@ -4,6 +4,7 @@ import {
   acceptManagementEvent,
   COMMAND_SCHEMA_VERSION,
   type CommandResult,
+  type ActionEvent,
   type EventCursor,
   type GameState,
   type GameplayEvent,
@@ -16,17 +17,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   claimInvitation,
+  claimHostRecovery,
+  claimSeatRecovery,
   createGame,
+  isDefinitiveResumeError,
+  isRetryableApiError,
   resumeGame,
   sendHostCommand,
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
-import { invitationUrl, type InvitationFragment } from "./invitation";
+import { invitationUrl, type SecretGrantFragment } from "./invitation";
 import { TabletopControls } from "./TabletopControls";
 
 interface AppProps {
-  readonly initialInvitation?: InvitationFragment | null;
+  readonly initialGrant?: SecretGrantFragment | null;
+  readonly initialInvitation?: Omit<SecretGrantFragment, "kind"> | null;
 }
 
 interface ActiveGame extends SessionResponse {
@@ -46,14 +52,33 @@ function humanSide(side: Side): string {
   return side === "union" ? "Union" : "Confederate";
 }
 
-function actionEntries(events: readonly GameplayEvent[]): string[] {
+function actionEntries(events: readonly ActionEvent[]): string[] {
   return [...events]
     .reverse()
     .slice(0, 8)
     .map((event) => `v${event.state_version}: ${event.summary}`);
 }
 
-export function App({ initialInvitation = null }: AppProps) {
+function withoutInvitationUrl(game: ActiveGame): ActiveGame {
+  return {
+    action_log: game.action_log,
+    active_invitations: game.active_invitations,
+    game_id: game.game_id,
+    is_host: game.is_host,
+    seat: game.seat,
+    state: game.state,
+  };
+}
+
+export function App({
+  initialGrant: suppliedGrant = null,
+  initialInvitation = null,
+}: AppProps) {
+  const initialGrant =
+    suppliedGrant ??
+    (initialInvitation === null
+      ? null
+      : { ...initialInvitation, kind: "invitation" as const });
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] =
@@ -65,9 +90,15 @@ export function App({ initialInvitation = null }: AppProps) {
   const [activeInvitationLookupId, setActiveInvitationLookupId] = useState<
     string | null
   >(null);
+  const [activeInvitations, setActiveInvitations] = useState<
+    SessionResponse["active_invitations"]
+  >([]);
   const [reconnectAttempt, setReconnectAttempt] = useState(0);
   const roomReference = useRef<Room | null>(null);
   const eventCursorReference = useRef<EventCursor | null>(null);
+  const hostCommandIdsReference = useRef(new Map<string, string>());
+  const invitationClaimIdReference = useRef(crypto.randomUUID());
+  const recoveryClaimIdReference = useRef(crypto.randomUUID());
   const requestedGameId = gameIdFromLocation();
 
   const enterGame = useCallback(
@@ -82,6 +113,10 @@ export function App({ initialInvitation = null }: AppProps) {
         state_version: session.state.version,
       };
       setCopyStatus(null);
+      setActiveInvitationLookupId(
+        session.active_invitations[0]?.lookup_id ?? null,
+      );
+      setActiveInvitations(session.active_invitations);
       window.localStorage.setItem(LAST_GAME_KEY, session.game_id);
       window.history.replaceState(null, "", `/game/${session.game_id}`);
       setError(null);
@@ -90,7 +125,7 @@ export function App({ initialInvitation = null }: AppProps) {
   );
 
   useEffect(() => {
-    if (initialInvitation !== null || activeGame !== null) return;
+    if (initialGrant !== null || activeGame !== null) return;
     const gameId =
       gameIdFromLocation() ?? window.localStorage.getItem(LAST_GAME_KEY);
     if (gameId === null) return;
@@ -101,8 +136,11 @@ export function App({ initialInvitation = null }: AppProps) {
       .then((session) => {
         if (active) enterGame(session);
       })
-      .catch(() => {
-        if (window.localStorage.getItem(LAST_GAME_KEY) === gameId) {
+      .catch((resumeError: unknown) => {
+        if (
+          isDefinitiveResumeError(resumeError) &&
+          window.localStorage.getItem(LAST_GAME_KEY) === gameId
+        ) {
           window.localStorage.removeItem(LAST_GAME_KEY);
         }
         if (active)
@@ -114,10 +152,14 @@ export function App({ initialInvitation = null }: AppProps) {
     return () => {
       active = false;
     };
-  }, [activeGame, enterGame, initialInvitation]);
+  }, [activeGame, enterGame, initialGrant]);
 
   useEffect(() => {
-    if (activeGame === null) return;
+    if (activeGame === null || activeGame.seat === null) {
+      roomReference.current = null;
+      setConnectionStatus("disconnected");
+      return;
+    }
     let active = true;
     let connectedRoom: Room | undefined;
     eventCursorReference.current = {
@@ -130,6 +172,13 @@ export function App({ initialInvitation = null }: AppProps) {
       try {
         const session = await resumeGame(activeGame.game_id);
         if (!active) return;
+        const cursor = eventCursorReference.current;
+        if (
+          cursor !== null &&
+          session.state.event_sequence < cursor.event_sequence
+        ) {
+          return;
+        }
         eventCursorReference.current = {
           event_sequence: session.state.event_sequence,
           state_version: session.state.version,
@@ -178,10 +227,25 @@ export function App({ initialInvitation = null }: AppProps) {
           return;
         }
         if (result.event.command_name === "surrenderSeat") {
-          window.localStorage.removeItem(LAST_GAME_KEY);
-          window.history.replaceState(null, "", "/");
-          setActiveGame(null);
-          void connectedRoom?.leave(true);
+          if (activeGame.is_host) {
+            void resumeGame(activeGame.game_id)
+              .then((session) => {
+                if (active) enterGame(session);
+              })
+              .catch((resumeError: unknown) => {
+                if (!active) return;
+                setError(
+                  resumeError instanceof Error
+                    ? resumeError.message
+                    : "Host controls could not be refreshed. Reconnect to continue.",
+                );
+              });
+          } else {
+            window.localStorage.removeItem(LAST_GAME_KEY);
+            window.history.replaceState(null, "", "/");
+            setActiveGame(null);
+            void connectedRoom?.leave(true);
+          }
         }
         setError(null);
       });
@@ -229,6 +293,14 @@ export function App({ initialInvitation = null }: AppProps) {
 
       const refreshed = await resumeGame(activeGame.game_id);
       if (active) {
+        const cursor = eventCursorReference.current;
+        if (
+          cursor !== null &&
+          refreshed.state.event_sequence < cursor.event_sequence
+        ) {
+          setConnectionStatus("connected");
+          return;
+        }
         eventCursorReference.current = {
           event_sequence: refreshed.state.event_sequence,
           state_version: refreshed.state.version,
@@ -257,7 +329,34 @@ export function App({ initialInvitation = null }: AppProps) {
       roomReference.current = null;
       if (connectedRoom !== undefined) void connectedRoom.leave(true);
     };
-  }, [activeGame?.game_id, reconnectAttempt]);
+  }, [activeGame?.game_id, activeGame?.seat, enterGame, reconnectAttempt]);
+
+  async function executeHostCommand(
+    operationKey: string,
+    commandName: Parameters<typeof sendHostCommand>[2],
+    payload: Record<string, unknown>,
+  ) {
+    if (activeGame === null) throw new Error("No active game.");
+    const commandId =
+      hostCommandIdsReference.current.get(operationKey) ?? crypto.randomUUID();
+    hostCommandIdsReference.current.set(operationKey, commandId);
+    try {
+      const result = await sendHostCommand(
+        activeGame.game_id,
+        activeGame.state.version,
+        commandName,
+        payload,
+        commandId,
+      );
+      hostCommandIdsReference.current.delete(operationKey);
+      return result;
+    } catch (commandError) {
+      if (!isRetryableApiError(commandError)) {
+        hostCommandIdsReference.current.delete(operationKey);
+      }
+      throw commandError;
+    }
+  }
 
   async function handleCreate(seat: Side) {
     setIsBusy(true);
@@ -299,30 +398,50 @@ export function App({ initialInvitation = null }: AppProps) {
     }
   }
 
-  async function handleIssueInvitation() {
+  async function handleIssueInvitation(requestedSeat?: Side) {
     if (activeGame === null) return;
     setIsBusy(true);
     setError(null);
     try {
-      const result = await sendHostCommand(
-        activeGame.game_id,
-        activeGame.state.version,
+      const result = await executeHostCommand(
+        `issueInvitation:${requestedSeat ?? (activeGame.seat === "union" ? "confederate" : "union")}`,
         "issueInvitation",
-        { seat: activeGame.seat === "union" ? "confederate" : "union" },
+        {
+          seat:
+            requestedSeat ??
+            (activeGame.seat === "union" ? "confederate" : "union"),
+        },
       );
-      if (result.invitation === undefined) {
+      const issuedInvitation = result.invitation;
+      if (issuedInvitation === undefined) {
         throw new Error("The server did not return the new invitation secret.");
       }
-      setActiveInvitationLookupId(result.invitation.lookup_id);
+      setActiveInvitationLookupId(issuedInvitation.lookup_id);
+      const issuedSeat =
+        requestedSeat ??
+        (activeGame.seat === "union" ? "confederate" : "union");
+      setActiveInvitations((current) => [
+        ...current.filter(
+          (invitation) => invitation.lookup_id !== issuedInvitation.lookup_id,
+        ),
+        { lookup_id: issuedInvitation.lookup_id, seat: issuedSeat },
+      ]);
       setActiveGame((current) =>
         current === null
           ? current
           : {
               ...current,
+              active_invitations: [
+                ...current.active_invitations.filter(
+                  (invitation) =>
+                    invitation.lookup_id !== issuedInvitation.lookup_id,
+                ),
+                { lookup_id: issuedInvitation.lookup_id, seat: issuedSeat },
+              ],
               invitationUrl: invitationUrl(
                 window.location.origin,
-                result.invitation!.lookup_id,
-                result.invitation!.secret,
+                issuedInvitation.lookup_id,
+                issuedInvitation.secret,
               ),
             },
       );
@@ -338,26 +457,31 @@ export function App({ initialInvitation = null }: AppProps) {
     }
   }
 
-  async function handleRevokeInvitation() {
-    if (activeGame === null || activeInvitationLookupId === null) return;
+  async function handleRevokeInvitation(
+    lookupId: string | null = activeInvitationLookupId,
+  ) {
+    if (activeGame === null || lookupId === null) return;
     setIsBusy(true);
     setError(null);
     try {
-      await sendHostCommand(
-        activeGame.game_id,
-        activeGame.state.version,
+      await executeHostCommand(
+        `revokeInvitation:${lookupId}`,
         "revokeInvitation",
-        { lookup_id: activeInvitationLookupId },
+        { lookup_id: lookupId },
       );
-      setActiveInvitationLookupId(null);
+      const remaining = activeInvitations.filter(
+        (invitation) => invitation.lookup_id !== lookupId,
+      );
+      const revokedDisplayed = lookupId === activeInvitationLookupId;
+      setActiveInvitations(remaining);
+      setActiveInvitationLookupId(remaining[0]?.lookup_id ?? null);
       setActiveGame((current) => {
         if (current === null) return current;
         return {
-          action_log: current.action_log,
-          game_id: current.game_id,
-          is_host: current.is_host,
-          seat: current.seat,
-          state: current.state,
+          ...(revokedDisplayed ? withoutInvitationUrl(current) : current),
+          active_invitations: current.active_invitations.filter(
+            (invitation) => invitation.lookup_id !== lookupId,
+          ),
         };
       });
       setCopyStatus("Invitation revoked.");
@@ -383,12 +507,7 @@ export function App({ initialInvitation = null }: AppProps) {
     setIsBusy(true);
     setError(null);
     try {
-      await sendHostCommand(
-        activeGame.game_id,
-        activeGame.state.version,
-        "deleteGame",
-        { confirm: true },
-      );
+      await executeHostCommand("deleteGame", "deleteGame", { confirm: true });
       window.localStorage.removeItem(LAST_GAME_KEY);
       window.history.replaceState(null, "", "/");
       setActiveGame(null);
@@ -415,16 +534,29 @@ export function App({ initialInvitation = null }: AppProps) {
   }
 
   async function handleClaim() {
-    if (initialInvitation === null) return;
+    if (initialGrant === null) return;
     setIsBusy(true);
     setError(null);
     try {
-      enterGame(
-        await claimInvitation(
-          initialInvitation.lookupId,
-          initialInvitation.secret,
-        ),
-      );
+      const session =
+        initialGrant.kind === "invitation"
+          ? await claimInvitation(
+              initialGrant.lookupId,
+              initialGrant.secret,
+              invitationClaimIdReference.current,
+            )
+          : initialGrant.kind === "seat-recovery"
+            ? await claimSeatRecovery(
+                initialGrant.lookupId,
+                initialGrant.secret,
+                recoveryClaimIdReference.current,
+              )
+            : await claimHostRecovery(
+                initialGrant.lookupId,
+                initialGrant.secret,
+                recoveryClaimIdReference.current,
+              );
+      enterGame(session);
     } catch (claimError) {
       setError(
         claimError instanceof Error
@@ -469,19 +601,11 @@ export function App({ initialInvitation = null }: AppProps) {
     unitIds: readonly string[],
     path: readonly HexCoordinate[],
   ) {
-    if (unitIds.length === 1) {
-      sendCommand("retreatUnit", {
-        combat_id: combatId,
-        destination: path.at(-1),
-        unit_id: unitIds[0],
-      });
-    } else {
-      sendCommand("retreatStack", {
-        combat_id: combatId,
-        path,
-        unit_ids: unitIds,
-      });
-    }
+    sendCommand("retreatStack", {
+      combat_id: combatId,
+      path,
+      unit_ids: unitIds,
+    });
   }
 
   function handleAdvance(
@@ -509,7 +633,7 @@ export function App({ initialInvitation = null }: AppProps) {
             PostgreSQL.
           </p>
 
-          {initialInvitation === null && requestedGameId === null ? (
+          {initialGrant === null && requestedGameId === null ? (
             <div className="seat-actions" aria-label="Choose a host seat">
               <button
                 disabled={isBusy}
@@ -524,15 +648,22 @@ export function App({ initialInvitation = null }: AppProps) {
                 Host as Union
               </button>
             </div>
-          ) : initialInvitation !== null ? (
+          ) : initialGrant !== null ? (
             <div className="join-panel">
-              <h2>Private invitation</h2>
+              <h2>
+                {initialGrant.kind === "invitation"
+                  ? "Private invitation"
+                  : "Private recovery grant"}
+              </h2>
               <p>
-                The invitation secret was removed from browser history. Claim
-                the open opposing seat once.
+                {initialGrant.kind === "invitation"
+                  ? "The invitation secret was removed from browser history. Claim the seat to continue."
+                  : "The recovery secret was removed from browser history. Claim the grant to continue."}
               </p>
               <button disabled={isBusy} onClick={() => void handleClaim()}>
-                Claim seat
+                {initialGrant.kind === "host-recovery"
+                  ? "Recover host controls"
+                  : "Claim seat"}
               </button>
             </div>
           ) : (
@@ -564,7 +695,11 @@ export function App({ initialInvitation = null }: AppProps) {
         <dl className="game-facts">
           <div>
             <dt>Seat</dt>
-            <dd>{humanSide(activeGame.seat)}</dd>
+            <dd>
+              {activeGame.seat === null
+                ? "Host controls only"
+                : humanSide(activeGame.seat)}
+            </dd>
           </div>
           <div>
             <dt>State</dt>
@@ -585,30 +720,47 @@ export function App({ initialInvitation = null }: AppProps) {
             </dd>
           </div>
         </dl>
-        {connectionStatus === "disconnected" ? (
+        {activeGame.seat !== null && connectionStatus === "disconnected" ? (
           <button onClick={() => setReconnectAttempt((attempt) => attempt + 1)}>
             Reconnect
           </button>
         ) : null}
       </header>
 
-      {activeGame.invitationUrl === undefined ? null : (
+      {activeGame.invitationUrl === undefined &&
+      activeInvitationLookupId === null ? null : (
         <section className="invitation-panel" aria-labelledby="invite-heading">
           <div>
             <p className="eyebrow">Opposing seat</p>
-            <h2 id="invite-heading">Share this one-time invitation</h2>
+            <h2 id="invite-heading">
+              {activeGame.invitationUrl === undefined
+                ? "Manage the active invitation"
+                : "Share this one-time invitation"}
+            </h2>
             <p>
               Open it in a private window or a separate browser. This browser
-              already owns the {humanSide(activeGame.seat)} seat.
+              already owns
+              {activeGame.seat === null
+                ? " host controls."
+                : ` the ${humanSide(activeGame.seat)} seat.`}
             </p>
           </div>
-          <input
-            aria-label="One-time invitation URL"
-            onFocus={(event) => event.currentTarget.select()}
-            readOnly
-            value={activeGame.invitationUrl}
-          />
-          <button onClick={() => void handleCopyInvitation()}>Copy</button>
+          {activeGame.invitationUrl === undefined ? (
+            <p>
+              The bearer secret is not stored in the browser. Revoke this
+              invitation or issue a replacement if it was not shared.
+            </p>
+          ) : (
+            <>
+              <input
+                aria-label="One-time invitation URL"
+                onFocus={(event) => event.currentTarget.select()}
+                readOnly
+                value={activeGame.invitationUrl}
+              />
+              <button onClick={() => void handleCopyInvitation()}>Copy</button>
+            </>
+          )}
           {activeGame.is_host && activeInvitationLookupId !== null ? (
             <button
               disabled={isBusy}
@@ -624,40 +776,85 @@ export function App({ initialInvitation = null }: AppProps) {
       )}
 
       <section className="game-lifecycle" aria-label="Game lifecycle">
+        {activeGame.is_host
+          ? activeInvitations.map((invitation) => (
+              <button
+                disabled={isBusy}
+                key={invitation.lookup_id}
+                onClick={() =>
+                  void handleRevokeInvitation(invitation.lookup_id)
+                }
+              >
+                Revoke {humanSide(invitation.seat)} invitation
+              </button>
+            ))
+          : null}
         {activeGame.is_host ? (
           <>
-            <button
-              disabled={isBusy}
-              onClick={() => void handleIssueInvitation()}
-            >
-              Issue opposing-seat invitation
-            </button>
+            {activeGame.seat === null ? null : (
+              <button
+                disabled={isBusy}
+                onClick={() => void handleIssueInvitation()}
+              >
+                Issue opposing-seat invitation
+              </button>
+            )}
             <button disabled={isBusy} onClick={() => void handleDeleteGame()}>
               Delete game
             </button>
           </>
         ) : null}
-        <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
-          Surrender seat
-        </button>
+        {activeGame.is_host && activeGame.seat === null ? (
+          <>
+            <button
+              disabled={isBusy}
+              onClick={() => void handleIssueInvitation("union")}
+            >
+              Issue Union invitation
+            </button>
+            <button
+              disabled={isBusy}
+              onClick={() => void handleIssueInvitation("confederate")}
+            >
+              Issue Confederate invitation
+            </button>
+          </>
+        ) : null}
+        {activeGame.seat === null ? null : (
+          <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
+            Surrender seat
+          </button>
+        )}
       </section>
 
-      <TabletopControls
-        disabled={connectionStatus !== "connected" || pendingCommand}
-        onCommand={sendCommand}
-        seat={activeGame.seat}
-        state={activeGame.state}
-      />
+      {activeGame.seat === null ? (
+        <section className="join-panel">
+          <h2>Host controls recovered</h2>
+          <p>
+            This browser can issue or revoke seat invitations and delete the
+            game. Claim a seat invitation in another browser to play.
+          </p>
+        </section>
+      ) : (
+        <>
+          <TabletopControls
+            disabled={connectionStatus !== "connected" || pendingCommand}
+            onCommand={sendCommand}
+            seat={activeGame.seat}
+            state={activeGame.state}
+          />
 
-      <Board
-        disabled={connectionStatus !== "connected" || pendingCommand}
-        error={error ?? undefined}
-        onAdvance={handleAdvance}
-        onMove={handleMove}
-        onRetreat={handleRetreat}
-        seat={activeGame.seat}
-        state={activeGame.state}
-      />
+          <Board
+            disabled={connectionStatus !== "connected" || pendingCommand}
+            error={error ?? undefined}
+            onAdvance={handleAdvance}
+            onMove={handleMove}
+            onRetreat={handleRetreat}
+            seat={activeGame.seat}
+            state={activeGame.state}
+          />
+        </>
+      )}
 
       <section className="action-log" aria-labelledby="log-heading">
         <div>

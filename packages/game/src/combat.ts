@@ -8,9 +8,6 @@ import {
   type UnitState,
 } from "./protocol.js";
 
-const MAX_EXACT_COVER_VERTICES = 20;
-const MAX_EXACT_COVER_STATES = 50_000;
-
 export interface CombatOpportunity {
   readonly attacker_hexes: readonly HexCoordinate[];
   readonly attacker_modifier: number;
@@ -188,9 +185,12 @@ function candidateForHexes(
   };
 }
 
-function separateOpportunity(
+const EXACT_COVER_STATE_BUDGET = 250_000;
+
+export function separateOpportunity(
   state: GameState,
   opportunity: CombatOpportunity,
+  stateBudget = EXACT_COVER_STATE_BUDGET,
 ): readonly CombatOpportunity[] {
   if (!opportunity.requires_separation) return [opportunity];
 
@@ -208,6 +208,14 @@ function separateOpportunity(
       opportunity.defenders.filter((id) => state.units[id]?.location === hex),
     );
   }
+
+  const vertices = [
+    ...opportunity.attacker_hexes.map((hex) => `attacker:${hex}`),
+    ...opportunity.defender_hexes.map((hex) => `defender:${hex}`),
+  ].sort(compareText);
+  // A valid board has only 231 unique hexes. Fail closed on corrupted or
+  // synthetic state before constructing exponential candidate subsets.
+  if (vertices.length > 231) return [opportunity];
 
   const candidates = new Map<string, SkirmishCandidate>();
   for (const defenderHex of opportunity.defender_hexes) {
@@ -241,10 +249,6 @@ function separateOpportunity(
     }
   }
 
-  const vertices = [
-    ...opportunity.attacker_hexes.map((hex) => `attacker:${hex}`),
-    ...opportunity.defender_hexes.map((hex) => `defender:${hex}`),
-  ].sort(compareText);
   const vertexIndex = new Map(vertices.map((vertex, index) => [vertex, index]));
   const indexedCandidates = [...candidates.values()]
     .map((candidate) => ({
@@ -271,8 +275,14 @@ function separateOpportunity(
     bigint,
     readonly (typeof indexedCandidates)[number][] | null
   >();
-  let exactStates = 0;
-  let exactSearchExhausted = false;
+  let remainingWork = stateBudget;
+  let stateBudgetExhausted = false;
+  const consumeWork = () => {
+    remainingWork -= 1;
+    if (remainingWork >= 0) return true;
+    stateBudgetExhausted = true;
+    return false;
+  };
   const better = (
     left: readonly (typeof indexedCandidates)[number][],
     right: readonly (typeof indexedCandidates)[number][] | null,
@@ -295,18 +305,18 @@ function separateOpportunity(
     if (remaining === 0n) return [];
     const cached = memo.get(remaining);
     if (cached !== undefined) return cached;
-    if (exactStates >= MAX_EXACT_COVER_STATES) {
-      exactSearchExhausted = true;
-      return null;
-    }
-    exactStates += 1;
+    if (!consumeWork()) return null;
 
     let options: typeof indexedCandidates | null = null;
     for (let index = 0; index < vertices.length; index += 1) {
+      if (!consumeWork()) return null;
       if ((remaining & (1n << BigInt(index))) === 0n) continue;
-      const compatible = (candidatesByVertex.get(index) ?? []).filter(
-        (candidate) => (candidate.mask & remaining) === candidate.mask,
-      );
+      const compatible: typeof indexedCandidates = [];
+      for (const candidate of candidatesByVertex.get(index) ?? []) {
+        if (!consumeWork()) return null;
+        if ((candidate.mask & remaining) === candidate.mask)
+          compatible.push(candidate);
+      }
       if (options === null || compatible.length < options.length) {
         options = compatible;
       }
@@ -325,58 +335,8 @@ function separateOpportunity(
   };
 
   const allVertices = (1n << BigInt(vertices.length)) - 1n;
-  const hasCandidateForEveryVertex = (remaining: bigint): boolean => {
-    for (let index = 0; index < vertices.length; index += 1) {
-      const vertexMask = 1n << BigInt(index);
-      if ((remaining & vertexMask) === 0n) continue;
-      if (
-        !indexedCandidates.some(
-          (candidate) =>
-            (candidate.mask & vertexMask) !== 0n &&
-            (candidate.mask & remaining) === candidate.mask,
-        )
-      ) {
-        return false;
-      }
-    }
-    return true;
-  };
-  const bitCount = (mask: bigint): number => {
-    let count = 0;
-    for (let value = mask; value !== 0n; value >>= 1n) {
-      if ((value & 1n) !== 0n) count += 1;
-    }
-    return count;
-  };
-  const solveGreedily = () => {
-    let remaining = allVertices;
-    const selected: (typeof indexedCandidates)[number][] = [];
-    while (remaining !== 0n) {
-      const choice = indexedCandidates
-        .filter(
-          (candidate) =>
-            (candidate.mask & remaining) === candidate.mask &&
-            hasCandidateForEveryVertex(remaining ^ candidate.mask),
-        )
-        .sort((left, right) => {
-          const sizeDifference = bitCount(right.mask) - bitCount(left.mask);
-          return (
-            sizeDifference ||
-            compareText(left.opportunity.id, right.opportunity.id)
-          );
-        })[0];
-      if (choice === undefined) return null;
-      selected.push(choice);
-      remaining ^= choice.mask;
-    }
-    return selected;
-  };
-  const exactSolution =
-    vertices.length <= MAX_EXACT_COVER_VERTICES ? solve(allVertices) : null;
-  const solution =
-    vertices.length > MAX_EXACT_COVER_VERTICES || exactSearchExhausted
-      ? solveGreedily()
-      : exactSolution;
+  const solution = solve(allVertices);
+  if (stateBudgetExhausted) return [opportunity];
   if (solution === null) return [opportunity];
   return solution
     .map((candidate) => candidate.opportunity)

@@ -42,7 +42,10 @@ export function createGettysburgRoom(
   eventBus?: GameEventBus,
 ): GameRoomConstructor {
   return class GettysburgRoom extends Room {
-    override maxClients = 2;
+    // Keep the room matchable while a reload overlaps the old socket. onJoin
+    // replaces the prior connection for the same binding, so stable occupancy
+    // remains one client per seat and all broadcasts stay in one room.
+    override maxClients = 4;
     #gameId = "";
     #unsubscribeManagement: (() => void) | undefined;
 
@@ -137,6 +140,15 @@ export function createGettysburgRoom(
 
     override async onJoin(client: Client): Promise<void> {
       const authorization = client.auth as GameAuthorization;
+      for (const existing of [...this.clients]) {
+        if (
+          existing !== client &&
+          (existing.auth as GameAuthorization | undefined)?.bindingId ===
+            authorization.bindingId
+        ) {
+          existing.leave(4000);
+        }
+      }
       client.send(
         "snapshot",
         await gameService.getAuthorizedState(authorization),

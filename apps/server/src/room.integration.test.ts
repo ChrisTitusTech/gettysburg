@@ -120,6 +120,39 @@ describe("Colyseus authoritative room", () => {
     expect(reconstructed.roomId).not.toBe(firstRoomId);
   });
 
+  it("keeps a reload overlap in one room and replaces the older socket", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+    const createResponse = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const cookie = cookieFrom(createResponse);
+    const created = (await createResponse.json()) as CreatedGame;
+    const first = await new ColyseusClient(origin, {
+      headers: { cookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(first);
+    const firstLeft = new Promise<number>((resolve) => first.onLeave(resolve));
+
+    const replacement = await new ColyseusClient(origin, {
+      headers: { cookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(replacement);
+
+    expect(replacement.roomId).toBe(first.roomId);
+    await expect(firstLeft).resolves.toBe(4000);
+    rooms.splice(rooms.indexOf(first), 1);
+  });
+
   it("synchronizes two seats, rejects bad commands, and resumes latest state", async () => {
     const service = new InMemoryGameService();
     const port = await reservePort();

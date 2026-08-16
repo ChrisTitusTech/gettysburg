@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 readonly backup_root="${GETTYSBURG_BACKUP_ROOT:-/srv/gettysburg/backups}"
 readonly container_name="${GETTYSBURG_DB_CONTAINER:-gettysburg-db}"
+readonly app_volume_name="${GETTYSBURG_APP_VOLUME:-gettysburg-app-state}"
 readonly recipient_file="${GETTYSBURG_BACKUP_AGE_RECIPIENT_FILE:-/srv/gettysburg/.config/gettysburg/backup-age-recipient}"
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 readonly timestamp
@@ -11,6 +12,7 @@ readonly dump_encrypted="${backup_dir}/gettysburg.dump.age"
 readonly ledger_plaintext="${backup_dir}/deletion-ledger.json"
 readonly ledger_encrypted="${ledger_plaintext}.age"
 readonly ledger_watermark_file="${backup_dir}/deletion-ledger-watermark"
+readonly pepper_encrypted="${backup_dir}/credential-pepper.age"
 backup_complete=false
 
 for command in age find podman sha256sum; do
@@ -39,6 +41,16 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 podman container exists "${container_name}"
+podman volume exists "${app_volume_name}"
+app_volume_mountpoint="$(podman volume inspect \
+	--format '{{.Mountpoint}}' "${app_volume_name}")"
+readonly app_volume_mountpoint
+readonly pepper_plaintext="${app_volume_mountpoint}/credential-pepper"
+test -s "${pepper_plaintext}"
+grep -Eq '^[A-Za-z0-9_-]{43}$' "${pepper_plaintext}"
+age --encrypt --recipients-file "${recipient_file}" \
+	--output "${pepper_encrypted}" "${pepper_plaintext}"
+
 podman exec "${container_name}" pg_dump \
 	--username=gettysburg \
 	--dbname=gettysburg \
@@ -92,11 +104,12 @@ rm -- "${ledger_plaintext}"
 (
 	cd "${backup_dir}"
 	sha256sum \
+		"$(basename "${pepper_encrypted}")" \
 		"$(basename "${dump_encrypted}")" \
 		"$(basename "${ledger_encrypted}")" \
 		"$(basename "${ledger_watermark_file}")" >SHA256SUMS
 )
-chmod 0600 "${dump_encrypted}" "${ledger_encrypted}" \
+chmod 0600 "${pepper_encrypted}" "${dump_encrypted}" "${ledger_encrypted}" \
 	"${ledger_watermark_file}" "${backup_dir}/SHA256SUMS"
 find "${backup_root}" -mindepth 1 -maxdepth 1 -type d \
 	-name '????????T??????Z' ! -newermt '35 days ago' -exec rm -rf -- {} +

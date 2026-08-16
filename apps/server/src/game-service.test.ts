@@ -471,6 +471,38 @@ describe("in-memory game lifecycle", () => {
     );
   });
 
+  it("replays a claimed invitation only for the original claim identifier", () => {
+    const service = new InMemoryGameService();
+    const host = service.createGame("confederate");
+    const claimId = randomUUID();
+    const first = service.claimInvitation({
+      claimId,
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    const retried = service.claimInvitation({
+      claimId,
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+
+    expect(retried).toMatchObject({
+      credential: first.credential,
+      gameId: first.gameId,
+      seat: first.seat,
+      sessionId: first.sessionId,
+    });
+    expectServiceError(
+      () =>
+        service.claimInvitation({
+          claimId: randomUUID(),
+          lookupId: host.invitation.lookup_id,
+          secret: host.invitation.secret,
+        }),
+      "invitation_unavailable",
+    );
+  });
+
   it("rejects a mismatched request without consuming the invitation", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("union");
@@ -831,9 +863,21 @@ describe("operator seat recovery", () => {
       "union",
       "local-operator:test",
     );
+    const claimId = randomUUID();
     const recovered = service.claimSeatRecovery({
+      claimId,
       lookupId: grant.lookup_id,
       secret: grant.secret,
+    });
+    expect(
+      service.claimSeatRecovery({
+        claimId,
+        lookupId: grant.lookup_id,
+        secret: grant.secret,
+      }),
+    ).toMatchObject({
+      credential: recovered.credential,
+      sessionId: recovered.sessionId,
     });
 
     expectServiceError(
@@ -935,6 +979,7 @@ describe("Phase 2 seat and host lifecycle", () => {
   it("revokes an invitation and soft-deletes every game binding", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("union");
+    const retainedGame = service.createGame("confederate", host.credential);
     const authorization = service.authenticateHost(
       host.credential,
       host.gameId,
@@ -982,6 +1027,9 @@ describe("Phase 2 seat and host lifecycle", () => {
     expect(service.executeHostCommand(retryAuthorization, deletion)).toEqual(
       deleted,
     );
+    expect(
+      service.authenticateHost(host.credential, retainedGame.gameId),
+    ).toMatchObject({ gameId: retainedGame.gameId });
     expectServiceError(() => service.getGameState(host.gameId), "game_deleted");
     expectServiceError(
       () => service.authenticate(host.credential, host.gameId),
@@ -1147,9 +1195,21 @@ describe("Phase 2 seat and host lifecycle", () => {
       first.gameId,
       "local-operator:test",
     );
+    const claimId = randomUUID();
     const recovered = service.claimHostRecovery({
+      claimId,
       lookupId: grant.lookup_id,
       secret: grant.secret,
+    });
+    expect(
+      service.claimHostRecovery({
+        claimId,
+        lookupId: grant.lookup_id,
+        secret: grant.secret,
+      }),
+    ).toMatchObject({
+      credential: recovered.credential,
+      sessionId: recovered.sessionId,
     });
 
     expectServiceError(

@@ -205,7 +205,9 @@ unrecorded shell history:
    maintenance mode and keep the candidate running rather than starting an
    older ruleset against data the candidate may have written.
 8. Verify the Caddy route, WebSocket upgrade, and a
-   two-client smoke flow.
+   two-client smoke flow. The deploy script creates and retains one ordinary
+   smoke game so it does not bypass the deletion ledger or make readiness
+   depend on an off-host backup performed mid-deploy.
 9. Confirm the independent review and successful CI both reference the exact
    candidate revision recorded by the image label. Retain the last compatible
    image and backup until the release is accepted.
@@ -232,6 +234,10 @@ scripts/vps-recovery.sh purge-deleted
 # its deletion-ledger watermark only after checksums and decryption pass.
 scripts/offhost-backup.sh
 ```
+
+Each recovery issue command returns a `redemption_path` containing the one-time
+bearer fragment. Send the complete public-origin URL to the intended recipient
+over a private channel; the browser removes the fragment before claiming it.
 
 The Quadlets are under `ops/quadlet/`; they run both containers rootlessly with
 read-only root filesystems, private named volumes, and an internal network. The

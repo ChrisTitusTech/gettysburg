@@ -12,6 +12,7 @@ import {
   combatOpportunities,
   combatSkirmishes,
   currentCombatValue,
+  separateOpportunity,
 } from "./combat";
 
 function unit(
@@ -141,6 +142,18 @@ describe("combat discovery", () => {
     ).toBe(true);
   });
 
+  it("falls back deterministically when the exact-cover state budget is exhausted", () => {
+    const current = state({
+      firstAttacker: unit("firstAttacker", "confederate", "K6", 2),
+      secondAttacker: unit("secondAttacker", "confederate", "L6", 2),
+      firstDefender: unit("firstDefender", "union", "K7", 2),
+      secondDefender: unit("secondDefender", "union", "L7", 2),
+    });
+    const opportunity = combatOpportunities(current, "confederate")[0]!;
+    expect(opportunity.requires_separation).toBe(true);
+    expect(separateOpportunity(current, opportunity, 0)).toEqual([opportunity]);
+  });
+
   it("keeps one attacker in one battle with every touching defender", () => {
     const current = state({
       attacker: unit("attacker", "confederate", "L7", 4),
@@ -224,6 +237,59 @@ describe("combat discovery", () => {
           skirmish.defender_hexes.length === 1,
       ),
     ).toBe(true);
+  });
+
+  it("keeps the exact minimum cover for a contact network above 20 hexes", () => {
+    const attackers = [
+      "E9",
+      "F8",
+      "F9",
+      "G4",
+      "G5",
+      "G7",
+      "H6",
+      "H8",
+      "I5",
+      "J4",
+      "J8",
+      "K4",
+      "K5",
+      "K9",
+    ] as const;
+    const defenders = [
+      "E10",
+      "F3",
+      "G8",
+      "G9",
+      "H4",
+      "H7",
+      "I6",
+      "I9",
+      "J3",
+      "J5",
+      "K8",
+    ] as const;
+    const units = Object.fromEntries([
+      ...attackers.map((hex) => [
+        `attacker-${hex}`,
+        unit(`attacker-${hex}`, "confederate", hex, 1),
+      ]),
+      ...defenders.map((hex) => [
+        `defender-${hex}`,
+        unit(`defender-${hex}`, "union", hex, 1),
+      ]),
+    ]);
+
+    const skirmishes = combatSkirmishes(state(units), "confederate");
+    expect(skirmishes).toHaveLength(9);
+    expect(
+      new Set(
+        skirmishes.flatMap((skirmish) => [
+          ...skirmish.attackers,
+          ...skirmish.defenders,
+        ]),
+      ).size,
+    ).toBe(25);
   });
 
   it("caps printed combat-factor modifiers at ten", () => {

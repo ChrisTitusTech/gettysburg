@@ -41,17 +41,24 @@ readonly backup_directory
 )
 readonly ledger_encrypted="${backup_directory}/deletion-ledger.json.age"
 readonly ledger_watermark_file="${backup_directory}/deletion-ledger-watermark"
+readonly pepper_encrypted="${backup_directory}/credential-pepper.age"
 test -s "${ledger_encrypted}"
+test -s "${pepper_encrypted}"
 test -f "${ledger_watermark_file}"
 
 temporary_directory="$(mktemp -d)"
 readonly dump_plaintext="${temporary_directory}/gettysburg.dump"
 readonly ledger_plaintext="${temporary_directory}/deletion-ledger.json"
+readonly pepper_plaintext="${temporary_directory}/credential-pepper"
 age --decrypt --identity "${identity_file}" \
 	--output "${dump_plaintext}" "${dump_file}"
 age --decrypt --identity "${identity_file}" \
 	--output "${ledger_plaintext}" "${ledger_encrypted}"
+age --decrypt --identity "${identity_file}" \
+	--output "${pepper_plaintext}" "${pepper_encrypted}"
 test -s "${dump_plaintext}"
+grep -Eq '^[A-Za-z0-9_-]{43}$' "${pepper_plaintext}"
+test "$(wc -c <"${pepper_plaintext}")" -eq 44
 node -e '
 const fs = require("node:fs");
 const parsed = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));

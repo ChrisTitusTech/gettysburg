@@ -152,7 +152,7 @@ export const retreatStackPayloadSchema = z
   .object({
     combat_id: combatIdSchema,
     path: z.array(coordinateSchema).min(2),
-    unit_ids: z.array(unitIdSchema).min(2),
+    unit_ids: z.array(unitIdSchema).min(1),
   })
   .strict();
 export const advanceAfterCombatPayloadSchema = z
@@ -385,6 +385,17 @@ export interface ManagementEvent {
   readonly state_version: number;
   readonly summary: string;
 }
+
+export interface AuditEvent {
+  readonly command_id: string;
+  readonly command_name: "operatorRecovery";
+  readonly event_sequence: number;
+  readonly kind: "operator_audit";
+  readonly state_version: number;
+  readonly summary: string;
+}
+
+export type ActionEvent = AuditEvent | GameplayEvent | ManagementEvent;
 
 export interface CommandSuccess {
   readonly event: GameplayEvent;

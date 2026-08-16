@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 
-import type { GameplayEvent } from "@gettysburg/game";
+import type { ActionEvent } from "@gettysburg/game";
 import { parseCookie, stringifySetCookie } from "cookie";
 import express, {
   type Application,
@@ -57,16 +58,35 @@ function setSessionCookie(response: Response, credential: string): void {
   );
 }
 
-async function gameplayActionLog(
+async function actionLog(
   gameService: GameService,
   gameId: string,
-): Promise<GameplayEvent[]> {
-  return (await gameService.getActions(gameId)).flatMap((action) =>
-    action.kind === "gameplay" && action.result?.ok && "state" in action.result
-      ? [action.result.event]
-      : [],
+): Promise<ActionEvent[]> {
+  return (await gameService.getActions(gameId)).flatMap<ActionEvent>(
+    (action) => {
+      if (action.result?.ok === true) return [action.result.event];
+      if (
+        action.kind === "operator_audit" &&
+        action.operatorRequestId !== null
+      ) {
+        return [
+          {
+            command_id: action.operatorRequestId,
+            command_name: "operatorRecovery" as const,
+            event_sequence: action.sequence,
+            kind: "operator_audit" as const,
+            state_version: action.resultingVersion,
+            summary: "Operator recovery completed",
+          },
+        ];
+      }
+      return [];
+    },
   );
 }
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function errorStatus(code: ServiceErrorCode): number {
   switch (code) {
@@ -175,7 +195,10 @@ export function configureHttpApplication(
       );
       setSessionCookie(response, result.credential);
       response.status(201).json({
-        action_log: await gameplayActionLog(gameService, result.gameId),
+        action_log: await actionLog(gameService, result.gameId),
+        active_invitations: await gameService.getActiveInvitations(
+          result.gameId,
+        ),
         game_id: result.gameId,
         invitation: result.invitation,
         is_host: true,
@@ -192,12 +215,18 @@ export function configureHttpApplication(
     async (request, response, next) => {
       try {
         const secret = request.body?.secret;
-        if (typeof secret !== "string") {
+        const suppliedClaimId = request.body?.claim_id;
+        if (
+          typeof secret !== "string" ||
+          (suppliedClaimId !== undefined && !UUID_PATTERN.test(suppliedClaimId))
+        ) {
           response.status(400).json({ error: "invalid_invitation" });
           return;
         }
 
         const credential = readSessionCredential(request);
+        const claimId =
+          typeof suppliedClaimId === "string" ? suppliedClaimId : randomUUID();
         const requestedGameId =
           typeof request.body?.game_id === "string"
             ? request.body.game_id
@@ -208,6 +237,7 @@ export function configureHttpApplication(
             : undefined;
         const result = await gameService.claimInvitation({
           ...(credential === undefined ? {} : { credential }),
+          claimId,
           lookupId: request.params.lookupId ?? "",
           ...(requestedGameId === undefined ? {} : { requestedGameId }),
           ...(requestedSeat === undefined ? {} : { requestedSeat }),
@@ -215,7 +245,8 @@ export function configureHttpApplication(
         });
         setSessionCookie(response, result.credential);
         response.status(200).json({
-          action_log: await gameplayActionLog(gameService, result.gameId),
+          action_log: await actionLog(gameService, result.gameId),
+          active_invitations: [],
           game_id: result.gameId,
           is_host: false,
           seat: result.seat,
@@ -232,21 +263,31 @@ export function configureHttpApplication(
     async (request, response, next) => {
       try {
         const secret = request.body?.secret;
-        if (typeof secret !== "string") {
+        const suppliedClaimId = request.body?.claim_id;
+        if (
+          typeof secret !== "string" ||
+          (suppliedClaimId !== undefined && !UUID_PATTERN.test(suppliedClaimId))
+        ) {
           response.status(400).json({ error: "invalid_recovery" });
           return;
         }
 
         const credential = readSessionCredential(request);
         const result = await gameService.claimSeatRecovery({
+          claimId:
+            typeof suppliedClaimId === "string"
+              ? suppliedClaimId
+              : randomUUID(),
           ...(credential === undefined ? {} : { credential }),
           lookupId: request.params.lookupId ?? "",
           secret,
         });
         setSessionCookie(response, result.credential);
         response.status(200).json({
-          action_log: await gameplayActionLog(gameService, result.gameId),
+          action_log: await actionLog(gameService, result.gameId),
+          active_invitations: [],
           game_id: result.gameId,
+          is_host: false,
           seat: result.seat,
           state: result.state,
         });
@@ -261,18 +302,35 @@ export function configureHttpApplication(
     async (request, response, next) => {
       try {
         const secret = request.body?.secret;
-        if (typeof secret !== "string") {
+        const suppliedClaimId = request.body?.claim_id;
+        if (
+          typeof secret !== "string" ||
+          (suppliedClaimId !== undefined && !UUID_PATTERN.test(suppliedClaimId))
+        ) {
           response.status(400).json({ error: "invalid_recovery" });
           return;
         }
         const credential = readSessionCredential(request);
         const result = await gameService.claimHostRecovery({
+          claimId:
+            typeof suppliedClaimId === "string"
+              ? suppliedClaimId
+              : randomUUID(),
           ...(credential === undefined ? {} : { credential }),
           lookupId: request.params.lookupId ?? "",
           secret,
         });
         setSessionCookie(response, result.credential);
-        response.status(200).json({ game_id: result.gameId, is_host: true });
+        response.status(200).json({
+          action_log: await actionLog(gameService, result.gameId),
+          active_invitations: await gameService.getActiveInvitations(
+            result.gameId,
+          ),
+          game_id: result.gameId,
+          is_host: true,
+          seat: null,
+          state: await gameService.getGameState(result.gameId),
+        });
       } catch (error) {
         next(error);
       }
@@ -309,28 +367,42 @@ export function configureHttpApplication(
   application.get("/api/games/:gameId", async (request, response, next) => {
     try {
       const gameId = request.params.gameId ?? "";
-      const authorization = await gameService.authenticate(
-        readSessionCredential(request),
-        gameId,
-      );
-      let isHost = false;
+      const credential = readSessionCredential(request);
+      let seatAuthorization;
+      let hostAuthorization;
       try {
-        await gameService.authenticateHost(
-          readSessionCredential(request),
-          gameId,
-        );
-        isHost = true;
+        seatAuthorization = await gameService.authenticate(credential, gameId);
       } catch (error) {
         if (!(error instanceof ServiceError) || error.code !== "unauthorized") {
           throw error;
         }
       }
+      try {
+        hostAuthorization = await gameService.authenticateHost(
+          credential,
+          gameId,
+        );
+      } catch (error) {
+        if (!(error instanceof ServiceError) || error.code !== "unauthorized") {
+          throw error;
+        }
+      }
+      if (seatAuthorization === undefined && hostAuthorization === undefined) {
+        throw new ServiceError("unauthorized", "No game access was found.");
+      }
       response.status(200).json({
-        action_log: await gameplayActionLog(gameService, gameId),
+        action_log: await actionLog(gameService, gameId),
+        active_invitations:
+          hostAuthorization === undefined
+            ? []
+            : await gameService.getActiveInvitations(gameId),
         game_id: gameId,
-        is_host: isHost,
-        seat: authorization.side,
-        state: await gameService.getAuthorizedState(authorization),
+        is_host: hostAuthorization !== undefined,
+        seat: seatAuthorization?.side ?? null,
+        state:
+          seatAuthorization === undefined
+            ? await gameService.getGameState(gameId)
+            : await gameService.getAuthorizedState(seatAuthorization),
       });
     } catch (error) {
       next(error);

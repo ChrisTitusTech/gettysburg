@@ -418,6 +418,37 @@ describe("night movement and combat", () => {
     ).toMatchObject({ location: "L6", movement_spent: 1 });
   });
 
+  it.each([
+    ["moveUnit", { destination: "A5", unit_id: "mover" }],
+    ["moveStack", { destination: "A5", unit_ids: ["mover", "leader"] }],
+  ] as const)(
+    "charges %s for every hex in a safe night detour",
+    (name, payload) => {
+      const units = {
+        enemy: unit("enemy", "union", "infantry", "A3"),
+        leader: unit("leader", "confederate", "general", "A1"),
+        mover: unit("mover", "confederate", "infantry", "A1", {
+          movement: 6,
+        }),
+      };
+      const moved = accept(
+        nightState(units),
+        "confederate",
+        command(name, payload),
+      );
+      expect(moved.units.mover).toMatchObject({
+        location: "A5",
+        movement_spent: 6,
+      });
+      if (name === "moveStack") {
+        expect(moved.units.leader).toMatchObject({
+          location: "A5",
+          movement_spent: 6,
+        });
+      }
+    },
+  );
+
   it("rejects reinforcement entry into an enemy night zone of control", () => {
     const current = nightState({
       reinforcement: unit("reinforcement", "confederate", "infantry", null, {

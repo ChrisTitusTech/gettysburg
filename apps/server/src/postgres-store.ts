@@ -44,6 +44,7 @@ export interface GameService {
     options?: { terminalCommandId?: string },
   ): Promise<HostAuthorization>;
   claimInvitation(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     requestedGameId?: string;
@@ -51,11 +52,13 @@ export interface GameService {
     secret: string;
   }): Promise<ClaimResult>;
   claimSeatRecovery(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     secret: string;
   }): Promise<ClaimResult>;
   claimHostRecovery(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     secret: string;
@@ -75,6 +78,9 @@ export interface GameService {
     options?: { afterCommit?: (event: ManagementEvent) => void },
   ): Promise<HostManagementResult>;
   getActions(gameId: string): Promise<readonly StoredAction[]>;
+  getActiveInvitations(
+    gameId: string,
+  ): Promise<readonly { lookup_id: string; seat: Side }[]>;
   getDeletionLedger(): Promise<readonly DeletionReceipt[]>;
   getAuthorizedState(authorization: GameAuthorization): Promise<GameState>;
   getGameState(gameId: string): Promise<GameState>;
@@ -147,6 +153,9 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async getActions(gameId: string) {
     return this.service.getActions(gameId);
+  }
+  async getActiveInvitations(gameId: string) {
+    return this.service.getActiveInvitations(gameId);
   }
   async getDeletionLedger() {
     return this.service.getDeletionLedger();
@@ -406,6 +415,9 @@ export class PostgresGameService implements GameService {
   async getActions(gameId: string) {
     return this.#read((service) => service.getActions(gameId));
   }
+  async getActiveInvitations(gameId: string) {
+    return this.#read((service) => service.getActiveInvitations(gameId));
+  }
 
   async getDeletionLedger() {
     return this.#read((service) => service.getDeletionLedger());
@@ -537,16 +549,30 @@ export class PostgresGameService implements GameService {
         receipt.gameId,
       ]);
     }
-    if ((snapshot.deletionLedger?.length ?? 0) > 0) {
+    for (const [gameId, game] of snapshot.games) {
+      if (game.deletedAt === null || game.deletedAt === undefined) continue;
       await client.query(
-        `DELETE FROM browser_sessions AS session
-         WHERE NOT EXISTS (
-           SELECT 1 FROM host_bindings WHERE browser_session_id = session.id
-         ) AND NOT EXISTS (
-           SELECT 1 FROM seat_bindings WHERE browser_session_id = session.id
-         )`,
+        "DELETE FROM recovery_grants WHERE game_id = $1::uuid",
+        [gameId],
       );
+      await client.query("DELETE FROM invitations WHERE game_id = $1::uuid", [
+        gameId,
+      ]);
+      await client.query("DELETE FROM seat_bindings WHERE game_id = $1::uuid", [
+        gameId,
+      ]);
+      await client.query("DELETE FROM host_bindings WHERE game_id = $1::uuid", [
+        gameId,
+      ]);
     }
+    await client.query(
+      `DELETE FROM browser_sessions AS session
+       WHERE NOT EXISTS (
+         SELECT 1 FROM host_bindings WHERE browser_session_id = session.id
+       ) AND NOT EXISTS (
+         SELECT 1 FROM seat_bindings WHERE browser_session_id = session.id
+       )`,
+    );
 
     for (const [gameId, game] of snapshot.games) {
       const state = game.state;

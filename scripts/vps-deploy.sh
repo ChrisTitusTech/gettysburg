@@ -275,6 +275,8 @@ caddy validate --config "${caddy_file}" --adapter caddyfile >/dev/null
 systemctl reload caddy
 curl --fail --silent --show-error --max-time 15 \
 	"${public_origin}/readyz" >/dev/null
+run_user podman exec gettysburg-app node scripts/public-smoke.mjs \
+	"${public_origin}"
 
 run_user podman image inspect \
 	--format 'revision={{ index .Labels "org.opencontainers.image.revision" }} image={{.Id}}' \

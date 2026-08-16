@@ -78,6 +78,7 @@ async function shutdown(signal: NodeJS.Signals) {
   console.log(`Received ${signal}; stopping Gettysburg server`);
   await gameServer.gracefullyShutdown(false);
   await gameService.close();
+  process.exit(0);
 }
 
 process.once("SIGINT", () => {

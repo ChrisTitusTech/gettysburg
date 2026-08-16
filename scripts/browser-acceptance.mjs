@@ -181,6 +181,11 @@ async function runScenario(browser, origin, options) {
       .getByLabel("One-time invitation URL")
       .inputValue();
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
+    await hostPage.reload();
+    await hostPage.getByText("connected", { exact: true }).waitFor();
+    await hostPage
+      .getByRole("button", { exact: true, name: "Revoke" })
+      .waitFor();
 
     await opponentPage.goto(invitation);
     await opponentPage.getByRole("button", { name: "Claim seat" }).waitFor();
@@ -283,6 +288,13 @@ async function runScenario(browser, origin, options) {
         .waitFor();
     }
     const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;
+    cleanupHostPage.once("dialog", (dialog) => dialog.accept());
+    await cleanupHostPage
+      .getByRole("button", { name: "Surrender seat" })
+      .click();
+    await cleanupHostPage
+      .getByRole("heading", { name: "Host controls recovered" })
+      .waitFor();
     cleanupHostPage.once("dialog", (dialog) => dialog.accept());
     await cleanupHostPage.getByRole("button", { name: "Delete game" }).click();
     await cleanupHostPage

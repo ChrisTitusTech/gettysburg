@@ -73,15 +73,18 @@ export interface SeatBinding {
 
 export interface Invitation {
   readonly allowedSeat: Side;
+  claimId?: string;
   claimedAt: number | null;
   readonly expiresAt: number;
   readonly gameId: string;
   readonly lookupId: string;
   revokedAt: number | null;
+  sealedClaimCredential?: string;
   readonly tokenHash: string;
 }
 
 export interface RecoveryGrant {
+  claimId?: string;
   consumedAt: number | null;
   readonly expiresAt: number;
   readonly gameId: string;
@@ -90,6 +93,7 @@ export interface RecoveryGrant {
   readonly oldBindingVersion: number;
   readonly operatorIdentity: string;
   revokedAt: number | null;
+  sealedClaimCredential?: string;
   readonly side: Side | null;
   readonly targetBindingType: "host" | "seat";
   readonly tokenHash: string;
@@ -147,6 +151,7 @@ interface GameRecord {
       readonly result: HostManagementSuccess;
       invitationLookupId?: string;
       sealedInvitationSecret?: string;
+      terminalCredentialHash?: string;
     }
   >;
   state: GameState;
@@ -177,6 +182,7 @@ export interface GameServiceSnapshot {
           readonly result: HostManagementSuccess;
           readonly invitationLookupId?: string;
           readonly sealedInvitationSecret?: string;
+          readonly terminalCredentialHash?: string;
         },
       ][];
       readonly state: GameState;
@@ -768,6 +774,7 @@ export class InMemoryGameService {
             invitation.revokedAt === null
           ) {
             invitation.revokedAt = receipt.deletedAt;
+            delete invitation.sealedClaimCredential;
             this.#destroyInvitationSecret(invitation.lookupId);
           }
         }
@@ -815,6 +822,14 @@ export class InMemoryGameService {
   purgeDeletedGames(): readonly DeletionReceipt[] {
     const purgedAt = this.#now();
     const receipts: DeletionReceipt[] = [];
+
+    for (const invitation of this.#invitations.values()) {
+      if (invitation.expiresAt <= purgedAt)
+        delete invitation.sealedClaimCredential;
+    }
+    for (const grant of this.#recoveryGrants.values()) {
+      if (grant.expiresAt <= purgedAt) delete grant.sealedClaimCredential;
+    }
 
     for (const [gameId, game] of this.#games) {
       if (
@@ -923,6 +938,7 @@ export class InMemoryGameService {
   }
 
   claimInvitation(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     requestedGameId?: string;
@@ -931,9 +947,11 @@ export class InMemoryGameService {
   }): ClaimResult {
     const invitation = this.#invitations.get(input.lookupId);
     const now = this.#now();
+    if (invitation !== undefined && invitation.expiresAt <= now) {
+      delete invitation.sealedClaimCredential;
+    }
     if (
       invitation === undefined ||
-      invitation.claimedAt !== null ||
       invitation.revokedAt !== null ||
       invitation.expiresAt <= now ||
       !this.#credentialMatches("invitation", input.secret, invitation.tokenHash)
@@ -942,6 +960,48 @@ export class InMemoryGameService {
         "invitation_unavailable",
         "Invitation is invalid, expired, or already used.",
       );
+    }
+    if (invitation.claimedAt !== null) {
+      if (
+        invitation.claimId !== input.claimId ||
+        invitation.sealedClaimCredential === undefined
+      ) {
+        throw new ServiceError(
+          "invitation_unavailable",
+          "Invitation is invalid, expired, or already used.",
+        );
+      }
+      let credential: string;
+      try {
+        credential = openInvitationSecret(
+          this.#pepper,
+          invitation.sealedClaimCredential,
+        );
+      } catch {
+        throw new ServiceError(
+          "invitation_unavailable",
+          "The claimed invitation credential is unavailable.",
+        );
+      }
+      const session = this.#findSession(credential);
+      const binding = this.#activeSeatBindings(invitation.gameId).find(
+        (candidate) =>
+          candidate.side === invitation.allowedSeat &&
+          candidate.sessionId === session?.id,
+      );
+      if (session === undefined || binding === undefined) {
+        throw new ServiceError(
+          "invitation_unavailable",
+          "The claimed invitation is no longer recoverable.",
+        );
+      }
+      return {
+        credential,
+        gameId: invitation.gameId,
+        seat: invitation.allowedSeat,
+        sessionId: session.id,
+        state: this.getGameState(invitation.gameId),
+      };
     }
     this.#requireActiveGame(invitation.gameId);
 
@@ -982,7 +1042,12 @@ export class InMemoryGameService {
     }
 
     const session = this.#resolveOrCreateSession(input.credential);
+    invitation.claimId = input.claimId ?? randomUUID();
     invitation.claimedAt = now;
+    invitation.sealedClaimCredential = sealInvitationSecret(
+      this.#pepper,
+      session.credential,
+    );
     this.#destroyInvitationSecret(invitation.lookupId);
     this.#seatBindings.push({
       gameId: invitation.gameId,
@@ -1040,6 +1105,32 @@ export class InMemoryGameService {
   ): HostAuthorization {
     const game = this.#requireGame(gameId);
     const session = this.#findSession(credential);
+    if (
+      credential !== undefined &&
+      isCanonicalCredential(credential) &&
+      game.deletedAt !== null &&
+      game.deletedAt + DELETION_RETENTION_MS > this.#now() &&
+      options.terminalCommandId !== undefined
+    ) {
+      const previous = game.hostCommandResults.get(options.terminalCommandId);
+      const verifier = credentialVerifier(
+        this.#pepper,
+        "browser-session",
+        credential,
+      );
+      if (
+        previous?.result.event.command_name === "deleteGame" &&
+        previous.terminalCredentialHash !== undefined &&
+        hashesEqual(previous.terminalCredentialHash, verifier)
+      ) {
+        return {
+          bindingId: previous.authorizingBindingId,
+          bindingVersion: previous.authorizingBindingVersion,
+          gameId,
+          sessionId: "terminal-delete-retry",
+        };
+      }
+    }
     if (session === undefined) {
       throw new ServiceError(
         "unauthorized",
@@ -1172,12 +1263,18 @@ export class InMemoryGameService {
         binding?.revokedAt !== null &&
         game.deletedAt !== null &&
         game.deletedAt + DELETION_RETENTION_MS > this.#now();
+      const credentialOnlyTerminalRetry =
+        command.command_name === "deleteGame" &&
+        game.deletedAt !== null &&
+        authorization.sessionId === "terminal-delete-retry" &&
+        previous.terminalCredentialHash !== undefined;
       if (
-        session === undefined ||
-        session.revokedAt !== null ||
-        session.expiresAt <= this.#now() ||
-        binding === undefined ||
-        (binding.revokedAt !== null && !terminalDeleteRetry)
+        !credentialOnlyTerminalRetry &&
+        (session === undefined ||
+          session.revokedAt !== null ||
+          session.expiresAt <= this.#now() ||
+          binding === undefined ||
+          (binding.revokedAt !== null && !terminalDeleteRetry))
       ) {
         return this.#failure(
           game.state,
@@ -1228,6 +1325,7 @@ export class InMemoryGameService {
     }
 
     let invitation: InvitationCredential | undefined;
+    let terminalCredentialHash: string | undefined;
     let summary: string;
     const now = this.#now();
     switch (command.command_name) {
@@ -1268,6 +1366,9 @@ export class InMemoryGameService {
         break;
       }
       case "deleteGame":
+        terminalCredentialHash = this.#sessionsById.get(
+          authorization.sessionId,
+        )?.credentialHash;
         summary = "Game deleted";
         game.deletedAt = now;
         game.deletedBy = authorization.bindingId;
@@ -1298,6 +1399,7 @@ export class InMemoryGameService {
             target.revokedAt === null
           ) {
             target.revokedAt = now;
+            delete target.sealedClaimCredential;
             this.#destroyInvitationSecret(target.lookupId);
           }
         }
@@ -1341,6 +1443,9 @@ export class InMemoryGameService {
               invitation.secret,
             ),
           }),
+      ...(terminalCredentialHash === undefined
+        ? {}
+        : { terminalCredentialHash }),
       result: structuredClone(persistedResult),
     });
     game.actions.push({
@@ -1362,6 +1467,9 @@ export class InMemoryGameService {
       rulesetVersion: game.state.ruleset_version,
     });
     options.afterCommit?.(result.event);
+    if (command.command_name === "deleteGame") {
+      this.#dropBindingsForGame(authorization.gameId);
+    }
     return structuredClone(result);
   }
 
@@ -1483,11 +1591,12 @@ export class InMemoryGameService {
       for (const invitation of this.#invitations.values()) {
         if (
           invitation.gameId === authorization.gameId &&
-          invitation.allowedSeat === authorization.side &&
-          invitation.claimedAt === null &&
-          invitation.revokedAt === null
+          invitation.allowedSeat === authorization.side
         ) {
-          invitation.revokedAt = now;
+          delete invitation.sealedClaimCredential;
+          if (invitation.claimedAt === null && invitation.revokedAt === null) {
+            invitation.revokedAt = now;
+          }
           this.#destroyInvitationSecret(invitation.lookupId);
         }
       }
@@ -1631,6 +1740,7 @@ export class InMemoryGameService {
   }
 
   claimSeatRecovery(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     secret: string;
@@ -1639,7 +1749,6 @@ export class InMemoryGameService {
     const now = this.#now();
     if (
       grant === undefined ||
-      grant.consumedAt !== null ||
       grant.revokedAt !== null ||
       grant.expiresAt <= now ||
       grant.targetBindingType !== "seat" ||
@@ -1650,6 +1759,49 @@ export class InMemoryGameService {
         "recovery_unavailable",
         "Recovery grant is invalid, expired, or already used.",
       );
+    }
+    if (grant.consumedAt !== null) {
+      if (
+        grant.claimId !== input.claimId ||
+        grant.sealedClaimCredential === undefined
+      ) {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "Recovery grant is invalid, expired, or already used.",
+        );
+      }
+      let credential: string;
+      try {
+        credential = openInvitationSecret(
+          this.#pepper,
+          grant.sealedClaimCredential,
+        );
+      } catch {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "The recovered seat credential is unavailable.",
+        );
+      }
+      const session = this.#findSession(credential);
+      const binding = this.#activeSeatBindings(grant.gameId).find(
+        (candidate) =>
+          candidate.side === grant.side &&
+          candidate.version === grant.oldBindingVersion + 1 &&
+          candidate.sessionId === session?.id,
+      );
+      if (session === undefined || binding === undefined) {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "The recovered seat is no longer available.",
+        );
+      }
+      return {
+        credential,
+        gameId: grant.gameId,
+        seat: grant.side,
+        sessionId: session.id,
+        state: this.getGameState(grant.gameId),
+      };
     }
 
     const oldBinding = this.#seatBindings.find(
@@ -1682,8 +1834,21 @@ export class InMemoryGameService {
     }
 
     const session = this.#resolveOrCreateSession(input.credential);
+    grant.claimId = input.claimId ?? randomUUID();
+    grant.sealedClaimCredential = sealInvitationSecret(
+      this.#pepper,
+      session.credential,
+    );
     oldBinding.revokedAt = now;
     grant.consumedAt = now;
+    for (const invitation of this.#invitations.values()) {
+      if (
+        invitation.gameId === grant.gameId &&
+        invitation.allowedSeat === grant.side
+      ) {
+        delete invitation.sealedClaimCredential;
+      }
+    }
     this.#seatBindings.push({
       gameId: grant.gameId,
       id: randomUUID(),
@@ -1762,6 +1927,7 @@ export class InMemoryGameService {
   }
 
   claimHostRecovery(input: {
+    claimId?: string;
     credential?: string;
     lookupId: string;
     secret: string;
@@ -1771,7 +1937,6 @@ export class InMemoryGameService {
     if (
       grant === undefined ||
       grant.targetBindingType !== "host" ||
-      grant.consumedAt !== null ||
       grant.revokedAt !== null ||
       grant.expiresAt <= now ||
       !this.#credentialMatches("recovery-grant", input.secret, grant.tokenHash)
@@ -1780,6 +1945,44 @@ export class InMemoryGameService {
         "recovery_unavailable",
         "Recovery grant is invalid, expired, or already used.",
       );
+    }
+    if (grant.consumedAt !== null) {
+      if (
+        grant.claimId !== input.claimId ||
+        grant.sealedClaimCredential === undefined
+      ) {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "Recovery grant is invalid, expired, or already used.",
+        );
+      }
+      let credential: string;
+      try {
+        credential = openInvitationSecret(
+          this.#pepper,
+          grant.sealedClaimCredential,
+        );
+      } catch {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "The recovered host credential is unavailable.",
+        );
+      }
+      const session = this.#findSession(credential);
+      const binding = this.#hostBindings.find(
+        (candidate) =>
+          candidate.gameId === grant.gameId &&
+          candidate.version === grant.oldBindingVersion + 1 &&
+          candidate.sessionId === session?.id &&
+          candidate.revokedAt === null,
+      );
+      if (session === undefined || binding === undefined) {
+        throw new ServiceError(
+          "recovery_unavailable",
+          "The recovered host binding is no longer available.",
+        );
+      }
+      return { credential, gameId: grant.gameId, sessionId: session.id };
     }
     const oldBinding = this.#hostBindings.find(
       (binding) =>
@@ -1795,6 +1998,11 @@ export class InMemoryGameService {
     }
     this.#requireActiveGame(grant.gameId);
     const session = this.#resolveOrCreateSession(input.credential);
+    grant.claimId = input.claimId ?? randomUUID();
+    grant.sealedClaimCredential = sealInvitationSecret(
+      this.#pepper,
+      session.credential,
+    );
     oldBinding.revokedAt = now;
     grant.consumedAt = now;
     this.#hostBindings.push({
@@ -1819,6 +2027,46 @@ export class InMemoryGameService {
 
   getActions(gameId: string): readonly StoredAction[] {
     return structuredClone(this.#requireGame(gameId).actions);
+  }
+
+  getActiveInvitations(
+    gameId: string,
+  ): readonly { lookup_id: string; seat: Side }[] {
+    this.#requireActiveGame(gameId);
+    const now = this.#now();
+    return [...this.#invitations.values()]
+      .filter(
+        (invitation) =>
+          invitation.gameId === gameId &&
+          invitation.claimedAt === null &&
+          invitation.revokedAt === null &&
+          invitation.expiresAt > now,
+      )
+      .map((invitation) => ({
+        lookup_id: invitation.lookupId,
+        seat: invitation.allowedSeat,
+      }));
+  }
+
+  #dropBindingsForGame(gameId: string): void {
+    for (let index = this.#hostBindings.length - 1; index >= 0; index -= 1) {
+      if (this.#hostBindings[index]?.gameId === gameId)
+        this.#hostBindings.splice(index, 1);
+    }
+    for (let index = this.#seatBindings.length - 1; index >= 0; index -= 1) {
+      if (this.#seatBindings[index]?.gameId === gameId)
+        this.#seatBindings.splice(index, 1);
+    }
+    const retainedSessionIds = new Set([
+      ...this.#hostBindings.map((binding) => binding.sessionId),
+      ...this.#seatBindings.map((binding) => binding.sessionId),
+    ]);
+    for (const [sessionId, session] of this.#sessionsById) {
+      if (!retainedSessionIds.has(sessionId)) {
+        this.#sessionsById.delete(sessionId);
+        this.#sessionsByHash.delete(session.credentialHash);
+      }
+    }
   }
 
   #activeSeatBindings(gameId: string): SeatBinding[] {
