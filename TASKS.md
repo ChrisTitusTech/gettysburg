@@ -224,7 +224,7 @@ recorded below; no implementation or local-validation failure remains.
     off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
   - Status: Rootless Quadlet services run code revision
-    `172b2dd9ea9af73eec398a0065a816dd41b4a24c`, recorded
+    `cf9d75e663d405b98b7e659bfbaf8e35e291a2bf`, recorded
     by the image label and deployment rollback record behind host Caddy at
     `https://gettysburg.christitus.com`. Local/public health and readiness,
     HSTS, non-root application UID/GID, internal-only application network,
@@ -233,8 +233,8 @@ recorded below; no implementation or local-validation failure remains.
     sessions, application restart/resume, PostgreSQL
     restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
     pass. The post-deployment encrypted backup
-    `20260816T065446Z` includes the encrypted credential pepper and passed strict
-    checksums, remote isolated restore (`15:48:47:11`), off-host copy validation,
+    `20260816T071347Z` includes the encrypted credential pepper and passed strict
+    checksums, remote isolated restore (`16:48:47:12`), off-host copy validation,
     and the deletion-ledger watermark gate. The original Caddy
     placeholder and failed candidate units were restored after each
     pre-acceptance deployment failure.
