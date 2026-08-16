@@ -4,9 +4,12 @@
 
 Phase 2 is published on `codex/phase-2-tabletop` and deployed to private staging
 at `https://gettysburg.christitus.com` as of 2026-08-15. The local
-PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. Built-in
-review and exact-head CI remain open; the phase is not marked complete while
-either is unresolved.
+PostgreSQL/Caddy stack remains available at `http://127.0.0.1:8080`. PR #2 is
+ready for review. The full local, browser, PostgreSQL, container, deployment,
+encrypted backup/restore, independent-review, and exact-head CI gates pass; the
+remaining publication action is owner-controlled merge of the ready PR.
+
+## Phase 1 open gates
 
 PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
@@ -31,7 +34,7 @@ recorded below; no implementation or local-validation failure remains.
     ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before Phase 1 is
     marked complete.
 
-- [ ] Scaffold the typed pnpm workspace and CI gate.
+- [x] Scaffold the typed pnpm workspace and CI gate.
   - Scope: Create `apps/web`, `apps/server`, `packages/game`, and
     `packages/content`; pin supported Node/pnpm versions; add format, lint,
     type-check, test, build, and development scripts.
@@ -44,13 +47,10 @@ recorded below; no implementation or local-validation failure remains.
   - Manual validation: `pnpm dev` starts the browser and server together for
     interactive development and stops cleanly on operator request.
   - Dependencies or blockers: None.
-  - Status: Local implementation complete. The frozen install, format, lint,
-    type-check, 62 tests, build, bounded smoke check, and interactive start/stop
-    check pass on Node.js 24.13.1 with pnpm 11.21.0. Exact-head CI is unavailable
-    because the completed work is uncommitted and unpublished; committing,
-    pushing, and opening a pull request require explicit owner authorization.
-    Follow-up: ChrisTitusTech authorizes publication, then CI must pass at that
-    exact head before this task is checked.
+  - Status: Complete. PR #1 merged as
+    `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c`, and its exact-head workspace and
+    documentation CI passed. The supported entry points continue to pass on
+    Node.js 24 with pnpm 11.21.0.
 
 - [x] Implement the board calibration and accessible two-counter client.
   - Scope: Create an approved original or clean-room fixture board, map the
@@ -130,15 +130,13 @@ recorded below; no implementation or local-validation failure remains.
     and follow-up before leaving this task open; never mark it complete on an
     unexplained skip.
   - Dependencies or blockers: All Phase 1 implementation tasks.
-  - Status: Local evidence complete. The full repository gate, browser
+  - Status: Implementation evidence complete. The full repository gate, browser
     acceptance, container smoke, compose proxy run, Markdown lint, Action lint,
     source-asset boundary, secret scan, and final diff checks pass. Built-in
     review found a cross-binding idempotency disclosure; the fix and regression
-    tests pass. CodeRabbit was stopped after exceeding the owner's duration
-    tolerance and must not block progress. Remaining owners and follow-up:
-    ChrisTitusTech reviews the rights ledger and authorizes commit/push/PR;
-    independent review and exact-head GitHub CI then run on the published head.
-    This task and Phase 1 remain open until those results are observed.
+    tests pass. PR #1 merged after exact-head CI. The remaining owner gate is
+    ChrisTitusTech's review of the rights ledger; this task and Phase 1 remain
+    open until that manual result is recorded.
 
 ## Backlog by phase
 
@@ -220,16 +218,19 @@ recorded below; no implementation or local-validation failure remains.
     backup cannot restore access; `/readyz` fails closed until the mounted
     off-host watermark equals the live ledger.
 - [x] Deploy and restore-test the private staging service on the VPS.
-  - Status: Rootless Quadlet services run the exact published revision recorded
+  - Status: Rootless Quadlet services run revision
+    `9fd3f78618b9ae75b45d7ff225b8c510e9dee817`, recorded
     by the image label and deployment rollback record behind host Caddy at
     `https://gettysburg.christitus.com`. Local/public health and readiness,
-    non-root application UID/GID, image-revision label, public WebSocket origin,
+    non-root application UID/GID, internal-only application network,
+    image-revision label, public WebSocket origin,
     two independent browser sessions, application restart/resume, PostgreSQL
     restart/resume, encrypted-credential continuity, and an isolated `pg_restore`
-    pass. Backup `/srv/gettysburg/backups/20260816T005329Z` restored six deleted
-    test games at event sequence 48/state version 47 with ledger watermark 0
-    and verified strict checksums. The original Caddy placeholder and failed
-    candidate units were restored after each pre-acceptance deployment failure.
+    pass. The post-deployment encrypted backup
+    `20260816T044115Z` passed strict checksums, remote isolated restore, off-host
+    copy validation, and the deletion-ledger watermark gate. The original Caddy
+    placeholder and failed candidate units were restored after each
+    pre-acceptance deployment failure.
 - [x] Complete a full two-player Phase 2 acceptance game.
   - Status: Real two-browser create/join/reject/reconnect workflows pass locally
     and through public HTTPS/WebSockets at 1440 x 900 and 1024 x 768. A separate
@@ -238,11 +239,11 @@ recorded below; no implementation or local-validation failure remains.
     `test-results/phase-2-live/live-full-game-complete.png`, and deleted its test
     game through the confirmed host workflow. The owner confirmed the human
     24-turn acceptance game is complete. CodeRabbit reviewed the complete
-    Phase 2 diff, its validated findings were addressed, and the focused
-    remediation re-review returned zero findings. Exact-head CI remains
-    unobserved. The built-in Codex review completed a direct multi-pass review;
-    every validated durability, deployment, readiness, and backup finding was
-    addressed, and the final focused review returned zero findings.
+    Phase 2 diff, every validated finding was addressed, and the final focused
+    reviews returned zero findings. The built-in Codex review completed a direct
+    multi-pass review with every validated durability, deployment, readiness,
+    and backup finding addressed. PR #2's exact-head Application and
+    Documentation CI pass.
 
 - [x] Add the immutable ruleset/content version registry gate.
   - Status: Saved games resolve through the exact ruleset/content pair. Unknown
