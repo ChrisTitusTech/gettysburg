@@ -22,6 +22,17 @@ type GameRoomConstructor = new () => Room;
 export const ROOM_COMMAND_LIMIT = 30;
 const ROOM_COMMAND_WINDOW_MS = 10_000;
 
+export function pruneExpiredCommandWindows(
+  commandWindows: Map<string, { count: number; windowStartedAt: number }>,
+  now: number,
+): void {
+  for (const [bindingId, candidate] of commandWindows) {
+    if (now - candidate.windowStartedAt >= ROOM_COMMAND_WINDOW_MS) {
+      commandWindows.delete(bindingId);
+    }
+  }
+}
+
 function failure(error: ServiceError): CommandFailure {
   const preservedCodes = new Set<CommandFailure["error"]>([
     "game_deleted",
@@ -48,6 +59,7 @@ export function createGettysburgRoom(
     string,
     { count: number; windowStartedAt: number }
   >();
+  let lastCommandWindowPruneAt = 0;
   return class GettysburgRoom extends Room {
     // Keep the room matchable while a reload overlaps the old socket. onJoin
     // replaces the prior connection for the same binding, so stable occupancy
@@ -101,6 +113,10 @@ export function createGettysburgRoom(
           try {
             const authorization = client.auth as GameAuthorization;
             const now = Date.now();
+            if (now - lastCommandWindowPruneAt >= ROOM_COMMAND_WINDOW_MS) {
+              pruneExpiredCommandWindows(commandWindows, now);
+              lastCommandWindowPruneAt = now;
+            }
             const previousWindow = commandWindows.get(authorization.bindingId);
             const window =
               previousWindow === undefined ||

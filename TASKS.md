@@ -155,8 +155,8 @@ recorded below; no implementation or local-validation failure remains.
     built-in review, independent review, and exact-head cleanup-PR CI pass.
   - Status: Implementation, the complete local gate, real PostgreSQL integration,
     desktop/tablet browser acceptance, and the rootless container smoke test pass.
-    Initial built-in and independent review findings are addressed. The task
-    remains open until clean follow-up review and exact-head cleanup-PR CI pass.
+    Built-in, independent, and hosted review findings are addressed. The task
+    remains open until the cleanup PR has clean current-head checks and merges.
 
 - [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry

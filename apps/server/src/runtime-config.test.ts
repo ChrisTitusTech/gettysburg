@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   isDeletionLedgerAcknowledged,
   isDeletionLedgerStartupReady,
+  loadDeletionLedgerStartupReadiness,
   loadCredentialPepper,
   loadDeletionLedgerWatermark,
 } from "./runtime-config.js";
@@ -88,6 +89,26 @@ describe("isDeletionLedgerStartupReady", () => {
         { position: 1 },
         { position: 2 },
       ]),
+    ).resolves.toBe(false);
+  });
+});
+
+describe("loadDeletionLedgerStartupReadiness", () => {
+  it("skips the ledger read when no startup watermark is configured", async () => {
+    const loadReceipts = () => Promise.reject(new Error("must not be called"));
+    await expect(
+      loadDeletionLedgerStartupReadiness(undefined, loadReceipts),
+    ).resolves.toBe(true);
+  });
+
+  it("fails readiness without blocking startup when the ledger read fails", async () => {
+    const loadReceipts = () =>
+      Promise.reject(new Error("database unavailable"));
+    await expect(
+      loadDeletionLedgerStartupReadiness(
+        await watermarkFile("0\n"),
+        loadReceipts,
+      ),
     ).resolves.toBe(false);
   });
 });
