@@ -24,6 +24,9 @@ const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const CREATION_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
 const CREATION_LIMIT_PER_SOURCE = 10;
 const CREATION_LIMIT_GLOBAL = 100;
+const CLAIM_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
+const CLAIM_LIMIT_PER_SOURCE = 20;
+const CLAIM_LIMIT_GLOBAL = 200;
 
 interface CreationBucket {
   readonly creationIds: Set<string>;
@@ -61,6 +64,38 @@ class CreationRateLimiter {
     }
     sourceBucket.creationIds.add(creationId);
     this.#global.creationIds.add(creationId);
+    return true;
+  }
+}
+
+interface AttemptBucket {
+  count: number;
+  readonly resetAt: number;
+}
+
+class AttemptRateLimiter {
+  #global: AttemptBucket = {
+    count: 0,
+    resetAt: Date.now() + CLAIM_LIMIT_WINDOW_MS,
+  };
+  readonly #sources = new Map<string, AttemptBucket>();
+
+  allow(source: string, now = Date.now()): boolean {
+    if (this.#global.resetAt <= now) {
+      this.#global = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      this.#sources.clear();
+    }
+    if (this.#global.count >= CLAIM_LIMIT_GLOBAL) return false;
+    let sourceBucket = this.#sources.get(source);
+    if (sourceBucket === undefined || sourceBucket.resetAt <= now) {
+      sourceBucket = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      this.#sources.set(source, sourceBucket);
+    }
+    if (sourceBucket.count >= CLAIM_LIMIT_PER_SOURCE) {
+      return false;
+    }
+    this.#global.count += 1;
+    sourceBucket.count += 1;
     return true;
   }
 }
@@ -160,6 +195,16 @@ export function configureHttpApplication(
 ): Application {
   const { gameService, readiness, staticDirectory } = options;
   const creationRateLimiter = new CreationRateLimiter();
+  const claimRateLimiter = new AttemptRateLimiter();
+  const allowBearerClaim = (request: Request, response: Response) => {
+    if (claimRateLimiter.allow(request.ip ?? "unknown")) return true;
+    response.setHeader(
+      "Retry-After",
+      String(Math.ceil(CLAIM_LIMIT_WINDOW_MS / 1_000)),
+    );
+    response.status(429).json({ error: "claim_rate_limited" });
+    return false;
+  };
   application.disable("x-powered-by");
   application.set("trust proxy", "loopback");
   application.use((_request, response, next) => {
@@ -314,6 +359,7 @@ export function configureHttpApplication(
           response.status(400).json({ error: "invalid_invitation" });
           return;
         }
+        if (!allowBearerClaim(request, response)) return;
 
         const credential = readSessionCredential(request);
         const claimId =
@@ -362,6 +408,7 @@ export function configureHttpApplication(
           response.status(400).json({ error: "invalid_recovery" });
           return;
         }
+        if (!allowBearerClaim(request, response)) return;
 
         const credential = readSessionCredential(request);
         let auditEvent: AuditEvent | undefined;
@@ -411,6 +458,7 @@ export function configureHttpApplication(
           response.status(400).json({ error: "invalid_recovery" });
           return;
         }
+        if (!allowBearerClaim(request, response)) return;
         const credential = readSessionCredential(request);
         let auditEvent: AuditEvent | undefined;
         const result = await gameService.claimHostRecovery(

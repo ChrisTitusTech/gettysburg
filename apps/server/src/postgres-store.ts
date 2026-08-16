@@ -592,6 +592,11 @@ export class PostgresGameService implements GameService {
     previous?: GameServiceSnapshot,
   ) {
     const previousGames = new Map(previous?.games ?? []);
+    const deletedGameIds = new Set(
+      snapshot.games.flatMap(([gameId, game]) =>
+        game.deletedAt === null || game.deletedAt === undefined ? [] : [gameId],
+      ),
+    );
     const changed = (current: unknown, prior: unknown) =>
       JSON.stringify(current) !== JSON.stringify(prior);
     const newReceipts = (snapshot.deletionLedger ?? []).slice(
@@ -738,6 +743,7 @@ export class PostgresGameService implements GameService {
       (previous?.hostBindings ?? []).map((binding) => [binding.id, binding]),
     );
     for (const binding of snapshot.hostBindings) {
+      if (deletedGameIds.has(binding.gameId)) continue;
       if (!changed(binding, previousHostBindings.get(binding.id))) continue;
       await client.query(
         `INSERT INTO host_bindings
@@ -757,6 +763,7 @@ export class PostgresGameService implements GameService {
       (previous?.seatBindings ?? []).map((binding) => [binding.id, binding]),
     );
     for (const binding of snapshot.seatBindings) {
+      if (deletedGameIds.has(binding.gameId)) continue;
       if (!changed(binding, previousSeatBindings.get(binding.id))) continue;
       await client.query(
         `INSERT INTO seat_bindings
@@ -775,6 +782,7 @@ export class PostgresGameService implements GameService {
     }
     const previousInvitations = new Map(previous?.invitations ?? []);
     for (const [, invitation] of snapshot.invitations) {
+      if (deletedGameIds.has(invitation.gameId)) continue;
       if (!changed(invitation, previousInvitations.get(invitation.lookupId)))
         continue;
       await client.query(
@@ -796,6 +804,7 @@ export class PostgresGameService implements GameService {
     }
     const previousGrants = new Map(previous?.recoveryGrants ?? []);
     for (const [, grant] of snapshot.recoveryGrants) {
+      if (deletedGameIds.has(grant.gameId)) continue;
       if (!changed(grant, previousGrants.get(grant.lookupId))) continue;
       await client.query(
         `INSERT INTO recovery_grants

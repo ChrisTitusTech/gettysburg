@@ -144,6 +144,32 @@ describe("HTTP game lifecycle", () => {
     });
   });
 
+  it("rate-limits bearer claims across invitation and recovery endpoints", async () => {
+    await withServer(true, async (origin) => {
+      const paths = ["/api/invitations", "/api/recovery", "/api/host-recovery"];
+      const claim = (attempt: number) =>
+        fetch(
+          `${origin}${paths[attempt % paths.length]}/${randomUUID()}/claim`,
+          {
+            body: JSON.stringify({
+              claim_id: randomUUID(),
+              secret: "A".repeat(43),
+            }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          },
+        );
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        expect((await claim(attempt)).status).toBe(409);
+      }
+      const limited = await claim(20);
+      expect(limited.status).toBe(429);
+      expect(limited.headers.get("retry-after")).toBe("900");
+      expect(await limited.json()).toEqual({ error: "claim_rate_limited" });
+    });
+  });
+
   it("rejects a malformed creation id distinctly from the seat", async () => {
     await withServer(true, async (origin) => {
       const response = await fetch(`${origin}/api/games`, {

@@ -672,4 +672,51 @@ postgres("PostgreSQL durability", () => {
       related_count: "0",
     });
   });
+
+  it("mirrors an externally synchronized soft deletion without reinserting credentials", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const created = await service.createGame("union");
+    const existingLedger = await service.getDeletionLedger();
+    const deletionReceipt = {
+      actor: "off-host-recovery:soft-delete-test",
+      deletedAt: Date.UTC(2026, 7, 16),
+      gameId: created.gameId,
+      position: existingLedger.length + 1,
+      purgedAt: null,
+    };
+
+    await expect(
+      service.synchronizeDeletionLedger([...existingLedger, deletionReceipt]),
+    ).resolves.toEqual([deletionReceipt]);
+    await expect(service.getGameState(created.gameId)).rejects.toMatchObject({
+      code: "game_deleted",
+    });
+    await service.close();
+
+    const persisted = await administration.query<{
+      deleted: boolean;
+      related_count: string;
+      session_count: string;
+    }>(
+      `SELECT
+         deleted_at IS NOT NULL AS deleted,
+         ((SELECT count(*) FROM host_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM seat_bindings WHERE game_id = $1) +
+          (SELECT count(*) FROM invitations WHERE game_id = $1) +
+          (SELECT count(*) FROM recovery_grants WHERE game_id = $1))::text AS related_count,
+         (SELECT count(*)::text FROM browser_sessions WHERE id = $2::uuid) AS session_count
+       FROM games
+       WHERE id = $1::uuid`,
+      [created.gameId, created.sessionId],
+    );
+    expect(persisted.rows[0]).toEqual({
+      deleted: true,
+      related_count: "0",
+      session_count: "0",
+    });
+  });
 });
