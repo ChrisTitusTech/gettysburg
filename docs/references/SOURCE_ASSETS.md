@@ -27,9 +27,15 @@ files.
 | --- | --- | --- | --- | --- | --- |
 | `apps/web/src/assets/gettysburg-board-deluxe.png` | OpenAI built-in image generation, iteratively directed from the project's original procedural board and owner-authored terrain mock | Owner-approved for this project; no attribution requirement specified | ChrisTitusTech, 2026-08-16 | 1658 x 949 PNG; 2,988,216 bytes | `f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91` |
 
-The approved revision supplies presentation only. Authoritative coordinates,
-movement, combat, and future terrain modifiers remain typed independently of
-the pixels.
+The approved revision is the project's visual board. Coordinates, movement,
+combat, and terrain modifiers remain typed independently of the pixels, but this
+PNG controls which terrain is visually present in a hex and whether painted
+terrain continues across a hex side. The owner-reviewed typed transcription will
+become runtime rules data in Phase 3.
+
+The protected `gameboard.jpg` is not used to approve the worksheet's display
+coordinates, terrain placement, or forest connections. The interactive renderer
+calibrates all 231 coordinate labels over the tracked PNG for owner comparison.
 
 ### Artwork generation record
 
@@ -37,12 +43,14 @@ The owner directed an iterative built-in image-generation and editing process.
 The visual brief called for a 231-hex, hand-painted Gettysburg landscape with
 edge-to-edge roads and streams, rocky Round Tops, southern woods, named
 landmarks, no Time Record Track, and no center-bottom A/B markers. The protected
-`gameboard.jpg` was used as a private visual/geographic reference at the owner's
-request; subsequent edits used generated board variants and the owner's
-`mock.png` paint-over. Neither reference file is embedded in or tracked beside
-the approved PNG. The final selected bytes came from the generated revision
-named `exec-6d2c04a2-841a-46ff-aaec-61b75b54a6d3.png`, and the owner explicitly
-approved that exact revision for the cleanup pull request on 2026-08-16.
+`gameboard.jpg` was available as a private visual/geographic reference during
+generation; subsequent edits used generated board variants and the owner's
+`mock.png` paint-over. It did not define the per-hex terrain worksheet and is not
+the terrain approval surface for the finished project board. Neither reference
+file is embedded in or tracked beside the approved PNG. The final selected bytes
+came from the generated revision named
+`exec-6d2c04a2-841a-46ff-aaec-61b75b54a6d3.png`, and the owner explicitly approved
+that exact revision for the cleanup pull request on 2026-08-16.
 
 The committed asset is original generated presentation artwork rather than a
 reproduction of the scan. This is a project provenance record, not a legal
@@ -154,11 +162,11 @@ unresolved exact landmark value.
 
 The remaining owner gates are narrower but still release-blocking: record the
 formal review of this interpretation/rights ledger, approve exact Battle Manual
-interpretations and a reviewed per-hex terrain/edge transcription before Phase 3
-enforcement using `TERRAIN_ADJUSTMENTS.md`, decide optional-rule and
-additional-scenario scope, decide the reduced-face presentation, and establish a
-rights or clean-room basis for every name, artwork element, and explanation
-shipped in the first public release.
+interpretations and a project-board-reviewed per-hex terrain/edge transcription
+before Phase 3 enforcement using `TERRAIN_ADJUSTMENTS.md`, decide optional-rule
+and additional-scenario scope, decide the reduced-face presentation, and
+establish a rights or clean-room basis for every name, artwork element, and
+explanation shipped in the first public release.
 
 ## Phase 1 interpretation and rights ledger
 

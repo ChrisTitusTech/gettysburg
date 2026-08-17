@@ -58,14 +58,19 @@ implementation or local-validation failure remains.
   - Dependencies or blockers: Project-owner review and decisions.
   - Status: Implementation complete. The Battle Manual, Scenario Five setup,
     objective/victory schedule, front values, reduced-value formula, and original
-    deluxe board are recorded. ChrisTitusTech confirmed the coordinates and
-    rough-hill/woods identification for Big Round Top (`E6`), Little Round Top
-    (`F6`), and Culp's Hill (`M9`) in the terrain worksheet. ChrisTitusTech also
-    confirmed that woods provide no defense adjustment when a participating
-    attacker and defender occupy the same connected forest. The landmark exact
-    adjustments and the remaining per-hex terrain, optional-rule,
+    deluxe board are recorded. The earlier Big Round Top (`E6`) location and the
+    terrain confirmations for `E6`, Little Round Top (`F6`), and Culp's Hill
+    (`M9`) have been reopened because they were not checked against the approved
+    tracked project board. The source-verified scenario objective coordinates at
+    `F6` and `M9` remain fixed. ChrisTitusTech confirmed that woods provide no defense
+    adjustment when a participating attacker and defender occupy the same
+    connected forest. The landmark locations, exact adjustments, remaining
+    per-hex terrain, optional-rule,
     additional-scenario, reduced-art, publication, and interpretation/rights
-    decisions remain open. Follow-up: ChrisTitusTech completes those reviews in
+    decisions remain open. All coordinate-table terrain candidates require
+    comparison against the approved tracked project board; the protected
+    `gameboard.jpg` is not their approval surface. Follow-up: ChrisTitusTech
+    completes those reviews in
     `docs/references/SOURCE_ASSETS.md` and
     `docs/references/TERRAIN_ADJUSTMENTS.md` before Phase 1 is marked complete.
 
@@ -342,8 +347,9 @@ implementation or local-validation failure remains.
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
   preview are complete in Phase 2. A 231-coordinate terrain/defense worksheet is
-  ready for owner review in `docs/references/TERRAIN_ADJUSTMENTS.md`; every row
-  remains non-authoritative until checked and assigned an exact value.
+  ready for owner review against the approved tracked project board in
+  `docs/references/TERRAIN_ADJUSTMENTS.md`; every row remains non-authoritative
+  until checked and assigned an exact value.
 - [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
   loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
   mandatory legal skirmish separation, independent automatic two-die unit-factor

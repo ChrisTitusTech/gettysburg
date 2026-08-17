@@ -127,8 +127,10 @@ is in `docs/operations/VPS.md`.
 - Complete the production counter treatment. All available source-card fronts
   and the owner-approved Phase 2 reduced-value rule are encoded; reduced-face
   artwork remains a later presentation input.
-- Review the per-hex terrain transcription against the supplied board before
-  Phase 3 terrain enforcement; it is deliberately unavailable to Phase 2 rules.
+- Review the per-hex terrain and edge transcription against the owner-approved
+  tracked project board before Phase 3 terrain enforcement. Use the supplied
+  rules and explicit owner decisions for terrain effects and numeric modifiers;
+  terrain remains deliberately unavailable to Phase 2 rules.
 - Decide whether optional rules are in scope.
 - Decide whether the supplied scans may be used beyond a private prototype or
   whether the release must use entirely original art and wording.
