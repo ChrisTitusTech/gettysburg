@@ -68,7 +68,7 @@ function start(name, args, environment) {
   children.push(runningChild);
   void exited.then(
     ({ code, signal }) => {
-      if (!isStopping && code !== null && code !== 0) {
+      if (!isStopping && (signal !== null || code !== 0)) {
         failure ??= new Error(
           `${name} exited early with ${signal ?? `code ${String(code)}`}`,
         );

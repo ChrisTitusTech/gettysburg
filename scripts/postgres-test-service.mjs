@@ -48,7 +48,7 @@ export async function startPostgres(options = {}) {
   run(engine, args);
 
   const remove = () => {
-    run(engine, ["rm", "--force", name], { stdio: "ignore" });
+    run(engine, ["rm", "--force", name]);
   };
   const removeBestEffort = () => {
     try {

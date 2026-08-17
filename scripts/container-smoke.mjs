@@ -228,7 +228,7 @@ try {
   const cleanupErrors = [];
   for (const name of new Set(createdContainers)) {
     try {
-      run(["rm", "--force", name], { stdio: "ignore" });
+      run(["rm", "--force", name]);
     } catch (error) {
       cleanupErrors.push(
         new Error(`Failed to remove container ${name}`, { cause: error }),
@@ -249,7 +249,7 @@ try {
   if (imageCreated) createdResources.push(["image", "rm", "--force", image]);
   for (const args of createdResources) {
     try {
-      run(args, { stdio: "ignore" });
+      run(args);
     } catch (error) {
       cleanupErrors.push(
         new Error(`Failed to clean up ${args.join(" ")}`, { cause: error }),
