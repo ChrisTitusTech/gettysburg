@@ -347,7 +347,10 @@ implementation or local-validation failure remains.
   mandatory legal skirmish separation, independent automatic two-die unit-factor
   result interpretation, and printed-factor modifier totals are complete in
   Phase 2. Phase 3 retains verified per-hex terrain modifiers and any remaining
-  rule-derived ZOC effects.
+  rule-derived ZOC effects. Terrain tests must prove that repeated standard hill
+  or woods/forest terrain across connected defending hexes contributes its
+  adjustment only once per skirmish, never once per hex or unit, and that
+  matching terrain outside the skirmish contributes nothing.
 - [ ] Implement and test remaining reinforcement, night, objective, and victory
   rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
   trapped-only combat are complete; nighttime reorganization remains.

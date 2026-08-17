@@ -68,6 +68,14 @@ Feature values are not automatically additive. A wooded hill does not become
 reviewed defensive adjustment, subject to the existing overall combat-modifier
 cap.
 
+Connected or adjacent hexes of the same terrain do not multiply that adjustment.
+Within one combat skirmish, repeated standard hill or woods/forest terrain on
+participating defending hexes contributes its `+2` adjustment only once, not
+once per hex or unit. Matching terrain in an adjacent hex outside the skirmish
+provides no adjustment. Separate skirmishes calculate their terrain adjustment
+independently. How different terrain types interact in one multi-hex defense
+remains an owner-review decision.
+
 ## Priority landmark review
 
 | Display coordinate | Runtime key | Visual draft | Proposed defense | Owner landmark confirmation |

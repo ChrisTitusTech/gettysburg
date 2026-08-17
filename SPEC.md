@@ -404,6 +404,13 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   available. Per-hex hill, woods, and town modifiers remain excluded until the
   terrain transcription is reviewed, so the interface identifies the result as
   unit-factor-only rather than claiming complete Phase 3 terrain correctness.
+  Phase 3 terrain defense is calculated once per skirmish, not once per unit or
+  participating hex. Repeated standard hill or woods/forest terrain across
+  connected defending hexes contributes that terrain's approved adjustment only
+  once. Matching terrain in an adjacent hex outside the skirmish contributes
+  nothing. Separate skirmishes calculate independently; combinations of
+  different terrain types require an explicit approved interpretation before
+  enforcement.
   A reduced counter contributes half its full combat factor rounded up. A
   combat-one counter has no reduced step and is eliminated by its first
   allocated loss. Saved Phase 2 v1 games retain their original combat behavior;
