@@ -8,7 +8,8 @@ without changing authoritative game data. The visual verification source is the
 approved tracked project artwork at
 `apps/web/src/assets/gettysburg-board-deluxe.png`. The protected
 `gameboard.jpg` is not the approval surface for this worksheet and remains
-ignored outside Git.
+ignored outside Git. For static comparison, the coordinate-labelled derivative
+is `apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png`.
 
 The display syntax requested for review is:
 
@@ -47,12 +48,13 @@ standard hill and woods share a hex, the worksheet proposes one non-additive
 
 ## How to verify against the project board
 
-1. Run `pnpm dev`, create or resume a game, and open the interactive board.
-2. Select **Fit**, then use **Zoom in** and pan to the area under review. The
-   renderer overlays runtime coordinates `A1` through `U11` directly on the
-   approved project board.
-3. Match the overlaid runtime key to this table's `Runtime key`; the corresponding
-   `Display coordinate` is the same key with a hyphen, such as `A1` to `A-1`.
+1. Open `apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png` for a
+   static board with display coordinates `A-1` through `U-11` matching this
+   worksheet.
+2. For interactive zoom and pan, run `pnpm dev`, create or resume a game, and open
+   the board. Select **Fit**, then use **Zoom in** and pan to the area under review.
+3. The interactive renderer uses compact runtime keys `A1` through `U11`; match
+   each to the corresponding hyphenated display key, such as `A1` to `A-1`.
 4. Correct the terrain candidate to match what is visibly painted in the project
    board hex.
 5. Approve the defense value separately against the supplied rules or an explicit

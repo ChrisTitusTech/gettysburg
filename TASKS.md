@@ -69,8 +69,10 @@ implementation or local-validation failure remains.
     additional-scenario, reduced-art, publication, and interpretation/rights
     decisions remain open. All coordinate-table terrain candidates require
     comparison against the approved tracked project board; the protected
-    `gameboard.jpg` is not their approval surface. Follow-up: ChrisTitusTech
-    completes those reviews in
+    `gameboard.jpg` is not their approval surface. A deterministic labelled
+    derivative at `apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png`
+    supplies all 231 worksheet display coordinates for static comparison.
+    Follow-up: ChrisTitusTech completes those reviews in
     `docs/references/SOURCE_ASSETS.md` and
     `docs/references/TERRAIN_ADJUSTMENTS.md` before Phase 1 is marked complete.
 

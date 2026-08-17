@@ -19,13 +19,15 @@ created content.
 
 ## Approved repository artwork
 
-The following clean-room presentation asset is intentionally tracked. It is not
-a supplied scan and does not contain bytes copied from the local-only reference
-files.
+The following presentation artwork and derived verification asset are
+intentionally tracked. They are not supplied scans and do not contain bytes
+copied from the local-only reference files. Public-release rights remain governed
+by the unresolved decision recorded below.
 
 | File | Creator and derivation | Permission and attribution | Approval | Dimensions/bytes | SHA-256 |
 | --- | --- | --- | --- | --- | --- |
 | `apps/web/src/assets/gettysburg-board-deluxe.png` | OpenAI built-in image generation, iteratively directed from the project's original procedural board and owner-authored terrain mock | Owner-approved for this project; no attribution requirement specified | ChrisTitusTech, 2026-08-16 | 1658 x 949 PNG; 2,988,216 bytes | `f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91` |
+| `apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png` | Deterministic `A-1` through `U-11` label overlay derived from the approved PNG and the client board calibration | Inherits the approved board's project-use boundary; no separate public-release approval | Requested by ChrisTitusTech for terrain review, 2026-08-17 | 1658 x 949 PNG; 2,981,672 bytes | `8ec3fb767b65ad06d98900acfca32a196f6f762c1bdd0666f9ed6b6978fb782d` |
 
 The approved revision is the project's visual board. Coordinates, movement,
 combat, and terrain modifiers remain typed independently of the pixels, but this
@@ -36,6 +38,9 @@ become runtime rules data in Phase 3.
 The protected `gameboard.jpg` is not used to approve the worksheet's display
 coordinates, terrain placement, or forest connections. The interactive renderer
 calibrates all 231 coordinate labels over the tracked PNG for owner comparison.
+The `with-hexvalues` derivative provides the same calibrated coordinates in the
+worksheet's hyphenated display syntax without replacing the approved board as the
+visual terrain authority.
 
 ### Artwork generation record
 
@@ -198,8 +203,13 @@ set -euo pipefail
 printf '%s  %s\n' \
   f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91 \
   apps/web/src/assets/gettysburg-board-deluxe.png | sha256sum --check --strict
+printf '%s  %s\n' \
+  8ec3fb767b65ad06d98900acfca32a196f6f762c1bdd0666f9ed6b6978fb782d \
+  apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png | \
+  sha256sum --check --strict
 git ls-files --error-unmatch \
-  apps/web/src/assets/gettysburg-board-deluxe.png >/dev/null
+  apps/web/src/assets/gettysburg-board-deluxe.png \
+  apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png >/dev/null
 file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
   gettysburg-battle-manual_OCR.pdf mock.png
 sha256sum --check --strict <<'EOF'
