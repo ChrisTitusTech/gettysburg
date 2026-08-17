@@ -60,7 +60,9 @@ implementation or local-validation failure remains.
     objective/victory schedule, front values, reduced-value formula, and original
     deluxe board are recorded. ChrisTitusTech confirmed the coordinates and
     rough-hill/woods identification for Big Round Top (`E6`), Little Round Top
-    (`F6`), and Culp's Hill (`M9`) in the terrain worksheet. Their exact defensive
+    (`F6`), and Culp's Hill (`M9`) in the terrain worksheet. ChrisTitusTech also
+    confirmed that woods provide no defense adjustment when a participating
+    attacker and defender occupy the same connected forest. The landmark exact
     adjustments and the remaining per-hex terrain, optional-rule,
     additional-scenario, reduced-art, publication, and interpretation/rights
     decisions remain open. Follow-up: ChrisTitusTech completes those reviews in
@@ -350,7 +352,14 @@ implementation or local-validation failure remains.
   rule-derived ZOC effects. Terrain tests must prove that repeated standard hill
   or woods/forest terrain across connected defending hexes contributes its
   adjustment only once per skirmish, never once per hex or unit, and that
-  matching terrain outside the skirmish contributes nothing.
+  matching terrain outside the skirmish contributes nothing. They must also
+  prove that a participating attacker cancels woods eligibility for every
+  defender in the same connected forest, a defender in a disconnected forest
+  remains eligible, the side receives only one woods adjustment when any
+  defender remains eligible, and independently applicable hill adjustments
+  remain available. Forest-link tests must distinguish woods artwork that crosses
+  a shared hex side from visually disconnected woods in adjacent hexes; reviewed
+  per-hex-side forest links are required before enforcement.
 - [ ] Implement and test remaining reinforcement, night, objective, and victory
   rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
   trapped-only combat are complete; nighttime reorganization remains.

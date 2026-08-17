@@ -42,7 +42,8 @@ hills and prominent landmarks keep their separate owner-review values.
 After owner review, a separate implementation change must:
 
 1. Transcribe only checked rows into typed content.
-2. Record hexside streams and road/rail links separately from hex terrain.
+2. Record forest connections, stream crossings, and road/rail links at each hex
+   side separately from hex terrain.
 3. Add table-driven content and combat tests.
 4. Assign a new immutable rules/content version before enforcement.
 5. Keep existing games on their starting version.
@@ -75,6 +76,21 @@ once per hex or unit. Matching terrain in an adjacent hex outside the skirmish
 provides no adjustment. Separate skirmishes calculate their terrain adjustment
 independently. How different terrain types interact in one multi-hex defense
 remains an owner-review decision.
+
+A forest is one continuous region of woods-containing hexes linked only across a
+shared hex side where the reviewed map artwork shows the woods continuing through
+that side. Adjacent woods hexes without that visual connection belong to
+different forests. Wooded-hill and rough-hill-plus-woods hexes participate only
+across sides where their woods artwork connects. These links require a separate
+owner-reviewed hex-side transcription; the coordinate table alone cannot infer
+them. Evaluate each participating defending woods hex: it is eligible for woods
+defense only when no participating attacker occupies the same connected forest.
+The defending side receives its single woods/forest `+2` only when at least one
+participating defending woods hex remains eligible. Thus, an attacker cancels
+woods protection for every defender in that same forest but not for a defender
+in a disconnected forest. If no defending woods hex remains eligible, the
+skirmish receives no woods adjustment. This cancellation affects only woods; a
+standard or rough hill may still supply its approved adjustment.
 
 ## Priority landmark review
 

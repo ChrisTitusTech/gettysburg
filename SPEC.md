@@ -410,7 +410,17 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   once. Matching terrain in an adjacent hex outside the skirmish contributes
   nothing. Separate skirmishes calculate independently; combinations of
   different terrain types require an explicit approved interpretation before
-  enforcement.
+  enforcement. A forest is a continuous region of woods-containing hexes linked
+  only across a shared hex side where reviewed map artwork shows the woods
+  continuing through that side. Adjacent woods hexes without that connection are
+  separate forests. Wooded-hill and rough-hill-plus-woods hexes participate only
+  through reviewed woods links. A participating defending woods hex is eligible
+  for woods defense only when no participating attacker occupies that same
+  connected forest. The defending side receives its single woods adjustment only
+  if at least one participating defending woods hex remains eligible. If none
+  remains eligible, the skirmish receives no woods adjustment. Cancellation
+  affects only woods; an independently applicable standard- or rough-hill
+  adjustment remains available.
   A reduced counter contributes half its full combat factor rounded up. A
   combat-one counter has no reduced step and is eliminated by its first
   allocated loss. Saved Phase 2 v1 games retain their original combat behavior;

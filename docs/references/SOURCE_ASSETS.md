@@ -143,6 +143,15 @@ data, and the tracked deluxe board is approved original presentation artwork.
 Those decisions close the earlier Phase 2 setup, objective, victory, and front-
 value questions.
 
+The owner also confirmed one Phase 3 terrain interpretation: woods provide no
+defense adjustment when a participating attacker and defender occupy the same
+connected forest. `TERRAIN_ADJUSTMENTS.md` defines the connected-region boundary
+and mixed-forest skirmish handling, while preserving hill defense as a separate
+component. Forest continuity must be transcribed from woods artwork crossing a
+shared hex side; mere hex adjacency does not establish a connection. This
+decision does not approve any unchecked per-hex or per-hex-side transcription or
+unresolved exact landmark value.
+
 The remaining owner gates are narrower but still release-blocking: record the
 formal review of this interpretation/rights ledger, approve exact Battle Manual
 interpretations and a reviewed per-hex terrain/edge transcription before Phase 3
