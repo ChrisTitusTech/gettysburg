@@ -58,11 +58,14 @@ implementation or local-validation failure remains.
   - Dependencies or blockers: Project-owner review and decisions.
   - Status: Implementation complete. The Battle Manual, Scenario Five setup,
     objective/victory schedule, front values, reduced-value formula, and original
-    deluxe board are recorded. The ledger explicitly retains the remaining
-    terrain, optional-rule, additional-scenario, reduced-art, and publication
-    decisions with ChrisTitusTech as owner. Owner review is still unobserved.
-    Follow-up: ChrisTitusTech reviews `docs/references/SOURCE_ASSETS.md` before
-    Phase 1 is marked complete.
+    deluxe board are recorded. ChrisTitusTech confirmed the coordinates and
+    rough-hill/woods identification for Big Round Top (`E6`), Little Round Top
+    (`F6`), and Culp's Hill (`M9`) in the terrain worksheet. Their exact defensive
+    adjustments and the remaining per-hex terrain, optional-rule,
+    additional-scenario, reduced-art, publication, and interpretation/rights
+    decisions remain open. Follow-up: ChrisTitusTech completes those reviews in
+    `docs/references/SOURCE_ASSETS.md` and
+    `docs/references/TERRAIN_ADJUSTMENTS.md` before Phase 1 is marked complete.
 
 - [x] Scaffold the typed pnpm workspace and CI gate.
   - Scope: Create `apps/web`, `apps/server`, `packages/game`, and
