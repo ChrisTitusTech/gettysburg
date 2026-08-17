@@ -62,7 +62,17 @@ export async function startPostgres(options = {}) {
   let ready = false;
   while (Date.now() < deadline) {
     try {
-      run(engine, ["exec", name, "pg_isready", "-U", user, "-d", database]);
+      run(engine, [
+        "exec",
+        name,
+        "pg_isready",
+        "-h",
+        "127.0.0.1",
+        "-U",
+        user,
+        "-d",
+        database,
+      ]);
       ready = true;
       break;
     } catch {
