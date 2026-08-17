@@ -12,7 +12,11 @@ const network = `gettysburg-smoke-${suffix}`;
 const appState = `gettysburg-app-state-${suffix}`;
 const readinessHealthCommand = "node apps/server/dist/readiness-healthcheck.js";
 const createdContainers = [];
+let appStateCreated = false;
+let imageCreated = false;
+let networkCreated = false;
 let postgres;
+let failure;
 
 const applicationQuadlet = readFileSync(
   "ops/quadlet/gettysburg-app.container.in",
@@ -135,8 +139,11 @@ try {
   run(["build", "--tag", image, "--file", "Containerfile", "."], {
     stdio: "inherit",
   });
+  imageCreated = true;
   run(["network", "create", network]);
+  networkCreated = true;
   run(["volume", "create", appState]);
+  appStateCreated = true;
   postgres = await startPostgres({ engine, network });
 
   startContainer(readyContainer, postgres.containerConnectionString);
@@ -215,24 +222,53 @@ try {
   console.log(
     `Container smoke passed with ${engine}: non-root ${uid}:${gid}, PostgreSQL restart resume, fail-closed readiness, clean shutdown`,
   );
+} catch (error) {
+  failure = error;
 } finally {
+  const cleanupErrors = [];
   for (const name of new Set(createdContainers)) {
     try {
       run(["rm", "--force", name], { stdio: "ignore" });
-    } catch {
-      // Preserve the original validation error.
+    } catch (error) {
+      cleanupErrors.push(
+        new Error(`Failed to remove container ${name}`, { cause: error }),
+      );
     }
   }
-  postgres?.stop();
-  for (const args of [
-    ["volume", "rm", "--force", appState],
-    ["network", "rm", network],
-    ["image", "rm", "--force", image],
-  ]) {
+  try {
+    postgres?.stop();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to stop the PostgreSQL container", { cause: error }),
+    );
+  }
+  const createdResources = [];
+  if (appStateCreated)
+    createdResources.push(["volume", "rm", "--force", appState]);
+  if (networkCreated) createdResources.push(["network", "rm", network]);
+  if (imageCreated) createdResources.push(["image", "rm", "--force", image]);
+  for (const args of createdResources) {
     try {
       run(args, { stdio: "ignore" });
-    } catch {
-      // Preserve the original validation error.
+    } catch (error) {
+      cleanupErrors.push(
+        new Error(`Failed to clean up ${args.join(" ")}`, { cause: error }),
+      );
     }
   }
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors,
+      "Container smoke cleanup failed",
+    );
+    failure =
+      failure === undefined
+        ? cleanupFailure
+        : new AggregateError(
+            [failure, cleanupFailure],
+            "Container smoke validation and cleanup failed",
+          );
+  }
 }
+
+if (failure !== undefined) throw failure;

@@ -18,11 +18,11 @@ approved row can later be transcribed without coordinate ambiguity.
 
 ## Status and approval boundary
 
-Every row is unverified until the project owner checks its box and replaces
-`TBD` or a range with one exact integer. The three named landmark rows are a
-visual draft from the protected board, not approved rules data. This pull request
-does not change `packages/content`, combat calculations, saved games, or the
-deployed service.
+Every row is unverified until the project owner checks its box and replaces any
+non-exact value - including `TBD`, a minimum, an inequality, or a range - with
+one exact integer. The three named landmark rows are a visual draft from the
+protected board, not approved rules data. This pull request does not change
+`packages/content`, combat calculations, saved games, or the deployed service.
 
 After owner review, a separate implementation change must:
 

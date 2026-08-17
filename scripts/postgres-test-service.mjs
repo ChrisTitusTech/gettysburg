@@ -48,8 +48,11 @@ export async function startPostgres(options = {}) {
   run(engine, args);
 
   const remove = () => {
+    run(engine, ["rm", "--force", name], { stdio: "ignore" });
+  };
+  const removeBestEffort = () => {
     try {
-      run(engine, ["rm", "--force", name], { stdio: "ignore" });
+      remove();
     } catch {
       // Preserve the original validation error.
     }
@@ -67,14 +70,20 @@ export async function startPostgres(options = {}) {
     }
   }
   if (!ready) {
-    remove();
+    removeBestEffort();
     throw new Error("PostgreSQL test service did not become ready");
   }
 
-  const mapping = run(engine, ["port", name, "5432/tcp"]);
+  let mapping;
+  try {
+    mapping = run(engine, ["port", name, "5432/tcp"]);
+  } catch (error) {
+    removeBestEffort();
+    throw error;
+  }
   const port = /:(\d+)\s*$/.exec(mapping)?.[1];
   if (port === undefined) {
-    remove();
+    removeBestEffort();
     throw new Error(`Could not parse PostgreSQL port: ${mapping}`);
   }
   return {
