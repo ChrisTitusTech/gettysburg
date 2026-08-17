@@ -31,11 +31,14 @@ browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
 
 Phase 0 is complete. Phase 1 implementation is merged but awaits the owner's
 recorded interpretation/rights-ledger review. Phase 2 implementation and its
-post-merge battle cleanup are merged through PR #3, while operational closeout
-remains open for green current-main Application CI and a healthy deployment of
-the reviewed current revision. Phase 3 rules assistance and Phase 4 production
-release work have not started as complete phases. `TASKS.md` is the authoritative
-current evidence ledger.
+post-merge battle cleanup are merged through PR #3. PR #4's validated
+implementation head has green Application and Documentation CI for the
+operational repair, but the final PR head and resulting `main` commit must each
+pass their workflows. The final PR head also needs a non-rate-limited
+independent review before merge. Operational closeout requires a healthy
+deployment of the reviewed current revision. Phase 3 rules assistance and Phase
+4 production release work have not started as complete phases. `TASKS.md` is the
+authoritative current evidence ledger.
 
 ## Approved decisions
 

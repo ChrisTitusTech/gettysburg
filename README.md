@@ -13,13 +13,16 @@ application candidate implements the Phase 2 rules-light tabletop in
 
 ## Current status
 
-Phase 2 code and its battle/review cleanup are merged through PR #3. Operational
-closeout is still active: post-merge Application CI must return to green, and the
-private staging service must receive the current reviewed revision and repeat
-the complete health, readiness, WebSocket, restart/resume, and two-client release
-gate. The currently deployed older revision is live for liveness but unavailable
-for readiness. See `TASKS.md` for the dated evidence; do not infer production
-readiness from the existence of the public staging URL.
+Phase 2 code and its battle/review cleanup are merged through PR #3. PR #4's
+validated implementation head has green Application and Documentation CI for
+the operational repair, but the final PR head and resulting `main` commit must
+each pass their workflows. The final PR head also needs independent review before
+merge. Operational closeout is still active: the private staging service must
+receive the current reviewed revision and repeat the complete health, readiness,
+WebSocket, restart/resume, and two-client release gate. The currently deployed
+older revision is live for liveness but unavailable for readiness. See
+`TASKS.md` for the dated evidence; do not infer production readiness from the
+existence of the public staging URL.
 
 ## Project documents
 

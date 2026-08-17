@@ -126,10 +126,13 @@ an auditable action log.
 ### Current status
 
 Implementation, the human acceptance game, and the PR #3 battle/review cleanup
-are merged. Operational closeout remains open: post-merge Application CI is red,
-and private staging is still on the older Phase 2 revision with public readiness
-unavailable and a malformed container health command. `TASKS.md` records the
-current evidence and required repeat release gate.
+are merged. PR #4 repairs the post-merge Application CI and malformed container
+health-probe failures; its validated implementation head passed Application and
+Documentation CI. The final PR head and resulting `main` commit must each pass
+their workflows. Operational closeout remains open until the final PR head
+passes a non-rate-limited independent review and the repair merges, and until
+private staging moves from the older Phase 2 revision through the required
+backup and repeat release gate. `TASKS.md` records the current evidence.
 
 ### Included work
 

@@ -28,10 +28,13 @@ must not be claimed until the full board workflow is manually validated.
 The merged application implements the Phase 2 Scenario Five rules-light digital
 tabletop, durable PostgreSQL state, recovery, and private-staging workflow. That
 evidence does not claim complete Phase 3 terrain/rule enforcement or Phase 4
-production readiness. Phase 2 operational closeout is also still active because
-current-main Application CI is red and the deployed older revision currently
-fails readiness. `TASKS.md` owns the live status so temporary operational facts
-do not weaken the requirements below.
+production readiness. Phase 2 operational closeout is also still active. PR #4's
+validated implementation head has green Application and Documentation CI for
+the current-main repair, but the final PR head and resulting `main` commit must
+each pass their workflows. The final PR head still needs independent review
+before merge, and the deployed older revision currently fails readiness.
+`TASKS.md` owns the live status so temporary operational facts do not weaken the
+requirements below.
 
 ## Source game facts
 

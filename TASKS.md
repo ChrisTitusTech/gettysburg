@@ -12,9 +12,17 @@ matched `origin/main`.
 Phase 2 remains open for operational closeout. Post-merge Documentation CI
 passed on `c6f406f`, but post-merge Application CI failed while the browser
 acceptance harness asserted that its server exited with status 1 during
-`stopServer`. The same `pnpm browser:acceptance` command passed locally at
-desktop and tablet widths on 2026-08-16, so the hosted failure must be rerun or
-fixed and cannot be treated as a completed exact-head gate.
+`stopServer`. PR #4 repairs that harness and the malformed container health
+probe. Its implementation head `405df158c32588438f2748e312146363b67796cb`
+passed Application and Documentation CI on 2026-08-16. Any later status-only
+commit must repeat both exact-head workflows before merge. Current `main`
+remains at `c6f406f` until the repair is reviewed and merged, and its separate
+post-merge workflows remain required.
+
+All four hosted CodeRabbit threads on PR #4 are resolved. The final local
+built-in review passed after the fixes, while the hosted exact-head CodeRabbit
+status completed as `Review rate limited` without a new review. A non-rate-
+limited independent review of the final PR head remains required before merge.
 
 Private staging at `https://gettysburg.christitus.com` is still running revision
 `f6a9ec27927d756daf5711188edbe4d564fed373`, not current `main`. Public
@@ -186,10 +194,15 @@ implementation or local-validation failure remains.
     browser-acceptance error when cleanup also fails. Its complete local
     repository gate, desktop/tablet browser acceptance, rootless Podman
     health-state smoke, source boundary, generated-Quadlet checks, and built-in
-    review pass. The task remains open until PR #4 passes exact-head CI and
-    independent review, merges, the verified off-host watermark covers the
-    database ledger, current `main` is deployed, and the complete live release
-    gate passes.
+    review pass. Application and Documentation CI passed on implementation head
+    `405df158c32588438f2748e312146363b67796cb`, and all four hosted review threads
+    are resolved. Any later commit must repeat both exact-head workflows. The
+    hosted review at that implementation head was rate limited, so a non-rate-
+    limited independent review of the final PR head remains required. The task
+    also remains open until PR #4 merges, post-merge Application and
+    Documentation CI pass on the resulting `main`, the verified off-host
+    watermark covers the database ledger, current `main` is deployed, and the
+    complete live release gate passes.
 
 - [x] Encode the complete approved map, units, counter states, setup, and entries.
   - Status: The 54 Union and 28 Confederate fronts, Scenario Five setup, entry
