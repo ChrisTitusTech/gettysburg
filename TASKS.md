@@ -479,6 +479,23 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete forced-retreat command and browser integration.
+  - Scope: Authorize the pending seat and complete original stack; use the shared
+    route validator for single/stack retreat commands. New mandatory-only
+    `retreatOffBoard` and `acceptTrappedLoss` commands provide free permanent exit
+    or exactly one extra combat-counter loss. General support loss, intermediate
+    objective capture, remaining stack choices, and vacated-only advance offers
+    are applied atomically. Room registration already derives from the protocol.
+  - Boundary: Browser controls, artillery-safe advance, full night behavior, and
+    mandatory ruleset/content activation remain separate tasks. Existing rulesets
+    retain their previous retreat behavior and reject the new choices.
+  - Acceptance: Twelve integration tests cover losses, exits, whole stacks,
+    authority, remaining choices, capture, previews, objectives, snapshots, ZOC,
+    terrain, and legacy isolation. Frozen install, format, lint, typecheck, 361
+    default workspace tests plus six harness tests, build, smoke, Markdown lint,
+    and all 93 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
+    regression pass (`test-results/forced-retreat-choices`). Independent review
+    and exact-head CI remain required before merge.
 - [ ] Complete mandatory retreat geometry, forced choices, and browser controls.
   - Scope: A shared pure calculator prefers viable non-enemy-ZOC steps, permits
     enemy ZOC only when necessary, continues through friendly stacks to the first
@@ -498,8 +515,9 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 349 default workspace tests plus six
     harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
     server tests pass. Desktop/tablet and full-game regression pass with evidence
-    in `test-results/retreat-path-rules`. Independent review and exact-head CI
-    remain required before merge.
+    in `test-results/retreat-path-rules`. PR #14 merged as `476da4d` after fresh
+    independent built-in review, hosted Codex review, and exact-head CI passed.
+    CodeRabbit was limited and skipped; no unresolved review threads remained.
 - [ ] Complete permanent board exit and its browser control.
   - Scope: An edge exit spends one normal movement point, obeys the active-group
     boundary and source capacity, and permanently removes counters from play.

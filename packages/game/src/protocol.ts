@@ -190,6 +190,19 @@ export const retreatStackPayloadSchema = z
     unit_ids: z.array(unitIdSchema).min(1),
   })
   .strict();
+export const retreatOffBoardPayloadSchema = z
+  .object({
+    combat_id: combatIdSchema,
+    path: z.array(coordinateSchema).min(1).max(253),
+    unit_ids: z.array(unitIdSchema).min(1).max(3),
+  })
+  .strict();
+export const acceptTrappedLossPayloadSchema = z
+  .object({
+    combat_id: combatIdSchema,
+    unit_id: unitIdSchema,
+  })
+  .strict();
 export const advanceAfterCombatPayloadSchema = z
   .object({
     combat_id: combatIdSchema,
@@ -216,6 +229,7 @@ export const endPhasePayloadSchema = z.object({}).strict();
 export const surrenderSeatPayloadSchema = z.object({}).strict();
 
 export const commandPayloadSchemas = {
+  acceptTrappedLoss: acceptTrappedLossPayloadSchema,
   advanceAfterCombat: advanceAfterCombatPayloadSchema,
   allocateLoss: allocateLossPayloadSchema,
   confirmCombatResult: confirmCombatResultPayloadSchema,
@@ -227,6 +241,7 @@ export const commandPayloadSchemas = {
   moveStack: moveStackPayloadSchema,
   moveUnit: moveUnitPayloadSchema,
   retreatStack: retreatStackPayloadSchema,
+  retreatOffBoard: retreatOffBoardPayloadSchema,
   retreatUnit: retreatUnitPayloadSchema,
   rollCombat: rollCombatPayloadSchema,
   surrenderSeat: surrenderSeatPayloadSchema,
@@ -251,6 +266,20 @@ export const moveUnitCommandSchema = z
 
 export const gameplayCommandSchema = z.discriminatedUnion("command_name", [
   moveUnitCommandSchema,
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("retreatOffBoard"),
+      payload: retreatOffBoardPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("acceptTrappedLoss"),
+      payload: acceptTrappedLossPayloadSchema,
+    })
+    .strict(),
   z
     .object({
       ...baseEnvelope,
