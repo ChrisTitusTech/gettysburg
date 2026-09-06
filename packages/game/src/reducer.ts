@@ -4,6 +4,7 @@ import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
 import { enemyZoneOfControl, movementPath } from "./zoc.js";
 import { prepareNormalMovement } from "./movement-validation.js";
 import { MANDATORY_RULESET_VERSION } from "./protocol.js";
+import { eliminateLoneGenerals } from "./generals.js";
 import type {
   CombatState,
   CommandFailure,
@@ -41,6 +42,9 @@ function accepted(
     event_sequence: state.event_sequence + 1,
     version: state.version + 1,
   };
+  if (next.ruleset_version === MANDATORY_RULESET_VERSION) {
+    next.units = eliminateLoneGenerals(next);
+  }
   return {
     ok: true,
     state: {

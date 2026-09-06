@@ -2,6 +2,7 @@ import { adjacentHexes, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
 import type { GameState, MovementEdges, Side, UnitKind } from "./protocol.js";
 import { enemyZoneOfControl } from "./zoc.js";
+import { hasCombatSupport, isUnsupportedGeneral } from "./generals.js";
 
 export type { MovementEdges } from "./protocol.js";
 
@@ -40,9 +41,15 @@ function stepCalculator(
   edges: MovementEdges,
 ) {
   const zoc = enemyZoneOfControl(state, side);
+  const movingCombat = kinds.some((kind) => kind !== "general");
   const occupied = new Set(
     Object.values(state.units).flatMap((unit) =>
-      unit.side !== side && unit.status === "deployed" && unit.location !== null
+      unit.side !== side &&
+      unit.status === "deployed" &&
+      unit.location !== null &&
+      // A combat counter captures an unsupported general on its adjacent
+      // approach, before it can enter that general's vacated hex.
+      !(movingCombat && isUnsupportedGeneral(state, unit))
         ? [unit.location]
         : [],
     ),
@@ -57,6 +64,9 @@ function stepCalculator(
       !isHexCoordinate(destination) ||
       !adjacentHexes(origin).includes(destination) ||
       occupied.has(destination) ||
+      (!movingCombat &&
+        zoc.has(origin) &&
+        !hasCombatSupport(state, side, origin)) ||
       (zoc.has(destination) && (state.night || zoc.has(origin)))
     ) {
       return null;
