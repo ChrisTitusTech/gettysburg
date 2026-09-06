@@ -477,6 +477,23 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Persist and enforce the approved continuous-move policy.
+  - Scope: A pure proposal tracks the active exact unit/stack group, previously
+    closed groups, and full-move general accompaniment. Reordering IDs preserves
+    a group; adding/dropping counters cannot restart a prior mover. A successful
+    different-group move closes the prior group, not a selection or rejection.
+  - Boundary: The serializable `normal_movement` state field and policy helper
+    are preparatory; current rulesets do not yet use or populate them. Server
+    integration must atomically persist the proposal with accepted movement and
+    reset it at the next side's movement phase. Reinforcement entry also counts
+    as a movement activation and cannot earn a retroactive general bonus.
+  - Acceptance: Test repeated drags, group changes, reconnect serialization,
+    half-point remaining budgets, general/slowest-unit limits, and immutability.
+    Frozen install, format, lint, typecheck, 284 default workspace tests plus
+    six harness tests, build, smoke, Markdown lint, and all 92 isolated
+    PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
+    (`test-results/continuous-movement-policy`). Independent review and
+    exact-head CI remain required before merge.
 - [ ] Deliver the mandatory movement calculator and then activate it.
   - Scope: Pure adjacent-step costs and deterministic least-cost routing for
     clear/hill/town, woods/rough heights, explicit road/rail/stream links, day

@@ -94,7 +94,14 @@ export interface HexTerrain {
   readonly hill_region: string | null;
 }
 
+export interface NormalMovementActivation {
+  readonly active_unit_ids: readonly string[];
+  readonly closed_unit_ids: readonly string[];
+  readonly bonus_unit_ids: readonly string[];
+}
+
 export interface GameState {
+  readonly normal_movement?: NormalMovementActivation;
   readonly terrain?: Readonly<Partial<Record<HexCoordinate, HexTerrain>>>;
   readonly active_side: Side | null;
   readonly combats: Readonly<Record<string, CombatState>>;
