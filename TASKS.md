@@ -1,5 +1,29 @@
 # Gettysburg project tasks
 
+## Remaining-phase execution: 2026-09-06
+
+The owner authorized completing remaining tasks/phases in small PRs and merging
+validated increments. Each PR addresses one independently testable concern;
+split implementation before it becomes difficult to review, not after bypassing
+review or CI. No unresolved owner decision is implicitly approved by this plan.
+
+1. Patch dependency advisories; verify frozen installation, audit, and local gates.
+2. Make browser-test deletion durable and verify it with independent sessions.
+3. Transcribe remaining mandatory-rule interpretations, then implement movement,
+   ZOC/retreat, night reorganization, and versioned replay in separate PRs.
+4. Validate rule explanations/previews and full rules-enforced acceptance games.
+5. Complete accessibility, supported-browser, security, and performance audits.
+6. Exercise recovery/reboot/rollback and measure a safe VPS room limit.
+7. Close owner scope, rights, artwork, manual acceptance, and release gates before
+   claiming all phases complete or publishing a production release.
+
+Owner decisions: first release is Scenario Five with mandatory rules only;
+replay, spectators, and asynchronous notifications are included. Nighttime
+reorganization is optional (Rules1.pdf marker description / Battle Manual 10c),
+so it is excluded from this mandatory-rules release. Rights approval,
+reduced-face presentation, notification channel, and owner gameplay acceptance
+remain owner-controlled gates. Approved unblocked engineering work continues.
+
 ## Terrain follow-up: 2026-09-06
 
 - [x] Implement and locally validate the approved painted-board terrain.
@@ -92,12 +116,19 @@ status in the August entries must not be treated as current deployment evidence.
     owner's remaining terrain-gameplay acceptance or claim Phase 3/4 completion.
     This documentation-only closeout does not change the deployed application.
 
-- [ ] Triage the three existing GitHub dependency alerts before public release.
+- [x] Triage and patch the existing GitHub dependency alerts.
   - Owner: ChrisTitusTech. Read-only inspection found `shell-quote` 1.8.3
     (critical/high, through development-only `concurrently`) and `qs` 6.15.3
     (moderate, through runtime Express/body-parser). These pre-existing alerts
-    were not introduced or fixed by the terrain PR. Review affected usage,
-    update dependencies, and repeat validation in the next authorized work item.
+    were not introduced or fixed by the terrain PR. Workspace overrides now pin
+    `shell-quote` 1.9.0 and `qs` 6.16.0 across all transitive paths. This also
+    covers the additional `qs` isBuffer advisory found by the current registry
+    audit. `pnpm audit --audit-level low` reports no known vulnerabilities.
+    Frozen install, format, lint, typecheck, 251 default tests, build, smoke,
+    desktop/tablet browser acceptance, and Markdown lint passed. All 92 server
+    tests passed against isolated PostgreSQL, including the 11 skipped in the
+    default suite. Built-in review found no actionable regressions. Published
+    exact-head CI and independent review remain required before merge.
 
 - [ ] Make browser acceptance await persisted deletion before closing contexts.
   - Owner: ChrisTitusTech. The deployed desktop/tablet scenarios passed, but both
