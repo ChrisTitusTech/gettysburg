@@ -477,6 +477,24 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Integrate mandatory movement validation and browser previews.
+  - Scope: Share terrain routing, budgets, accompaniment, activation, ownership,
+    and endpoint stacking checks. Apply a successful proposal atomically through
+    the reducer, reset activation for the next side, and capture objectives
+    entered along a multi-hex route consistently with repeated drags.
+  - Boundary: `gettysburg-mandatory-v4` is under construction and deliberately
+    absent from the server registry/new-game defaults. Existing terrain-v3 games
+    retain their prior movement behavior. The new validator requires a pinned
+    terrain/edge bundle; browser wiring, lone-general capture, reinforcement,
+    retreat, and complete night withdrawal still precede ruleset activation.
+  - Acceptance: Test preview/reducer identity, half-point spending, stack limits,
+    rejected-command immutability, persisted activation, phase reset, traversed
+    objectives, missing bundles, and unchanged current ruleset behavior.
+    Frozen install, format, lint, typecheck, 296 default workspace tests plus
+    six harness tests, build, smoke, Markdown lint, and all 92 isolated
+    PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
+    (`test-results/mandatory-movement-validator`). Independent review and
+    exact-head CI remain required before merge.
 - [ ] Persist and enforce the approved continuous-move policy.
   - Scope: A pure proposal tracks the active exact unit/stack group, previously
     closed groups, and full-move general accompaniment. Reordering IDs preserves

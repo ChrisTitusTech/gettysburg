@@ -4,6 +4,9 @@ import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
 export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
 export const RULESET_VERSION = "gettysburg-terrain-v3";
+// Under construction: deliberately absent from the server version registry and
+// not selected for new games until every mandatory rule family is validated.
+export const MANDATORY_RULESET_VERSION = "gettysburg-mandatory-v4";
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
 export type Side = "confederate" | "union";
@@ -100,7 +103,14 @@ export interface NormalMovementActivation {
   readonly bonus_unit_ids: readonly string[];
 }
 
+export interface MovementEdges {
+  readonly roads: readonly (readonly [HexCoordinate, HexCoordinate])[];
+  readonly railroads: readonly (readonly [HexCoordinate, HexCoordinate])[];
+  readonly streams: readonly (readonly [HexCoordinate, HexCoordinate])[];
+}
+
 export interface GameState {
+  readonly movement_edges?: MovementEdges;
   readonly normal_movement?: NormalMovementActivation;
   readonly terrain?: Readonly<Partial<Record<HexCoordinate, HexTerrain>>>;
   readonly active_side: Side | null;
