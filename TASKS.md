@@ -479,6 +479,23 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory combat inheritance and advance controls.
+  - Scope: Mandatory-v4 uses the approved reduced combat factors and terrain
+    calculation, including participating-attacker region cancellation, strongest
+    defending hex, and the combined +10 cap. Advance remains free and can enter
+    enemy ZOC, including at night, but artillery cannot enter wooded rough hills
+    even along roads. Missing terrain or a non-adjacent target is rejected.
+  - Boundary: The current terrain-v3 interpretation remains unchanged. Browser
+    controls, remaining night rules, and the complete mandatory ruleset/content
+    registry entry still precede activation for new games.
+  - Acceptance: Reuse all 17 terrain/skirmish checks against both versions, test
+    reduced factors in mandatory-v4, and add nine advance cases for terrain,
+    free movement, general support, ZOC, authorization, and legacy isolation.
+    Frozen install, format, lint, typecheck, 387 default workspace tests plus six
+    harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
+    server tests pass. Desktop/tablet and full-game regression pass with evidence
+    in `test-results/mandatory-combat-and-advance`. Independent review and
+    exact-head CI remain required before merge.
 - [ ] Complete forced-retreat command and browser integration.
   - Scope: Authorize the pending seat and complete original stack; use the shared
     route validator for single/stack retreat commands. New mandatory-only

@@ -7,6 +7,7 @@ import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
 import { prepareBoardExit } from "./board-exit.js";
+import { terrainMovementCost } from "./movement.js";
 import {
   prepareForcedRetreat,
   prepareTrappedLoss,
@@ -1333,6 +1334,21 @@ function advanceAfterCombat(
         "The dragged counters cannot occupy that advance destination.",
       );
     }
+    if (
+      state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      (state.terrain === undefined ||
+        hexDistance(source, destination) !== 1 ||
+        terrainMovementCost(
+          state,
+          movers.map((unit) => unit.kind),
+          destination,
+        ) === null)
+    )
+      return failure(
+        state,
+        "invalid_hex",
+        "Advance to an adjacent vacated hex that every selected counter can enter.",
+      );
     if (!sourceStacksRemainValid(state, movers, destination)) {
       return failure(
         state,

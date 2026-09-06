@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   LEGACY_RULESET_VERSION,
+  MANDATORY_RULESET_VERSION,
   RULESET_VERSION,
   type GameState,
   type Side,
@@ -320,6 +321,9 @@ describe("combat discovery", () => {
       strength: "reduced" as const,
     };
     expect(currentCombatValue(counter, RULESET_VERSION)).toBe(reduced);
+    expect(currentCombatValue(counter, MANDATORY_RULESET_VERSION)).toBe(
+      reduced,
+    );
     expect(currentCombatValue(counter, LEGACY_RULESET_VERSION)).toBe(full);
   });
 
@@ -330,6 +334,7 @@ describe("combat discovery", () => {
       strength: "reduced" as const,
     };
     expect(currentCombatValue(reduced, RULESET_VERSION)).toBe(2);
+    expect(currentCombatValue(reduced, MANDATORY_RULESET_VERSION)).toBe(2);
     expect(
       currentCombatValue(unit("general", "union", "A1", null), RULESET_VERSION),
     ).toBeNull();
