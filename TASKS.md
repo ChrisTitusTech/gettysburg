@@ -10,7 +10,7 @@ review or CI. No unresolved owner decision is implicitly approved by this plan.
 1. Patch dependency advisories; verify frozen installation, audit, and local gates.
 2. Make browser-test deletion durable and verify it with independent sessions.
 3. Transcribe remaining mandatory-rule interpretations, then implement movement,
-   ZOC/retreat, night reorganization, and versioned replay in separate PRs.
+   ZOC/retreat, mandatory night behavior, and versioned replay in separate PRs.
 4. Validate rule explanations/previews and full rules-enforced acceptance games.
 5. Complete accessibility, supported-browser, security, and performance audits.
 6. Exercise recovery/reboot/rollback and measure a safe VPS room limit.
@@ -20,9 +20,11 @@ review or CI. No unresolved owner decision is implicitly approved by this plan.
 Owner decisions: first release is Scenario Five with mandatory rules only;
 replay, spectators, and asynchronous notifications are included. Nighttime
 reorganization is optional (Rules1.pdf marker description / Battle Manual 10c),
-so it is excluded from this mandatory-rules release. Rights approval,
-reduced-face presentation, notification channel, and owner gameplay acceptance
-remain owner-controlled gates. Approved unblocked engineering work continues.
+so it is excluded from this mandatory-rules release. The owner also approved the
+current original generated board, original counter symbols, and a clearly marked
+reduced-strength treatment for public release, keeping supplied scans private.
+Notifications will use opt-in browser push. Owner gameplay acceptance and final
+release validation remain gates; engineering work continues through small PRs.
 
 ## Terrain follow-up: 2026-09-06
 
@@ -130,12 +132,21 @@ status in the August entries must not be treated as current deployment evidence.
     default suite. Built-in review found no actionable regressions. Published
     exact-head CI and independent review remain required before merge.
 
-- [ ] Make browser acceptance await persisted deletion before closing contexts.
+- [x] Make browser acceptance await persisted deletion before closing contexts.
   - Owner: ChrisTitusTech. The deployed desktop/tablet scenarios passed, but both
     test games remained active at the final database audit. The current final
-    heading wait does not prove the deletion request committed. Add response
-    and durable-deletion assertions in the next authorized maintenance item;
-    the rollout's separately audited cleanup retired both games.
+    heading wait did not prove the deletion request committed. A shared cleanup
+    helper now awaits the exact delete command's successful response, navigation
+    home, and an authenticated server read returning `410 game_deleted` before
+    contexts close. Desktop/tablet and full-game scenarios use the helper.
+    Six regression checks cover delayed completion, failed responses, logical
+    rejection, a still-active game, and an incorrect read-back error. They run
+    through `pnpm test`. The full 24-turn check then exposed a duplicate leave
+    on an already-closing WebSocket; room cleanup now has a single owner and
+    sends consent only on an open connection (two additional regression tests).
+    The rerun passed desktop/tablet and all 47 full-game transitions, including
+    committed deletion. Full-game evidence masks the invitation field. Published
+    review/CI gates remain before merge.
 
 ## Phase 1 open gates
 
