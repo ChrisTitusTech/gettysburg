@@ -413,11 +413,33 @@ function nightUnitsAbleToWithdraw(
       unit.side !== side ||
       unit.status !== "deployed" ||
       unit.location === null ||
-      !enemyZoc.has(unit.location) ||
-      unit.movement - (unit.movement_spent ?? 0) < 1
+      !enemyZoc.has(unit.location)
     ) {
       return false;
     }
+    if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+      // An edge exit can require the whole active group, source-stack support,
+      // or the general bonus. Test legal groups, not just individual budgets.
+      let groups: string[][] = [[unit.id]];
+      for (const companion of Object.values(state.units)) {
+        if (
+          companion.id === unit.id ||
+          companion.side !== side ||
+          companion.status !== "deployed" ||
+          companion.location !== unit.location
+        )
+          continue;
+        groups = [
+          ...groups,
+          ...groups
+            .filter((group) => group.length < 3)
+            .map((group) => [...group, companion.id]),
+        ];
+      }
+      if (groups.some((group) => prepareBoardExit(state, side, group).ok))
+        return true;
+    }
+    if (unit.movement - (unit.movement_spent ?? 0) < 1) return false;
     return adjacentHexes(unit.location).some(
       (destination) =>
         !enemyZoc.has(destination) &&

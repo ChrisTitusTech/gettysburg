@@ -490,10 +490,16 @@ validation remain separate gates.
     exits remain separate work.
   - Acceptance: Cover full/reduced scoring, snapshots, one-point cost, general
     allowance, activation, source capacity, capture, authority, night exits, and
-    legacy isolation. Frozen install, format, lint, typecheck, 331 default
+    legacy isolation. Room handlers now derive from the protocol command map;
+    a real WebSocket test verifies every name reaches authoritative validation.
+    Night withdrawal recognizes affordable exits, including active stacks and
+    general bonuses. These close two hosted-review findings; full terrain-aware
+    on-board night withdrawal remains in its separate task.
+    Frozen install, format, lint, typecheck, 334 default
     workspace tests plus six harness tests, build, smoke, Markdown lint, and
-    all 92 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
-    regression pass (`test-results/voluntary-board-exit`). Independent review
+    all 93 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
+    regression pass after review fixes (`test-results/voluntary-board-exit-review`).
+    Independent review
     and exact-head CI remain required before merge.
 - [ ] Complete mandatory reinforcement entry and browser controls.
   - Scope: Charge terrain or explicitly connected off-board-road entry costs;

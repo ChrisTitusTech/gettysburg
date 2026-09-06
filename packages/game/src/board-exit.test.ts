@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { prepareBoardExit } from "./board-exit";
+import { adjacentHexes } from "./coordinates";
 import { prepareNormalMovement } from "./movement-validation";
 import { planNormalMove } from "./normal-move";
 import {
@@ -63,6 +64,80 @@ function command(current: GameState, ids = ["a"]): GameplayCommand {
 }
 
 describe("mandatory permanent board exit", () => {
+  it("requires an affordable edge exit when enemies block every on-board night withdrawal", () => {
+    const units = {
+      a: unit("a"),
+      ...Object.fromEntries(
+        adjacentHexes("A2").map((location) => [
+          location,
+          unit(location, { side: "union", location }),
+        ]),
+      ),
+    };
+    const current = state({ night: true, units });
+    const end = (source: GameState) =>
+      reduceGameplayCommand(source, "confederate", {
+        ...command(source),
+        command_name: "endPhase",
+        payload: {},
+      });
+    expect(end(current)).toMatchObject({
+      ok: false,
+      failure: {
+        error: "phase_invalid",
+        message: expect.stringContaining("can withdraw"),
+      },
+    });
+    // Without a legal exit, this reaches combat generation instead of falsely
+    // demanding an impossible withdrawal (server dice deliberately omitted).
+    const exhausted = {
+      ...current,
+      units: { ...units, a: unit("a", { movement_spent: 5 }) },
+    };
+    expect(end(exhausted)).toMatchObject({
+      ok: false,
+      failure: { error: "combat_invalid" },
+    });
+    expect(end({ ...current, ruleset_version: RULESET_VERSION })).toMatchObject(
+      { ok: false, failure: { error: "combat_invalid" } },
+    );
+  });
+
+  it("recognizes a night exit that needs the active stack and its general bonus", () => {
+    const movers = [
+      unit("a"),
+      unit("b"),
+      unit("g", { kind: "general", combat: null, movement: 10 }),
+    ];
+    const plan = planNormalMove(undefined, movers);
+    expect(plan.ok).toBe(true);
+    if (!plan.ok) return;
+    const current = state({
+      night: true,
+      normal_movement: plan.activation,
+      units: Object.fromEntries([
+        ...movers.map(
+          (mover) => [mover.id, { ...mover, movement_spent: 5 }] as const,
+        ),
+        ...adjacentHexes("A2").map(
+          (location) =>
+            [location, unit(location, { side: "union", location })] as const,
+        ),
+      ]),
+    });
+    expect(prepareBoardExit(current, "confederate", ["a"]).ok).toBe(false);
+    expect(
+      reduceGameplayCommand(current, "confederate", {
+        ...command(current),
+        command_name: "endPhase",
+        payload: {},
+      }),
+    ).toMatchObject({
+      ok: false,
+      failure: { message: expect.stringContaining("a (A2), b (A2), g (A2)") },
+    });
+  });
+
   it("spends one point, preserves strength, and atomically applies the preview", () => {
     const current = state();
     const preview = prepareBoardExit(current, "confederate", ["a"]);

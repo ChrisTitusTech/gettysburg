@@ -1,7 +1,7 @@
 import { Room, type AuthContext, type Client } from "@colyseus/core";
 import {
+  commandPayloadSchemas,
   type CommandFailure,
-  type GameplayCommandName,
   type ManagementEvent,
 } from "@gettysburg/game";
 
@@ -94,20 +94,7 @@ export function createGettysburgRoom(
         },
       );
 
-      const commandNames: readonly GameplayCommandName[] = [
-        "advanceAfterCombat",
-        "allocateLoss",
-        "confirmCombatResult",
-        "declareCombat",
-        "endPhase",
-        "enterReinforcement",
-        "moveStack",
-        "moveUnit",
-        "retreatStack",
-        "retreatUnit",
-        "rollCombat",
-        "surrenderSeat",
-      ];
+      const commandNames = Object.keys(commandPayloadSchemas);
       for (const commandName of commandNames) {
         this.onMessage(commandName, async (client, message: unknown) => {
           try {
