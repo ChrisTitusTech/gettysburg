@@ -477,6 +477,21 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Deliver the mandatory movement calculator and then activate it.
+  - Scope: Pure adjacent-step costs and deterministic least-cost routing for
+    clear/hill/town, woods/rough heights, explicit road/rail/stream links, day
+    and night ZOC, enemy occupancy, and artillery terrain restrictions.
+  - Boundary: `packages/game/src/movement.ts` is a preparatory calculator only.
+    Existing server validation and browser previews still use the prior route;
+    no saved rules/content interpretation changes in this increment.
+  - Acceptance: Focused tests cover costs, road detours, stable tie-breaking,
+    artillery, friendly transit, invalid steps, and immutable route totals.
+    Frozen install, format, lint, typecheck, 273 default workspace tests plus
+    six harness tests, build, smoke, and Markdown lint pass. All 92 server tests
+    also pass with isolated PostgreSQL. Desktop/tablet and full-game acceptance
+    pass (`test-results/movement-calculator`). Independent review and exact-head
+    CI remain required before merge. Follow with general accompaniment, continuous
+    move boundaries, and matching authoritative/browser integration.
 - [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
