@@ -25,6 +25,12 @@ must not be claimed until the full board workflow is manually validated.
 
 ## Current implementation boundary
 
+First-release scope was confirmed on 2026-09-06: Scenario Five, mandatory rules
+only, plus replay, private spectators, and opt-in browser push notifications.
+The owner approved the original generated board, original counter symbols, and
+clearly marked reduced strength for public release; supplied scans stay private.
+`docs/references/MANDATORY_RULES.md` records the remaining rules contract.
+
 The 2026-09-06 development terrain follow-up supersedes the older terrain
 exclusion below: the active board is A-W / 1-11 (253 hexes), matching the painted
 columns. All terrain rows are owner-approved. Explicit best-guess forest and
@@ -323,7 +329,7 @@ core night withdrawal, no-entry, and trapped-combat ZOC rules. Phase 3 adds
 automated validation for variable movement costs, roads, terrain, streams,
 remaining zones of control and advanced stacking, authoritative terrain combat
 modifiers, retreat priority and forced off-board retreat, remaining reinforcement
-restrictions, nighttime reorganization, and any source-approved objective or
+restrictions, mandatory night behavior, and any source-approved objective or
 victory edge cases. Phase 2 already enforces basic general stacking, mandatory
 contact grouping, independent unit-factor results, loss allocation, connected
 retreat, eligible advance, objective control, casualty scoring, automatic-victory
@@ -817,18 +823,15 @@ accepted when:
   independent review pass.
 - The rights decision permits every asset and rule explanation shipped publicly.
 
-## Unresolved questions
+## Remaining decisions and acceptance
 
 - Which remaining Battle Manual interpretations must be approved for complete
   Phase 3 enforcement?
-- What artwork, if any, should appear on reduced counter faces beyond the
-  owner-approved derived combat values?
-- Is Scenario Five the only scenario required for the first release; if not,
-  what are the approved setup and victory contracts for each additional scenario?
-- Which rows and exact adjustments in
-  `docs/references/TERRAIN_ADJUSTMENTS.md` are owner-approved, and what edge data
-  completes their authoritative movement and combat interpretation?
-- Which optional rules, if any, are required?
-- Is the first production release private/invite-only, and what rights exist for
-  every supplied name, artwork element, and rule explanation proposed for it?
-- Is asynchronous turn notification required before the first production release?
+- Complete gameplay acceptance of inferred movement edges and the painted-board
+  scenario adaptations; all 253 terrain rows are already approved.
+- Implement the owner-approved continuous-move UI: repeated drags of one
+  unit/stack are allowed until a different unit moves; reconnect does not reset
+  that boundary.
+- Complete final production-candidate validation and obtain release approval.
+- New assets and source-derived explanations require their own provenance;
+  approval of current original presentation never permits publishing scans.

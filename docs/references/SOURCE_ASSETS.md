@@ -19,10 +19,18 @@ created content.
 
 ## Approved repository artwork
 
+On 2026-09-06, ChrisTitusTech explicitly approved the current original generated
+board, original counter symbols, and a clearly marked reduced-strength treatment
+for the first public release, while keeping every supplied scan private. No new
+counter-back scan is required: original symbols, derived values, and a visible
+reduced marker are the approved presentation. This records owner permission for
+these project assets, not permission to republish the source scans or a legal
+opinion about third-party rights. New or replacement art still requires review.
+
 The following presentation artwork and derived verification asset are
 intentionally tracked. They are not supplied scans and do not contain bytes
-copied from the local-only reference files. Public-release rights remain governed
-by the unresolved decision recorded below.
+copied from the local-only reference files. Public use of the current original
+presentation has the owner approval above; source material stays private.
 
 | File | Creator and derivation | Permission and attribution | Approval | Dimensions/bytes | SHA-256 |
 | --- | --- | --- | --- | --- | --- |
@@ -47,8 +55,9 @@ work. `TERRAIN_CONNECTIONS.md` records inferred links and scenario adaptations.
 Rules2.pdf rule 4b4 supplies town +1; rule 4b2 supplies connected-hill cancellation.
 The owner overrides the printed woods +1 with +2 and assigns rough heights +4.
 The +4 wooded-height split and strongest-hex mixed-terrain policy are explicitly
-recorded implementation assumptions. This does not approve optional rules,
-reduced-face artwork, or public rights.
+recorded implementation assumptions. That terrain decision alone did not approve
+optional rules, reduced-face artwork, or public rights; the later explicit scope
+and original-presentation approvals above govern the first release.
 
 ### Artwork generation record
 
@@ -141,14 +150,17 @@ This transcription supports the rules-light Phase 2 state model. It does not
 authorize public reproduction of the manual and does not supply the missing
 counter backs.
 
-## Missing or unresolved source inputs
+## Remaining source acceptance
 
-- Complete counter sheets including every reduced-face artwork treatment
-- Optional rules and whether they are in scope
+- New/replacement artwork needs separate provenance and owner review
 - Movement-edge and full gameplay acceptance of the inferred connections;
   terrain values are approved in `TERRAIN_ADJUSTMENTS.md`
-- Rights or licensing basis for any public use of the supplied scans, names,
-  artwork, or wording
+- Supplied scans and copied rule wording remain prohibited from publication
+
+The first release is Scenario Five with mandatory rules only, per the owner's
+2026-09-06 decision. Optional rules (including nighttime reorganization) and
+additional scenarios are out of scope. MANDATORY_RULES.md records the rule
+contract and remaining implementation/acceptance requirements.
 
 The approved formula may supply Phase 2 reduced combat data. Any remaining
 fixture values must be visibly labelled and must not be presented as final game
@@ -173,13 +185,12 @@ shared hex side; mere hex adjacency does not establish a connection. This
 decision does not approve any unchecked per-hex or per-hex-side transcription or
 unresolved exact landmark value.
 
-The remaining owner gates are narrower but still release-blocking: record the
-formal review of this interpretation/rights ledger, complete gameplay acceptance
-of the inferred terrain links and scenario adaptations, finish movement-rule
-interpretations before full Phase 3 enforcement, decide optional-rule
-and additional-scenario scope, decide the reduced-face presentation, and
-establish a rights or clean-room basis for every name, artwork element, and
-explanation shipped in the first public release.
+The owner has now selected scope and approved the original presentation for
+release. Remaining gates are gameplay acceptance of inferred terrain links and
+scenario adaptations, implementation of the approved continuous-movement UI,
+and final production-candidate review. New assets or source-derived wording
+cannot inherit approval without their own provenance/review. The Phase 1 ledger
+below is superseded by these explicit decisions, not silently treated as approval.
 
 ## Phase 1 interpretation and rights ledger
 
