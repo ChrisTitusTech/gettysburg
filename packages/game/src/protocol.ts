@@ -12,7 +12,7 @@ export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 export type Side = "confederate" | "union";
 export type GamePhase = "combat" | "completed" | "movement";
 export type UnitKind = "artillery" | "cavalry" | "general" | "infantry";
-export type UnitStatus = "deployed" | "eliminated" | "reinforcement";
+export type UnitStatus = "deployed" | "eliminated" | "reinforcement" | "exited";
 export type StrengthState = "eliminated" | "full" | "reduced";
 
 export interface UnitState {
@@ -154,6 +154,9 @@ export const moveStackPayloadSchema = z
   .strict();
 export const enterReinforcementPayloadSchema = moveUnitPayloadSchema;
 export const enterReinforcementStackPayloadSchema = moveStackPayloadSchema;
+export const exitBoardPayloadSchema = z
+  .object({ unit_ids: z.array(unitIdSchema).min(1).max(3) })
+  .strict();
 export const declareCombatPayloadSchema = z
   .object({
     attackers: z.array(unitIdSchema).min(1),
@@ -220,6 +223,7 @@ export const commandPayloadSchemas = {
   endPhase: endPhasePayloadSchema,
   enterReinforcement: enterReinforcementPayloadSchema,
   enterReinforcementStack: enterReinforcementStackPayloadSchema,
+  exitBoard: exitBoardPayloadSchema,
   moveStack: moveStackPayloadSchema,
   moveUnit: moveUnitPayloadSchema,
   retreatStack: retreatStackPayloadSchema,
@@ -247,6 +251,13 @@ export const moveUnitCommandSchema = z
 
 export const gameplayCommandSchema = z.discriminatedUnion("command_name", [
   moveUnitCommandSchema,
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("exitBoard"),
+      payload: exitBoardPayloadSchema,
+    })
+    .strict(),
   z
     .object({
       ...baseEnvelope,

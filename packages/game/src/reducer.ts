@@ -6,6 +6,7 @@ import { prepareNormalMovement } from "./movement-validation.js";
 import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
+import { prepareBoardExit } from "./board-exit.js";
 import type {
   CombatState,
   CommandFailure,
@@ -73,7 +74,11 @@ function scoreVictory(
     const beneficiary = otherSide(unit.side);
     if (unit.status === "eliminated") {
       score[beneficiary] += unit.combat ?? 0;
-    } else if (unit.strength === "reduced") {
+    } else if (
+      unit.strength === "reduced" &&
+      (state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+        unit.status === "deployed")
+    ) {
       score[beneficiary] += 1;
     }
   }
@@ -514,6 +519,27 @@ function mandatoryReinforcement(
         state,
         prepared.patch,
         `${ids.length} reinforcement counter${ids.length === 1 ? "" : "s"} entered at ${destination} (${prepared.cost} movement)`,
+      )
+    : failure(state, prepared.error, prepared.message);
+}
+
+function exitBoard(
+  state: GameState,
+  side: Side,
+  ids: readonly string[],
+): ReducerResult {
+  if (state.ruleset_version !== MANDATORY_RULESET_VERSION)
+    return failure(
+      state,
+      "phase_invalid",
+      "Board exits require the mandatory ruleset.",
+    );
+  const prepared = prepareBoardExit(state, side, ids);
+  return prepared.ok
+    ? accepted(
+        state,
+        prepared.patch,
+        `${ids.length} counter${ids.length === 1 ? "" : "s"} permanently exited the board (1 movement)`,
       )
     : failure(state, prepared.error, prepared.message);
 }
@@ -1438,6 +1464,8 @@ export function reduceGameplayCommand(
   } = {},
 ): ReducerResult {
   switch (command.command_name) {
+    case "exitBoard":
+      return exitBoard(state, actorSide, command.payload.unit_ids);
     case "moveUnit":
       return moveUnit(state, actorSide, command);
     case "moveStack":

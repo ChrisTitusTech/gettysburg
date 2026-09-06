@@ -70,11 +70,19 @@ Remaining retreat cases (Rules2 4d) must be explicit choices rather than deadloc
   spend no normal movement points. Only a victorious attacker can advance into
   a vacated defender hex, with legal stacking.
 
+On 2026-09-06 the owner approved the same extra-loss/edge-exit rule when
+impassable terrain makes retreat impossible on the expanded board. This includes
+artillery trapped by wooded rough hills, rather than only enemy-surrounded
+stacks. It is an explicit board-adaptation decision, not a copied printed rule.
+
 Night turns remain 8, 16, and 24. Require withdrawal when a legal move exists,
 forbid entry into enemy ZOC, and allow combat only for trapped active-side combat
 counters (Rules1 2f). Integrate actual terrain cost and stack movement into the
 withdrawal test so an impossible withdrawal never blocks ending movement.
 Preserve Scenario Five scoring, objective ownership, and automatic-victory checks.
+The Manual's casualty scoring counts reduced counters only while on the board.
+An exited counter is not eliminated and scores no casualty points, even when
+its retained historical strength is reduced.
 
 ## Versioning and acceptance
 
