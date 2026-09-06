@@ -37,8 +37,9 @@ authorized merge, deployment, and backed-up retirement of five old development
 games; those delivery actions completed on 2026-09-06.
 Current evidence and remaining gates are in `TASKS.md`.
 
-Phase 0 is complete. Phase 1 implementation is merged but awaits the owner's
-recorded interpretation/rights-ledger review. Phase 2 implementation and its
+Phases 0 and 1 are complete: the owner selected mandatory Scenario Five scope
+and approved the original presentation for public release on 2026-09-06.
+Phase 2 implementation and its
 post-merge battle cleanup are merged through PR #3. PR #4 merged and deployed as
 `40cff572aab183660dfeee188c4b6acddb2b1de5` after independent review and passing
 PR-head/post-merge CI. Verified backup/restore, healthy public readiness,
@@ -128,18 +129,19 @@ is in `docs/operations/VPS.md`.
 | Database migration loss | Back up first, test migrations on a copy, and require explicit production approval |
 | Mobile board complexity | Target desktop and tablet first; validate touch interactions before claiming phone support |
 
-## Decision gates before full content implementation
+## First-release scope and remaining gates
 
-- Complete the production counter treatment. All available source-card fronts
-  and the owner-approved Phase 2 reduced-value rule are encoded; reduced-face
-  artwork remains a later presentation input.
+- Use the approved original board/counter presentation with clearly marked
+  reduced strength; supplied scans and copied wording stay private.
 - Complete movement-edge and gameplay acceptance for the approved per-hex
   terrain transcription. Forest links use authorized best guesses. Use supplied
   rules and explicit owner decisions for terrain effects and numeric modifiers;
   terrain defense is enabled in the new development terrain ruleset.
-- Decide whether optional rules are in scope.
-- Decide whether the supplied scans may be used beyond a private prototype or
-  whether the release must use entirely original art and wording.
+- Scenario Five mandatory rules only; optional rules and additional scenarios
+  are excluded. See `docs/references/MANDATORY_RULES.md` for implementation scope.
+- Include replay, private spectators, and opt-in browser push notifications.
+- Complete owner gameplay acceptance and final release validation; new artwork
+  still requires separate provenance and approval.
 
 The locally supplied Battle Manual now answers the Scenario Five setup, turn,
 night, objective, scoring, and victory questions for the rules-light Phase 2

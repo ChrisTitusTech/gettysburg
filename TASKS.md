@@ -6,6 +6,8 @@ The owner authorized completing remaining tasks/phases in small PRs and merging
 validated increments. Each PR addresses one independently testable concern;
 split implementation before it becomes difficult to review, not after bypassing
 review or CI. No unresolved owner decision is implicitly approved by this plan.
+The owner directed skipping CodeRabbit when rate-limited. Record that skip;
+do not bypass built-in review, validation, exact-head CI, or actionable findings.
 
 1. Patch dependency advisories; verify frozen installation, audit, and local gates.
 2. Make browser-test deletion durable and verify it with independent sessions.
@@ -23,7 +25,8 @@ reorganization is optional (Rules1.pdf marker description / Battle Manual 10c),
 so it is excluded from this mandatory-rules release. The owner also approved the
 current original generated board, original counter symbols, and a clearly marked
 reduced-strength treatment for public release, keeping supplied scans private.
-Notifications will use opt-in browser push. Owner gameplay acceptance and final
+Notifications will use opt-in browser push. Repeated drags remain one continuous
+unit/stack move until another unit moves. Owner gameplay acceptance and final
 release validation remain gates; engineering work continues through small PRs.
 
 ## Terrain follow-up: 2026-09-06
@@ -130,7 +133,8 @@ status in the August entries must not be treated as current deployment evidence.
     desktop/tablet browser acceptance, and Markdown lint passed. All 92 server
     tests passed against isolated PostgreSQL, including the 11 skipped in the
     default suite. Built-in review found no actionable regressions. Published
-    exact-head CI and independent review remain required before merge.
+    PR #5 merged as `bbb97e20586457817251dac557a2f374831d0b5a` after exact-head
+    CI and independent review passed. GitHub reports no open dependency alerts.
 
 - [x] Make browser acceptance await persisted deletion before closing contexts.
   - Owner: ChrisTitusTech. The deployed desktop/tablet scenarios passed, but both
@@ -146,19 +150,23 @@ status in the August entries must not be treated as current deployment evidence.
     sends consent only on an open connection (two additional regression tests).
     The rerun passed desktop/tablet and all 47 full-game transitions, including
     committed deletion. Full-game evidence masks the invitation field. Published
-    review/CI gates remain before merge.
+    PR #6 merged as `fc8f907` after exact-head CI and built-in/independent CLI
+    reviews passed without findings. Hosted CodeRabbit was rate-limited and
+    skipped under the owner's instruction; no actionable threads remained.
 
-## Phase 1 open gates
+## Phase 1 completion
 
 PR #1 merged as `c3d3ef1e683fb7b2fb0fe0c25e40722a8779ff0c` on 2026-08-15.
 Phase 1 work may use clearly labelled fixture content while the source and rights
 decisions remain open.
 
-Phase 1 implementation is merged into `main`. The phase remains open only for
-the owner-controlled review/publication gates recorded below; no Phase 1
-implementation or local-validation failure remains.
+Phase 1 implementation and validation are merged into `main`. On 2026-09-06 the
+owner closed its remaining scope/original-presentation decisions: mandatory
+Scenario Five, current original art approved for release, visibly reduced original
+counters, and private source scans. Full Phase 3 gameplay and Phase 4 release
+validation remain separate gates.
 
-- [ ] Record the owner review of the interpretation and rights ledger.
+- [x] Record the owner review of the interpretation and rights ledger.
   - Scope: Confirm the Phase 2 Scenario Five interpretations and original board
     approval, then explicitly approve or defer the per-hex terrain transcription,
     reduced-face presentation, optional/additional-scenario scope, and public-use
@@ -170,8 +178,13 @@ implementation or local-validation failure remains.
   - Manual validation: Project owner reviews the interpretation/rights ledger
     and `docs/references/TERRAIN_ADJUSTMENTS.md`.
   - Dependencies or blockers: Project-owner review and decisions.
-  - Status: Implementation complete. The Battle Manual, Scenario Five setup,
-    objective/victory schedule, front values, reduced-value formula, and original
+  - Completion: Explicit 2026-09-06 scope and original-presentation approvals are
+    recorded in `docs/references/SOURCE_ASSETS.md`; the rule implementation
+    contract is in `docs/references/MANDATORY_RULES.md`. These supersede the
+    historical terrain/rights status below. No supplied scan may be published.
+  - Historical status: Implementation complete. The Battle Manual, Scenario Five
+    setup, objective/victory schedule, front values, reduced-value formula, and
+    original
     deluxe board are recorded. The earlier Big Round Top (`E6`) location and the
     terrain confirmations for `E6`, Little Round Top (`F6`), and Culp's Hill
     (`M9`) have been reopened because they were not checked against the approved
@@ -272,7 +285,7 @@ implementation or local-validation failure remains.
     compose path passes at `http://127.0.0.1:8080`; both application and proxy
     run non-root with all capabilities dropped and were removed after validation.
 
-- [ ] Complete Phase 1 review and evidence.
+- [x] Complete Phase 1 review and evidence.
   - Scope: Final diff, complete local gate, built-in review, independent review,
     exact-head CI, browser evidence, and documentation/status update.
   - Acceptance criteria: All Phase 1 exit criteria in `ROADMAP.md` pass and no
@@ -286,8 +299,10 @@ implementation or local-validation failure remains.
     and follow-up before leaving this task open; never mark it complete on an
     unexplained skip.
   - Dependencies or blockers: All Phase 1 implementation tasks.
-  - Status: Implementation evidence complete. The full repository gate, browser
-    acceptance, container smoke, compose proxy run, Markdown lint, Action lint,
+  - Completion: The 2026-09-06 owner decisions close the final ledger gate.
+  - Historical status: Implementation evidence complete. The full repository
+    gate, browser acceptance, container smoke, compose proxy run, Markdown lint,
+    Action lint,
     source-asset boundary, secret scan, and final diff checks pass. Built-in
     review found a cross-binding idempotency disclosure; the fix and regression
     tests pass. PR #1 merged after exact-head CI. The remaining owner gate is
@@ -486,15 +501,18 @@ implementation or local-validation failure remains.
   per-hex-side forest links are required before enforcement.
 - [ ] Implement and test remaining reinforcement, night, objective, and victory
   rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
-  trapped-only combat are complete; nighttime reorganization remains.
+  trapped-only combat are complete. Optional nighttime reorganization is excluded;
+  remaining mandatory edge cases are in `docs/references/MANDATORY_RULES.md`.
 - [ ] Add rule versions, explanations, previews, and deterministic replay.
 - [ ] Complete a full rules-enforced acceptance game.
 
 ### Phase 4
 
-- [ ] Finish original rights-safe art and responsive interaction design.
+- [ ] Finish responsive interaction design using the owner-approved original
+  board, counter symbols, and clearly marked reduced strength. Current original
+  presentation has explicit release approval; supplied scans stay private.
 - [ ] Complete accessibility, browser, performance, and security hardening.
-- [ ] Add approved spectator, replay, and asynchronous features.
+- [ ] Add approved private spectators, replay, and opt-in browser push.
 - [ ] Automate backups and exercise restore, migration, rollback, and reboot.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.

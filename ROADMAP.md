@@ -62,9 +62,10 @@ that survives reconnect.
 
 ### Current status
 
-Implementation and validation are merged into `main`. Formal phase closure still
-requires the project owner's recorded review of the interpretation and rights
-ledger; no Phase 1 code or local-validation failure remains.
+Complete. Implementation and validation are merged into `main`; the owner closed
+the remaining first-release scope/original-presentation decisions on 2026-09-06.
+The current source ledger records those approvals and the continuing prohibition
+on publishing supplied scans. Phase 3 gameplay and Phase 4 release gates remain.
 
 ### Included work
 
@@ -201,8 +202,8 @@ Terrain-defense work started on 2026-09-06 with approved A-W data and authorized
 best-guess connections. This does not complete Phase 3. Phase 2 pulled forward
 several movement, stacking,
 combat, and core night rules. Phase 2 operational closeout and owner per-hex
-approval are complete; terrain gameplay acceptance, movement rules, and
-optional-rule decisions remain open. The
+approval are complete; terrain gameplay acceptance and movement rules remain
+open. Optional rules/additional scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in
 `docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
 Forest/hill links feed combat; road/rail/stream estimates await movement rules.
@@ -217,14 +218,14 @@ TASKS.md records validation, review, and remaining owner acceptance.
   modifiers, retreat priority, forced off-board retreat, and any remaining
   advance legality. Phase 2 already enforces defender-wins-ties, loss thresholds,
   loss allocation, connected retreat, and eligible advance.
-- Complete any remaining reinforcement restrictions, nighttime reorganization,
+- Complete any remaining reinforcement restrictions, mandatory night behavior,
   and source-approved objective and victory edge cases. Phase 2 already enforces
   scheduled entry, objective control, casualty scoring, automatic-victory checks,
   and the turn-24 result.
   - Core night withdrawal, prohibition on entering enemy ZOC, and combat for
     trapped units only were pulled forward as a Phase 2 correctness fix.
-    Remaining work includes nighttime reorganization and complete advanced ZOC
-    interactions.
+    Remaining work includes complete advanced ZOC interactions. Nighttime
+    reorganization is optional rule 10c and excluded from the first release.
 - Add rules explanations, previews, warnings, and deterministic replay tests.
 - Add explicit rule-version metadata so existing games remain interpretable.
 
@@ -263,26 +264,27 @@ controls.
 
 ### Current status
 
-Not started as a production-release phase. Existing staging, backup, restore,
-original-board, and browser evidence are inputs to this phase, not substitutes
-for its rights, accessibility, security, capacity, reboot, and final acceptance
-gates.
+In progress. The owner approved original presentation and selected replay,
+private spectators, and opt-in browser push. Dependency hardening has begun.
+Existing staging, backup, restore, and browser evidence do not replace the
+remaining accessibility, security, capacity, reboot, and final acceptance gates.
 
 ### Included work
 
 - Replace any prototype-only source art with approved or original production art.
 - Complete responsive polish, animations, combat panels, reduced motion,
   keyboard support, and screen-reader-friendly inspectors.
-- Add spectator/replay capability and asynchronous invitations/notifications if
-  the unresolved product decision includes them.
+- Add private spectator/replay capability and opt-in browser push notifications.
 - Add rate limits, security headers, abuse controls, structured operations
   metrics, backup automation, restore exercises, and retention policy.
 - Load-test the target VPS, document capacity, and finalize deploy/rollback runbooks.
 
 ### Dependencies and risks
 
-- Public launch is blocked on the rights decision.
-- External notification services, if selected, add privacy and operational scope.
+- Original presentation has owner approval; new art and copied source wording
+  do not inherit that approval.
+- Browser push requires explicit consent, protected subscriptions, and retention
+  controls; email and third-party marketing integrations are not in scope.
 - Single-host capacity and recovery objectives must be measured, not assumed.
 
 ### Exit criteria
