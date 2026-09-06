@@ -477,6 +477,21 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory lone-general capture integration.
+  - Scope: Eliminate unsupported generals in enemy combat ZOC; retain combat
+    support and ignore general-only ZOC. Settle every normal-movement step and
+    every accepted mandatory-rules command. A combat counter can capture on
+    approach and enter the vacated hex; a lone general cannot keep moving after
+    capture. General losses award no casualty points.
+  - Boundary: This affects only the still-unavailable mandatory-v4 handler.
+    Existing terrain-v3 commands retain their previous interpretation.
+  - Acceptance: Cover support, both sides, intermediate capture, repeated-drag
+    equivalence, source abandonment, capture on entry, and legacy isolation;
+    frozen install, format, lint, typecheck, 307 default workspace tests plus
+    six harness tests, build, smoke, Markdown lint, and all 92 isolated
+    PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
+    (`test-results/lone-general-capture`). Independent review and exact-head
+    CI remain required before merge.
 - [ ] Integrate mandatory movement validation and browser previews.
   - Scope: Share terrain routing, budgets, accompaniment, activation, ownership,
     and endpoint stacking checks. Apply a successful proposal atomically through

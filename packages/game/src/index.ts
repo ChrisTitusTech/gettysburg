@@ -7,3 +7,4 @@ export * from "./terrain.js";
 export * from "./movement.js";
 export * from "./normal-move.js";
 export * from "./movement-validation.js";
+export * from "./generals.js";

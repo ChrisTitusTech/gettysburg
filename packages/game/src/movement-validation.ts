@@ -1,6 +1,7 @@
 import { isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
-import { normalMovementRoute } from "./movement.js";
+import { normalMovementRoute, normalMovementStep } from "./movement.js";
+import { eliminateLoneGenerals, isUnsupportedGeneral } from "./generals.js";
 import type { MovementRoute } from "./movement.js";
 import { planNormalMove } from "./normal-move.js";
 import type { CommandFailure, GameState, Side, UnitState } from "./protocol.js";
@@ -83,8 +84,15 @@ export function prepareNormalMovement(
   const remaining = Object.values(state.units).filter(
     (unit) => unit.status === "deployed" && !ids.has(unit.id),
   );
+  const movingCombat = movers.some((unit) => unit.kind !== "general");
   const destinationUnits = remaining.filter(
-    (unit) => unit.location === destination,
+    (unit) =>
+      unit.location === destination &&
+      !(
+        unit.side !== side &&
+        movingCombat &&
+        isUnsupportedGeneral(state, unit)
+      ),
   );
   if (destinationUnits.some((unit) => unit.side !== side))
     return reject("occupied", "An enemy occupies that hex.");
@@ -116,18 +124,30 @@ export function prepareNormalMovement(
       `${destination} requires ${route.cost} movement; this group has ${plan.allowance} remaining.`,
     );
 
-  const units = { ...state.units };
-  for (const unit of movers) {
-    units[unit.id] = {
-      ...unit,
-      location: destination,
-      movement_spent: (unit.movement_spent ?? 0) + route.cost,
-    };
-  }
+  let units = eliminateLoneGenerals(state);
   const objectives = { ...state.objectives };
   // Entered objectives change control even when a multi-hex drag passes through
   // them. Splitting the same legal route into repeated drags must agree.
-  for (const coordinate of route.path.slice(1)) {
+  let spent = 0;
+  for (const [index, coordinate] of route.path.slice(1).entries()) {
+    spent += normalMovementStep(
+      state,
+      side,
+      movers.map((unit) => unit.kind),
+      state.movement_edges,
+      route.path[index]!,
+      coordinate,
+    )!.cost;
+    const moved = { ...units };
+    for (const unit of movers) {
+      moved[unit.id] = {
+        ...unit,
+        location: coordinate,
+        movement_spent: (unit.movement_spent ?? 0) + spent,
+      };
+    }
+    // Settle capture at every entered hex, not only the final drag endpoint.
+    units = eliminateLoneGenerals({ ...state, units: moved });
     const objective = objectives[coordinate];
     if (objective !== undefined)
       objectives[coordinate] = { ...objective, controlled_by: side };
