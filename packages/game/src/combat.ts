@@ -1,4 +1,5 @@
 import { adjacentHexes, type HexCoordinate } from "./coordinates.js";
+import { terrainDefenseModifier } from "./terrain.js";
 import {
   RULESET_VERSION,
   type CombatConfirmation,
@@ -31,7 +32,9 @@ export function currentCombatValue(
   rulesetVersion: string,
 ): number | null {
   if (unit.combat === null) return null;
-  return rulesetVersion === RULESET_VERSION && unit.strength === "reduced"
+  return (rulesetVersion === RULESET_VERSION ||
+    rulesetVersion === "phase-2-tabletop-v2") &&
+    unit.strength === "reduced"
     ? (unit.reduced_combat ?? Math.ceil(unit.combat / 2))
     : unit.combat;
 }
@@ -62,6 +65,18 @@ export function combatFactorModifier(
   );
 }
 
+export function defenderCombatModifier(
+  state: GameState,
+  attackers: readonly string[],
+  defenders: readonly string[],
+): number {
+  return Math.min(
+    10,
+    combatFactorModifier(state, defenders) +
+      terrainDefenseModifier(state, attackers, defenders),
+  );
+}
+
 function availableSteps(state: GameState, unitIds: readonly string[]): number {
   return unitIds.reduce(
     (total, id) => total + (state.units[id]?.steps_remaining ?? 0),
@@ -70,18 +85,32 @@ function availableSteps(state: GameState, unitIds: readonly string[]): number {
 }
 
 /**
- * Resolve the verified Phase 2 combat table from server dice and printed unit
- * factors. Per-hex terrain bonuses remain excluded until the board terrain
- * transcription is reviewed.
+ * Resolve server dice, unit factors, and the versioned terrain defense total.
  */
 export function automaticCombatResolution(
   state: GameState,
   combat: CombatState,
 ): AutomaticCombatResolution | null {
   if (combat.rolls === null) return null;
+  if (combat.confirmation !== null) {
+    const attackerTotal =
+      combat.rolls.attacker + combat.confirmation.attacker_modifier;
+    const defenderTotal =
+      combat.rolls.defender + combat.confirmation.defender_modifier;
+    return {
+      attacker_total: attackerTotal,
+      defender_total: defenderTotal,
+      margin: Math.abs(attackerTotal - defenderTotal),
+      confirmation: combat.confirmation,
+    };
+  }
 
   const attackerModifier = combatFactorModifier(state, combat.attackers);
-  const defenderModifier = combatFactorModifier(state, combat.defenders);
+  const defenderModifier = defenderCombatModifier(
+    state,
+    combat.attackers,
+    combat.defenders,
+  );
   const attackerTotal = combat.rolls.attacker + attackerModifier;
   const defenderTotal = combat.rolls.defender + defenderModifier;
   const attackerWins = attackerTotal > defenderTotal;
@@ -173,7 +202,7 @@ function candidateForHexes(
       attacker_modifier: combatFactorModifier(state, attackers),
       attackers,
       defender_hexes: sortedDefenderHexes,
-      defender_modifier: combatFactorModifier(state, defenders),
+      defender_modifier: defenderCombatModifier(state, attackers, defenders),
       defenders,
       id,
       requires_separation: false,
@@ -213,9 +242,9 @@ export function separateOpportunity(
     ...opportunity.attacker_hexes.map((hex) => `attacker:${hex}`),
     ...opportunity.defender_hexes.map((hex) => `defender:${hex}`),
   ].sort(compareText);
-  // A valid board has only 231 unique hexes. Fail closed on corrupted or
+  // A valid board has only 253 unique hexes. Fail closed on corrupted or
   // synthetic state before constructing exponential candidate subsets.
-  if (vertices.length > 231) return null;
+  if (vertices.length > 253) return null;
 
   const candidates = new Map<string, SkirmishCandidate>();
   for (const defenderHex of opportunity.defender_hexes) {
@@ -402,7 +431,7 @@ export function combatOpportunities(
       attacker_modifier: combatFactorModifier(state, attackers),
       attackers,
       defender_hexes: sortedDefenderHexes,
-      defender_modifier: combatFactorModifier(state, defenders),
+      defender_modifier: defenderCombatModifier(state, attackers, defenders),
       defenders,
       id: `${sortedAttackerHexes.join("+")}-${sortedDefenderHexes.join("+")}`,
       requires_separation:

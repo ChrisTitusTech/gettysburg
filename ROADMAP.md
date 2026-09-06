@@ -198,11 +198,15 @@ from a connection or persistence failure.
 
 ### Current status
 
-Not started as a phase. Phase 2 pulled forward several movement, stacking,
+Terrain-defense work started on 2026-09-06 with approved A-W data and authorized
+best-guess connections. This does not complete Phase 3. Phase 2 pulled forward
+several movement, stacking,
 combat, and core night rules, but Phase 3 remains gated on Phase 2 operational
 closeout, owner-approved per-hex terrain data, and optional-rule decisions. The
 coordinate-by-coordinate review worksheet is in
-`docs/references/TERRAIN_ADJUSTMENTS.md`; it is not rules data until approved.
+`docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
+Forest/hill links feed combat; road/rail/stream estimates await movement rules.
+TASKS.md records validation, review, and remaining owner acceptance.
 
 ### Included work
 

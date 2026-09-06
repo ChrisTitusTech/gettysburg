@@ -306,7 +306,7 @@ describe("TabletopControls phase action", () => {
       screen.getByText(/Attacker: die 1 \+ units \+10 =/),
     ).toHaveTextContent("11");
     expect(
-      screen.getByText(/Defender: die 8 \+ units \+2 =/),
+      screen.getByText(/Defender: die 8 \+ units\/terrain \+2 =/),
     ).toHaveTextContent("10");
     expect(
       screen.getByText(

@@ -29,6 +29,12 @@ browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
 
 ## Current delivery status
 
+The 2026-09-06 approved terrain follow-up expands the development board to A-W,
+records best-guess connections, and implements terrain defense. The owner
+confirmed no live/production games require compatibility. This bounded Phase 3
+increment does not complete movement-rule enforcement or authorize deployment.
+Current evidence and remaining gates are in `TASKS.md`.
+
 Phase 0 is complete. Phase 1 implementation is merged but awaits the owner's
 recorded interpretation/rights-ledger review. Phase 2 implementation and its
 post-merge battle cleanup are merged through PR #3. PR #4's validated
@@ -127,10 +133,10 @@ is in `docs/operations/VPS.md`.
 - Complete the production counter treatment. All available source-card fronts
   and the owner-approved Phase 2 reduced-value rule are encoded; reduced-face
   artwork remains a later presentation input.
-- Review the per-hex terrain and edge transcription against the owner-approved
-  tracked project board before Phase 3 terrain enforcement. Use the supplied
+- Complete movement-edge and gameplay acceptance for the approved per-hex
+  terrain transcription. Forest links use authorized best guesses. Use supplied
   rules and explicit owner decisions for terrain effects and numeric modifiers;
-  terrain remains deliberately unavailable to Phase 2 rules.
+  terrain defense is enabled in the new development terrain ruleset.
 - Decide whether optional rules are in scope.
 - Decide whether the supplied scans may be used beyond a private prototype or
   whether the release must use entirely original art and wording.

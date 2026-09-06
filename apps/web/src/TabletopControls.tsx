@@ -107,7 +107,7 @@ function CombatCard({
                 {resolution.confirmation.attacker_modifier} ={" "}
                 <strong>{resolution.attacker_total}</strong>
                 <br />
-                Defender: die {combat.rolls?.defender} + units +
+                Defender: die {combat.rolls?.defender} + units/terrain +
                 {resolution.confirmation.defender_modifier} ={" "}
                 <strong>{resolution.defender_total}</strong>
               </p>
@@ -115,9 +115,10 @@ function CombatCard({
                 {outcomeSummary(resolution.confirmation, resolution.margin)}
               </p>
               <p className="modifier-guidance">
-                This result uses verified unit factors, capped at +10. Terrain
-                bonuses remain excluded until the board transcription is
-                reviewed.
+                Unit factors and eligible terrain are capped together at +10. A
+                participating attacker in the same connected forest or hill
+                cancels that terrain component. Repeated terrain does not stack
+                per hex.
               </p>
             </div>
           )}

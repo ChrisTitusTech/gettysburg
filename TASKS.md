@@ -1,5 +1,52 @@
 # Gettysburg project tasks
 
+## Terrain follow-up: 2026-09-06
+
+- [x] Implement and locally validate the approved painted-board terrain.
+  - Scope: Record 253 owner-approved A-W hexes, correct B2/F11 to woods +2,
+    infer forest/hill links, map road/rail/stream edges, and enable terrain combat.
+  - Implementation: New development games use 23 columns, town +1, independently
+    cancellable hill/woods components, strongest-hex terrain per skirmish, and a
+    combined +10 cap. Culp's Hill moves to R10; eastern entries move to W7/W10.
+    Other setup, unit values, schedules, and the 16 objective points remain.
+  - Authority: ChrisTitusTech approved all terrain and best-guess forest links,
+    and confirmed this is not live/production and old games need no compatibility.
+    The owner subsequently authorized commit, push, merge, VPS rollout, and
+    retirement of the five old development games after verified encrypted backup.
+    The database itself must be preserved.
+  - Plan and acceptance: Compare every worksheet row with typed data, validate
+    explicit adjacent links, test terrain cancellation and scenario totals,
+    then run the local gate and desktop/tablet two-session workflows. Inspect
+    the rendered board before claiming visual acceptance. Rollback is the
+    previous code revision; preserve stored data.
+  - Validation: Frozen install, format, lint, typecheck, tests (251 passed), and
+    build pass. The 11 database tests skipped by the default suite were then
+    run against an isolated PostgreSQL container: all 92 server tests passed.
+    Two-session browser acceptance passed at desktop/tablet widths; fit images
+    were visually inspected in `test-results/phase-2`. CodeRabbit reviewed all
+    changed and new files; after two minor fixes its second pass found no issues.
+    Built-in Codex review also completed with no actionable findings. The older
+    installed CLI could not use the configured model; the current CLI completed
+    the review without a model or global installation change.
+    Markdown lint passes with only table-spacing lint disabled around the
+    worksheet to preserve owner-authored A-H rows. Final smoke passed on retry
+    after a transient test-port collision; no unrelated process was stopped.
+    Full Phase 3 remains open for movement rules and other acceptance gates.
+  - References: `docs/references/TERRAIN_ADJUSTMENTS.md` and
+    `docs/references/TERRAIN_CONNECTIONS.md` record values, inferred links,
+    assumptions, source rules, and scenario adaptation.
+
+| Remaining gate | Responsible owner | Attempted result | Reason and follow-up |
+| --- | --- | --- | --- |
+| Exact-head CI and rollout | ChrisTitusTech | Local gates and independent reviews passed; pre-retirement encrypted backup restored and copied off-host | Delivery authorized; verify both workflows on the published head, merge PR #4, retire the five old development games, refresh the verified backup, deploy merged main, and verify remote health/readiness and client workflows |
+| Owner terrain gameplay | ChrisTitusTech | Automated desktop/tablet flows and visual inspection passed | Manually play representative forest/hill/town combats and inspect R10/W7/W10 adaptations before release |
+| Complete Phase 3 | ChrisTitusTech | Terrain defense implemented; phase not complete | Finish movement costs, remaining rules, and full rules-enforced acceptance game |
+
+This follow-up supersedes earlier terrain-unverified, fixed-M9, and 231-hex
+calibration statements below. The August operational entries are historical
+evidence, not a claim that this development project is in production. No remote
+status in the August entries must not be treated as current deployment evidence.
+
 ## Current phase: Phase 2 operational closeout
 
 Phase 2 implementation merged through PR #2 as
@@ -348,10 +395,9 @@ implementation or local-validation failure remains.
 - [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
-  preview are complete in Phase 2. A 231-coordinate terrain/defense worksheet is
-  ready for owner review against the approved tracked project board in
-  `docs/references/TERRAIN_ADJUSTMENTS.md`; every row remains non-authoritative
-  until checked and assigned an exact value.
+  preview are complete in Phase 2. The 253-coordinate terrain worksheet is
+  approved and transcribed. Road/rail/stream edge estimates are mapped and
+  structurally tested, but their variable movement costs are not yet enforced.
 - [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
   loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
   mandatory legal skirmish separation, independent automatic two-die unit-factor

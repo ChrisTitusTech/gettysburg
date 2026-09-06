@@ -3,7 +3,7 @@ import { z } from "zod";
 import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
 export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
-export const RULESET_VERSION = "phase-2-tabletop-v2";
+export const RULESET_VERSION = "gettysburg-terrain-v3";
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
 export type Side = "confederate" | "union";
@@ -85,7 +85,17 @@ export interface CombatState {
     "awaiting_result_confirmation" | "declared" | "pending_choice" | "resolved";
 }
 
+export interface HexTerrain {
+  readonly kind: "clear" | "hill" | "rough_hill" | "town" | "woods";
+  readonly defense: number;
+  readonly hill_defense: number;
+  readonly woods: boolean;
+  readonly forest_region: string | null;
+  readonly hill_region: string | null;
+}
+
 export interface GameState {
+  readonly terrain?: Readonly<Partial<Record<HexCoordinate, HexTerrain>>>;
   readonly active_side: Side | null;
   readonly combats: Readonly<Record<string, CombatState>>;
   readonly content_revision: string;

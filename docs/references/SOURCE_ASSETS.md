@@ -36,11 +36,19 @@ terrain continues across a hex side. The owner-reviewed typed transcription will
 become runtime rules data in Phase 3.
 
 The protected `gameboard.jpg` is not used to approve the worksheet's display
-coordinates, terrain placement, or forest connections. The interactive renderer
-calibrates all 231 coordinate labels over the tracked PNG for owner comparison.
-The `with-hexvalues` derivative provides the same calibrated coordinates in the
-worksheet's hyphenated display syntax without replacing the approved board as the
-visual terrain authority.
+coordinates, terrain placement, or forest connections. The September terrain
+review found 23 painted columns, not 21. The interactive renderer now uses 253
+A-W coordinates. The old `with-hexvalues` derivative retains displaced A-U
+labels and is obsolete as a verification surface; its provenance remains above.
+
+On 2026-09-06, ChrisTitusTech approved every worksheet hex, corrected B2 and F11
+to woods +2, and authorized best-guess forest links and completion of the terrain
+work. `TERRAIN_CONNECTIONS.md` records inferred links and scenario adaptations.
+Rules2.pdf rule 4b4 supplies town +1; rule 4b2 supplies connected-hill cancellation.
+The owner overrides the printed woods +1 with +2 and assigns rough heights +4.
+The +4 wooded-height split and strongest-hex mixed-terrain policy are explicitly
+recorded implementation assumptions. This does not approve optional rules,
+reduced-face artwork, or public rights.
 
 ### Artwork generation record
 
@@ -137,8 +145,8 @@ counter backs.
 
 - Complete counter sheets including every reduced-face artwork treatment
 - Optional rules and whether they are in scope
-- Owner-reviewed per-hex terrain transcription and exact defensive adjustments;
-  the draft worksheet is `TERRAIN_ADJUSTMENTS.md`
+- Movement-edge and full gameplay acceptance of the inferred connections;
+  terrain values are approved in `TERRAIN_ADJUSTMENTS.md`
 - Rights or licensing basis for any public use of the supplied scans, names,
   artwork, or wording
 
@@ -166,9 +174,9 @@ decision does not approve any unchecked per-hex or per-hex-side transcription or
 unresolved exact landmark value.
 
 The remaining owner gates are narrower but still release-blocking: record the
-formal review of this interpretation/rights ledger, approve exact Battle Manual
-interpretations and a project-board-reviewed per-hex terrain/edge transcription
-before Phase 3 enforcement using `TERRAIN_ADJUSTMENTS.md`, decide optional-rule
+formal review of this interpretation/rights ledger, complete gameplay acceptance
+of the inferred terrain links and scenario adaptations, finish movement-rule
+interpretations before full Phase 3 enforcement, decide optional-rule
 and additional-scenario scope, decide the reduced-face presentation, and
 establish a rights or clean-room basis for every name, artwork element, and
 explanation shipped in the first public release.

@@ -873,7 +873,7 @@ describe("Board", () => {
     expect(container.querySelector('[data-coordinate="F6"]')).toHaveClass(
       "terrain-rough-hill",
     );
-    for (const coordinate of ["I5", "J5", "J6"]) {
+    for (const coordinate of ["I5", "J5", "M9"]) {
       expect(
         container.querySelector(`[data-coordinate="${coordinate}"]`),
       ).toHaveClass("terrain-clear");
@@ -881,6 +881,13 @@ describe("Board", () => {
     expect(container.querySelector('[data-coordinate="O7"]')).toHaveClass(
       "terrain-town",
     );
+    expect(container.querySelector('[data-coordinate="J6"]')).toHaveClass(
+      "terrain-hill",
+    );
+    expect(container.querySelector('[data-coordinate="W11"]')).toHaveClass(
+      "terrain-woods",
+    );
+    expect(container.querySelectorAll(".hex")).toHaveLength(253);
     expect(container.querySelector(".deluxe-board-art")).toHaveAttribute(
       "data-art-finish",
       "deluxe-raster",
