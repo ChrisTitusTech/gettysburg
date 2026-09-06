@@ -6,6 +6,7 @@ import { prepareNormalMovement } from "./movement-validation.js";
 import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
+import { prepareBoardExit } from "./board-exit.js";
 import type {
   CombatState,
   CommandFailure,
@@ -73,7 +74,11 @@ function scoreVictory(
     const beneficiary = otherSide(unit.side);
     if (unit.status === "eliminated") {
       score[beneficiary] += unit.combat ?? 0;
-    } else if (unit.strength === "reduced") {
+    } else if (
+      unit.strength === "reduced" &&
+      (state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+        unit.status === "deployed")
+    ) {
       score[beneficiary] += 1;
     }
   }
@@ -408,11 +413,33 @@ function nightUnitsAbleToWithdraw(
       unit.side !== side ||
       unit.status !== "deployed" ||
       unit.location === null ||
-      !enemyZoc.has(unit.location) ||
-      unit.movement - (unit.movement_spent ?? 0) < 1
+      !enemyZoc.has(unit.location)
     ) {
       return false;
     }
+    if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+      // An edge exit can require the whole active group, source-stack support,
+      // or the general bonus. Test legal groups, not just individual budgets.
+      let groups: string[][] = [[unit.id]];
+      for (const companion of Object.values(state.units)) {
+        if (
+          companion.id === unit.id ||
+          companion.side !== side ||
+          companion.status !== "deployed" ||
+          companion.location !== unit.location
+        )
+          continue;
+        groups = [
+          ...groups,
+          ...groups
+            .filter((group) => group.length < 3)
+            .map((group) => [...group, companion.id]),
+        ];
+      }
+      if (groups.some((group) => prepareBoardExit(state, side, group).ok))
+        return true;
+    }
+    if (unit.movement - (unit.movement_spent ?? 0) < 1) return false;
     return adjacentHexes(unit.location).some(
       (destination) =>
         !enemyZoc.has(destination) &&
@@ -514,6 +541,27 @@ function mandatoryReinforcement(
         state,
         prepared.patch,
         `${ids.length} reinforcement counter${ids.length === 1 ? "" : "s"} entered at ${destination} (${prepared.cost} movement)`,
+      )
+    : failure(state, prepared.error, prepared.message);
+}
+
+function exitBoard(
+  state: GameState,
+  side: Side,
+  ids: readonly string[],
+): ReducerResult {
+  if (state.ruleset_version !== MANDATORY_RULESET_VERSION)
+    return failure(
+      state,
+      "phase_invalid",
+      "Board exits require the mandatory ruleset.",
+    );
+  const prepared = prepareBoardExit(state, side, ids);
+  return prepared.ok
+    ? accepted(
+        state,
+        prepared.patch,
+        `${ids.length} counter${ids.length === 1 ? "" : "s"} permanently exited the board (1 movement)`,
       )
     : failure(state, prepared.error, prepared.message);
 }
@@ -1438,6 +1486,8 @@ export function reduceGameplayCommand(
   } = {},
 ): ReducerResult {
   switch (command.command_name) {
+    case "exitBoard":
+      return exitBoard(state, actorSide, command.payload.unit_ids);
     case "moveUnit":
       return moveUnit(state, actorSide, command);
     case "moveStack":

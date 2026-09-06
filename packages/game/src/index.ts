@@ -9,3 +9,4 @@ export * from "./normal-move.js";
 export * from "./movement-validation.js";
 export * from "./generals.js";
 export * from "./reinforcements.js";
+export * from "./board-exit.js";

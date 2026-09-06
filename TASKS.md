@@ -28,6 +28,8 @@ reduced-strength treatment for public release, keeping supplied scans private.
 Notifications will use opt-in browser push. Repeated drags remain one continuous
 unit/stack move until another unit moves. Owner gameplay acceptance and final
 release validation remain gates; engineering work continues through small PRs.
+The owner also approved applying the extra-loss/edge-exit rule when impassable
+terrain makes retreat impossible, including trapped artillery on this board.
 
 ## Terrain follow-up: 2026-09-06
 
@@ -477,6 +479,28 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete permanent board exit and its browser control.
+  - Scope: An edge exit spends one normal movement point, obeys the active-group
+    boundary and source capacity, and permanently removes counters from play.
+    The separate `exited` status retains historical strength but cannot move,
+    re-enter, or participate in combat. Manual 6a5 counts reduced units only while
+    on the board, so exited counters score neither reduced nor eliminated losses.
+  - Boundary: The command is rejected by older rulesets; mandatory-v4 remains
+    unavailable for new games. Browser entry/exit controls and forced-retreat
+    exits remain separate work.
+  - Acceptance: Cover full/reduced scoring, snapshots, one-point cost, general
+    allowance, activation, source capacity, capture, authority, night exits, and
+    legacy isolation. Room handlers now derive from the protocol command map;
+    a real WebSocket test verifies every name reaches authoritative validation.
+    Night withdrawal recognizes affordable exits, including active stacks and
+    general bonuses. These close two hosted-review findings; full terrain-aware
+    on-board night withdrawal remains in its separate task.
+    Frozen install, format, lint, typecheck, 334 default
+    workspace tests plus six harness tests, build, smoke, Markdown lint, and
+    all 93 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
+    regression pass after review fixes (`test-results/voluntary-board-exit-review`).
+    Independent review
+    and exact-head CI remain required before merge.
 - [ ] Complete mandatory reinforcement entry and browser controls.
   - Scope: Charge terrain or explicitly connected off-board-road entry costs;
     replace enemy-occupied/ZOC entries with nearest safe board-edge alternatives.

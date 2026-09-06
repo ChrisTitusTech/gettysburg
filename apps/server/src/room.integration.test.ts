@@ -8,6 +8,7 @@ import {
 import { matchMaker } from "@colyseus/core";
 import {
   COMMAND_SCHEMA_VERSION,
+  commandPayloadSchemas,
   type AuditEvent,
   type CommandResult,
   type GameState,
@@ -79,6 +80,38 @@ describe("Colyseus authoritative room", () => {
       await server.gracefullyShutdown(false);
       server = undefined;
     }
+  });
+
+  it("routes every protocol command through authoritative validation", async () => {
+    const service = new InMemoryGameService();
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: new InMemoryAsyncGameService(service),
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+    const response = await fetch(`${origin}/api/games`, {
+      body: JSON.stringify({ seat: "union" }),
+      headers: { "content-type": "application/json" },
+      method: "POST",
+    });
+    const cookie = cookieFrom(response);
+    const created = (await response.json()) as CreatedGame;
+    const room = await new ColyseusClient(origin, {
+      headers: { cookie, origin },
+    }).joinOrCreate("game", { gameId: created.game_id });
+    rooms.push(room);
+    for (const name of Object.keys(commandPayloadSchemas)) {
+      const rejected = nextMessage<CommandResult>(room, "commandResult");
+      room.send(name, { command_name: name });
+      await expect(rejected).resolves.toMatchObject({
+        ok: false,
+        error: "invalid_payload",
+      });
+    }
+    expect(service.getGameState(created.game_id).version).toBe(0);
   });
 
   it("disposes an empty room and reconstructs it from authoritative state", async () => {
