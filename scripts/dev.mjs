@@ -37,8 +37,28 @@ let cleaned = false;
 function cleanup() {
   if (cleaned) return;
   cleaned = true;
-  postgres.stop();
-  rmSync(runtimeDirectory, { force: true, recursive: true });
+  const errors = [];
+  try {
+    postgres.stop();
+  } catch (error) {
+    errors.push(
+      new Error("Failed to stop the PostgreSQL development service", {
+        cause: error,
+      }),
+    );
+  }
+  try {
+    rmSync(runtimeDirectory, { force: true, recursive: true });
+  } catch (error) {
+    errors.push(
+      new Error("Failed to remove the development runtime directory", {
+        cause: error,
+      }),
+    );
+  }
+  if (errors.length > 0) {
+    throw new AggregateError(errors, "Development cleanup failed");
+  }
 }
 
 process.once("exit", cleanup);

@@ -10,6 +10,7 @@ import {
 } from "node:crypto";
 
 import {
+  BOARD_TERRAIN,
   SCENARIO_CONTENT_REVISION,
   SCENARIO_HEXES,
   SCENARIO_UNITS,
@@ -1009,6 +1010,7 @@ export class InMemoryGameService {
       active_side: "union",
       combats: {},
       content_revision: SCENARIO_CONTENT_REVISION,
+      terrain: BOARD_TERRAIN,
       event_sequence: 0,
       game_id: gameId,
       night: false,

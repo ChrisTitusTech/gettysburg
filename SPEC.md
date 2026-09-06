@@ -23,6 +23,28 @@ The primary interaction target is a current desktop browser. Tablet landscape
 is required before production release. Phone play is a later optimization and
 must not be claimed until the full board workflow is manually validated.
 
+## Current implementation boundary
+
+The 2026-09-06 development terrain follow-up supersedes the older terrain
+exclusion below: the active board is A-W / 1-11 (253 hexes), matching the painted
+columns. All terrain rows are owner-approved. Explicit best-guess forest and
+hill links drive combat; road/rail/stream links are transcribed but variable
+movement costs remain future work. See `docs/references/TERRAIN_ADJUSTMENTS.md`
+and `docs/references/TERRAIN_CONNECTIONS.md` for exact rules and assumptions.
+The owner confirmed this is not live/production and old development games need
+not remain compatible. No stored data is deleted or migrated by this work.
+
+The merged application implements the Phase 2 Scenario Five rules-light digital
+tabletop, durable PostgreSQL state, recovery, and private-staging workflow. That
+evidence does not claim complete Phase 3 terrain/rule enforcement or Phase 4
+production readiness. Phase 2 operational closeout is also still active. PR #4's
+validated implementation head has green Application and Documentation CI for
+the current-main repair, but the final PR head and resulting `main` commit must
+each pass their workflows. The final PR head still needs independent review
+before merge, and the deployed older revision currently fails readiness.
+`TASKS.md` owns the live status so temporary operational facts do not weaken the
+requirements below.
+
 ## Source game facts
 
 The implementation must preserve these facts visible in the supplied material:
@@ -52,8 +74,13 @@ The implementation must preserve these facts visible in the supplied material:
 - Reinforcements enter on scheduled turns and hexes listed by the orders of
   battle.
 
-The source files remain the authority where this summary is incomplete. Any
-ambiguity must be recorded and resolved, not guessed. See
+The supplied rules and orders of battle remain the authority for rule mechanics,
+unit data, and scenario data where this summary is incomplete. The owner-approved
+tracked project board is the visual authority for which terrain is painted in a
+hex and whether painted terrain continues across a hex side. Owner-reviewed typed
+content becomes the runtime authority after that visual terrain is transcribed.
+Ambiguity must be recorded; the owner explicitly authorized best-guess forest
+connections for the development terrain pass. See
 `docs/references/SOURCE_ASSETS.md`.
 
 ## Required behavior
@@ -124,7 +151,8 @@ values are never persisted or logged.
 
 - The board supports pan, zoom, hex selection, legible coordinate labels, and a
   visible selected-unit state.
-- A calibrated data overlay maps each playable coordinate to the source board.
+- A calibrated data overlay maps each playable coordinate to the approved
+  tracked project board.
 - Counters expose side, identity, strength state, movement allowance, location,
   and relevant status without relying on color alone.
 - Invalid drops return the counter to its authoritative location and explain
@@ -291,9 +319,13 @@ budget, never routes movement through an enemy-occupied hex, permits daytime
 movement into an enemy zone of control to establish an attack, and enforces the
 core night withdrawal, no-entry, and trapped-combat ZOC rules. Phase 3 adds
 automated validation for variable movement costs, roads, terrain, streams,
-remaining zones of control, generals, stacking, combat grouping, modifiers,
-losses, retreats, advances, remaining reinforcement entry, nighttime
-reorganization, objectives, and victory.
+remaining zones of control and advanced stacking, authoritative terrain combat
+modifiers, retreat priority and forced off-board retreat, remaining reinforcement
+restrictions, nighttime reorganization, and any source-approved objective or
+victory edge cases. Phase 2 already enforces basic general stacking, mandatory
+contact grouping, independent unit-factor results, loss allocation, connected
+retreat, eligible advance, objective control, casualty scoring, automatic-victory
+checks, and final victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
 
@@ -384,9 +416,30 @@ leaving terrain and the remaining advanced modifiers for Phase 3:
   causes retreat, 3-5 causes retreat plus one step loss, and 6 or more causes
   retreat plus two step losses. An attacker win offers advance after required
   losses and retreats resolve. Losses are capped at the participant steps still
-  available. Per-hex hill, woods, and town modifiers remain excluded until the
-  terrain transcription is reviewed, so the interface identifies the result as
-  unit-factor-only rather than claiming complete Phase 3 terrain correctness.
+  available. New terrain-version games include the approved hill, woods, and
+  town adjustments. The interface shows the combined unit/terrain total.
+  Phase 3 terrain defense is calculated once per skirmish, not once per unit or
+  participating hex. Repeated standard hill or woods/forest terrain across
+  connected defending hexes contributes that terrain's approved adjustment only
+  once. Matching terrain in an adjacent hex outside the skirmish contributes
+  nothing. Separate skirmishes calculate independently; combinations of
+  different terrain types use the strongest effective defending hex, not a sum
+  across hexes. Each hex is capped at its approved total. A +4 wooded rough hill
+  has +2 hill and +2 woods components; town is +1. These are recorded assumptions
+  under the owner's completion instruction. A forest is a continuous region
+  of woods-containing hexes linked
+  only across a shared hex side where the approved project-board artwork shows
+  the woods continuing through that side. Adjacent woods hexes without that
+  connection are separate forests. Wooded-hill and rough-hill-plus-woods hexes
+  participate only through reviewed woods links. A participating defending woods
+  hex is eligible for woods defense only when no participating attacker occupies
+  that same connected forest. The defending side receives its single woods
+  adjustment only if at least one participating defending woods hex remains
+  eligible. If none remains eligible, the skirmish receives no woods adjustment.
+  Cancellation affects only woods; an independently applicable standard- or
+  rough-hill adjustment remains available unless a participating attacker shares
+  that connected hill (Rules2.pdf rule 4b2). Explicit inferred hill links define
+  that independent cancellation.
   A reduced counter contributes half its full combat factor rounded up. A
   combat-one counter has no reduced step and is eliminated by its first
   allocated loss. Saved Phase 2 v1 games retain their original combat behavior;
@@ -764,12 +817,16 @@ accepted when:
 
 ## Unresolved questions
 
-- What are the complete Battle Manual rules referenced by the two supplied pages?
+- Which remaining Battle Manual interpretations must be approved for complete
+  Phase 3 enforcement?
 - What artwork, if any, should appear on reduced counter faces beyond the
   owner-approved derived combat values?
-- What is the precise initial setup for each scenario?
-- How are objectives scored and victory determined?
+- Is Scenario Five the only scenario required for the first release; if not,
+  what are the approved setup and victory contracts for each additional scenario?
+- Which rows and exact adjustments in
+  `docs/references/TERRAIN_ADJUSTMENTS.md` are owner-approved, and what edge data
+  completes their authoritative movement and combat interpretation?
 - Which optional rules, if any, are required?
-- Is the first deployment private/invite-only, and what rights exist for supplied
-  artwork and wording?
+- Is the first production release private/invite-only, and what rights exist for
+  every supplied name, artwork element, and rule explanation proposed for it?
 - Is asynchronous turn notification required before the first production release?

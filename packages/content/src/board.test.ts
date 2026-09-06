@@ -11,9 +11,9 @@ import {
 } from "./board";
 
 describe("fixture board calibration", () => {
-  it("maps all A-U and 1-11 coordinates exactly once", () => {
-    expect(FIXTURE_HEXES).toHaveLength(21 * 11);
-    expect(new Set(FIXTURE_HEXES.map((hex) => hex.coordinate)).size).toBe(231);
+  it("maps all A-W and 1-11 coordinates exactly once", () => {
+    expect(FIXTURE_HEXES).toHaveLength(23 * 11);
+    expect(new Set(FIXTURE_HEXES.map((hex) => hex.coordinate)).size).toBe(253);
   });
 
   it.each(["A1", "K6", "U11"] as const)(
@@ -40,7 +40,9 @@ describe("fixture board calibration", () => {
   it.each([
     ["A1", true],
     ["A12", false],
-    ["V1", false],
+    ["V1", true],
+    ["W11", true],
+    ["X1", false],
     ["not-a-coordinate", false],
   ] as const)("validates fixture coordinate %s", (coordinate, expected) => {
     expect(isFixtureCoordinate(coordinate)).toBe(expected);

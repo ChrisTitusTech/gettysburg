@@ -32,9 +32,9 @@ describe("source-card scenario content", () => {
     }
   });
 
-  it("keeps terrain unverified while preserving the eight board objectives", () => {
-    expect(SCENARIO_HEXES).toHaveLength(231);
-    expect(SCENARIO_HEXES.every((hex) => hex.terrain === "unverified")).toBe(
+  it("uses verified terrain and relocates Culp's Hill without changing points", () => {
+    expect(SCENARIO_HEXES).toHaveLength(253);
+    expect(SCENARIO_HEXES.every((hex) => hex.terrain !== "unverified")).toBe(
       true,
     );
     expect(
@@ -51,7 +51,7 @@ describe("source-card scenario content", () => {
       L6: 1,
       L7: 1,
       M7: 1,
-      M9: 3,
+      R10: 3,
     });
     expect(
       SCENARIO_HEXES.reduce((sum, hex) => sum + (hex.objective_value ?? 0), 0),

@@ -27,6 +27,25 @@ The delivery order is:
 Each phase is a separately reviewable outcome with automated validation, manual
 browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
 
+## Current delivery status
+
+The 2026-09-06 approved terrain follow-up expands the development board to A-W,
+records best-guess connections, and implements terrain defense. The owner
+confirmed no live/production games require compatibility. This bounded Phase 3
+increment does not complete movement-rule enforcement or authorize deployment.
+Current evidence and remaining gates are in `TASKS.md`.
+
+Phase 0 is complete. Phase 1 implementation is merged but awaits the owner's
+recorded interpretation/rights-ledger review. Phase 2 implementation and its
+post-merge battle cleanup are merged through PR #3. PR #4's validated
+implementation head has green Application and Documentation CI for the
+operational repair, but the final PR head and resulting `main` commit must each
+pass their workflows. The final PR head also needs a non-rate-limited
+independent review before merge. Operational closeout requires a healthy
+deployment of the reviewed current revision. Phase 3 rules assistance and Phase
+4 production release work have not started as complete phases. `TASKS.md` is the
+authoritative current evidence ledger.
+
 ## Approved decisions
 
 | Area | Decision | Reason |
@@ -111,11 +130,13 @@ is in `docs/operations/VPS.md`.
 
 ## Decision gates before full content implementation
 
-- Obtain complete counter fronts. For the Phase 2 rules-light model, derive a
-  reduced combat factor by halving and rounding up; combat-one counters have one
-  step. Reduced-face artwork remains a later presentation input.
-- Review the per-hex terrain transcription against the supplied board before
-  Phase 3 terrain enforcement; it is deliberately unavailable to Phase 2 rules.
+- Complete the production counter treatment. All available source-card fronts
+  and the owner-approved Phase 2 reduced-value rule are encoded; reduced-face
+  artwork remains a later presentation input.
+- Complete movement-edge and gameplay acceptance for the approved per-hex
+  terrain transcription. Forest links use authorized best guesses. Use supplied
+  rules and explicit owner decisions for terrain effects and numeric modifiers;
+  terrain defense is enabled in the new development terrain ruleset.
 - Decide whether optional rules are in scope.
 - Decide whether the supplied scans may be used beyond a private prototype or
   whether the release must use entirely original art and wording.

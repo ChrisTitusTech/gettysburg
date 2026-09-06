@@ -1,4 +1,5 @@
 import {
+  BOARD_TERRAIN,
   BOARD_VIEW_BOX,
   FIXTURE_HEXES,
   coordinateToPoint,
@@ -8,6 +9,7 @@ import {
 import {
   adjacentHexes,
   combatFactorModifier,
+  defenderCombatModifier,
   combatOpportunities,
   currentCombatValue,
   hexDistance,
@@ -146,7 +148,9 @@ export function Board({
                 }),
               ),
             ].sort(),
-            attacker_modifier: combatFactorModifier(state, combat.attackers),
+            attacker_modifier:
+              combat.confirmation?.attacker_modifier ??
+              combatFactorModifier(state, combat.attackers),
             defender_hexes: [
               ...new Set(
                 combat.defenders.flatMap((id) => {
@@ -157,7 +161,9 @@ export function Board({
                 }),
               ),
             ].sort(),
-            defender_modifier: combatFactorModifier(state, combat.defenders),
+            defender_modifier:
+              combat.confirmation?.defender_modifier ??
+              defenderCombatModifier(state, combat.attackers, combat.defenders),
             id: combat.id,
           }))
       : [];
@@ -649,7 +655,7 @@ export function Board({
       <div className="board-heading-row">
         <div>
           <p className="eyebrow">Original rules-light tabletop board</p>
-          <h2 id="board-heading">A-U / 1-11 field</h2>
+          <h2 id="board-heading">A-W / 1-11 field</h2>
         </div>
         <div className="zoom-controls" aria-label="Board controls">
           <button
@@ -733,7 +739,9 @@ export function Board({
                 points={hexPolygonPoints(hex.point)}
                 role={selectedUnit === undefined ? undefined : "button"}
                 tabIndex={selectedUnit === undefined ? -1 : 0}
-              />
+              >
+                <title>{`${hex.coordinate}: ${presentationTerrain(hex.coordinate)}; defense +${BOARD_TERRAIN[hex.coordinate].defense} before connected-terrain cancellation`}</title>
+              </polygon>
             ))}
           </g>
           <g aria-hidden="true">
@@ -840,7 +848,7 @@ export function Board({
                           <title>
                             Adjacent combat: attacker +
                             {opportunity.attacker_modifier}, defender +
-                            {opportunity.defender_modifier} before terrain
+                            {opportunity.defender_modifier} including terrain
                           </title>
                         </line>
                       );

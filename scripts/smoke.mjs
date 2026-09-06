@@ -12,6 +12,7 @@ const children = [];
 let isStopping = false;
 let postgres;
 let runtimeDirectory;
+let failure;
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -54,9 +55,46 @@ function start(name, args, environment) {
     });
   }
 
-  const runningChild = { child, name, output };
+  const exited = new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("exit", (code, signal) => resolve({ code, signal }));
+  });
+  const closed = new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("close", (code, signal) => resolve({ code, signal }));
+  });
+  void closed.catch(() => {});
+  const runningChild = { child, closed, exited, name, output };
   children.push(runningChild);
+  void exited.then(
+    ({ code, signal }) => {
+      if (!isStopping) {
+        failure ??= new Error(
+          `${name} exited early with ${signal ?? `code ${String(code)}`}`,
+        );
+      }
+    },
+    (error) => {
+      if (!isStopping) {
+        failure ??= new Error(`${name} failed to start`, { cause: error });
+      }
+    },
+  );
   return runningChild;
+}
+
+async function settlesWithin(promise, timeout) {
+  let timeoutHandle;
+  try {
+    return await Promise.race([
+      promise.then(() => true),
+      new Promise((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(false), timeout);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutHandle);
+  }
 }
 
 async function waitFor(url, expectedStatus, deadline) {
@@ -80,13 +118,16 @@ async function waitFor(url, expectedStatus, deadline) {
 }
 
 async function stop(runningChild) {
-  const { child } = runningChild;
-  if (child.exitCode !== null || child.signalCode !== null) {
+  const { child, closed } = runningChild;
+  if (child.pid === undefined) {
+    await closed;
     return;
   }
 
   if (process.platform === "win32") {
-    child.kill("SIGTERM");
+    if (child.exitCode === null && child.signalCode === null) {
+      child.kill("SIGTERM");
+    }
   } else {
     try {
       process.kill(-child.pid, "SIGTERM");
@@ -95,21 +136,21 @@ async function stop(runningChild) {
     }
   }
 
-  await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
-    new Promise((resolve) => setTimeout(resolve, 4_000)),
-  ]);
+  if (await settlesWithin(closed, 4_000)) return;
 
-  if (child.exitCode === null && child.signalCode === null) {
-    if (process.platform === "win32") {
+  if (process.platform === "win32") {
+    if (child.exitCode === null && child.signalCode === null) {
       child.kill("SIGKILL");
-    } else {
-      try {
-        process.kill(-child.pid, "SIGKILL");
-      } catch (error) {
-        if (error?.code !== "ESRCH") throw error;
-      }
     }
+  } else {
+    try {
+      process.kill(-child.pid, "SIGKILL");
+    } catch (error) {
+      if (error?.code !== "ESRCH") throw error;
+    }
+  }
+  if (!(await settlesWithin(closed, 4_000))) {
+    throw new Error(`${runningChild.name} did not close after SIGKILL`);
   }
 }
 
@@ -119,7 +160,7 @@ try {
   await run("pnpm", ["--filter", "@gettysburg/game", "build"]);
   await run("pnpm", ["--filter", "@gettysburg/content", "build"]);
 
-  const server = start("server", ["--filter", "@gettysburg/server", "start"], {
+  start("server", ["--filter", "@gettysburg/server", "start"], {
     DATABASE_URL: postgres.connectionString,
     GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
       runtimeDirectory,
@@ -129,37 +170,22 @@ try {
     GETTYSBURG_SERVER_PORT: String(serverPort),
     GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
   });
-  const web = start("web", ["--filter", "@gettysburg/web", "dev"], {
+  start("web", ["--filter", "@gettysburg/web", "dev"], {
     GETTYSBURG_SERVER_ORIGIN: `http://127.0.0.1:${serverPort}`,
     GETTYSBURG_WEB_HOST: "127.0.0.1",
     GETTYSBURG_WEB_PORT: String(webPort),
   });
-  const unavailableServer = start(
-    "unavailable-server",
-    ["--filter", "@gettysburg/server", "start"],
-    {
-      DATABASE_URL: postgres.connectionString,
-      GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
-        runtimeDirectory,
-        "unavailable-pepper",
-      ),
-      GETTYSBURG_REQUIRED_DEPENDENCY: "unavailable",
-      GETTYSBURG_SERVER_HOST: "127.0.0.1",
-      GETTYSBURG_SERVER_PORT: String(serverPort + 1),
-      GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
-    },
-  );
-
-  for (const runningChild of [server, web, unavailableServer]) {
-    runningChild.child.once("exit", (code, signal) => {
-      if (!isStopping && code !== null && code !== 0) {
-        process.exitCode = 1;
-        console.error(
-          `${runningChild.name} exited early with ${signal ?? `code ${String(code)}`}`,
-        );
-      }
-    });
-  }
+  start("unavailable-server", ["--filter", "@gettysburg/server", "start"], {
+    DATABASE_URL: postgres.connectionString,
+    GETTYSBURG_CREDENTIAL_PEPPER_FILE: join(
+      runtimeDirectory,
+      "unavailable-pepper",
+    ),
+    GETTYSBURG_REQUIRED_DEPENDENCY: "unavailable",
+    GETTYSBURG_SERVER_HOST: "127.0.0.1",
+    GETTYSBURG_SERVER_PORT: String(serverPort + 1),
+    GETTYSBURG_TRUSTED_ORIGIN: `http://127.0.0.1:${webPort}`,
+  });
 
   const deadline = Date.now() + timeoutMs;
   const readyResponse = await waitFor(
@@ -186,6 +212,54 @@ try {
     "Smoke check passed: web/server ready through proxy and missing dependency fails readiness",
   );
 } catch (error) {
+  failure ??= error;
+} finally {
+  const cleanupErrors = [];
+  isStopping = true;
+  const childResults = await Promise.allSettled(
+    children.map(async (runningChild) => {
+      await stop(runningChild);
+    }),
+  );
+  for (const result of childResults) {
+    if (result.status === "rejected") cleanupErrors.push(result.reason);
+  }
+  try {
+    postgres?.stop();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to stop the PostgreSQL smoke service", {
+        cause: error,
+      }),
+    );
+  }
+  if (runtimeDirectory !== undefined) {
+    try {
+      await rm(runtimeDirectory, { force: true, recursive: true });
+    } catch (error) {
+      cleanupErrors.push(
+        new Error("Failed to remove the smoke runtime directory", {
+          cause: error,
+        }),
+      );
+    }
+  }
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors,
+      "Smoke cleanup failed",
+    );
+    failure =
+      failure === undefined
+        ? cleanupFailure
+        : new AggregateError(
+            [failure, cleanupFailure],
+            "Smoke validation and cleanup failed",
+          );
+  }
+}
+
+if (failure !== undefined) {
   for (const runningChild of children) {
     if (runningChild.output.length > 0) {
       console.error(
@@ -193,11 +267,5 @@ try {
       );
     }
   }
-  throw error;
-} finally {
-  isStopping = true;
-  await Promise.all(children.map(stop));
-  postgres?.stop();
-  if (runtimeDirectory !== undefined)
-    await rm(runtimeDirectory, { force: true, recursive: true });
+  throw failure;
 }

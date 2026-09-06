@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 import { containerEngine, startPostgres } from "./postgres-test-service.mjs";
 
@@ -9,8 +10,27 @@ const readyContainer = `gettysburg-ready-${suffix}`;
 const unavailableContainer = `gettysburg-unavailable-${suffix}`;
 const network = `gettysburg-smoke-${suffix}`;
 const appState = `gettysburg-app-state-${suffix}`;
+const readinessHealthCommand = "node apps/server/dist/readiness-healthcheck.js";
 const createdContainers = [];
+let appStateCreated = false;
+let imageCreated = false;
+let networkCreated = false;
 let postgres;
+let failure;
+
+const applicationQuadlet = readFileSync(
+  "ops/quadlet/gettysburg-app.container.in",
+  "utf8",
+);
+if (
+  !applicationQuadlet
+    .split(/\r?\n/u)
+    .includes(`HealthCmd=${readinessHealthCommand}`)
+) {
+  throw new Error(
+    "Application Quadlet must use the argument-safe readiness health command",
+  );
+}
 
 function run(args, options = {}) {
   const output = execFileSync(engine, args, {
@@ -36,6 +56,16 @@ function startContainer(name, databaseUrl, extraEnvironment = []) {
     "ALL",
     "--security-opt",
     "no-new-privileges",
+    "--health-cmd",
+    readinessHealthCommand,
+    "--health-interval",
+    "1s",
+    "--health-retries",
+    "3",
+    "--health-start-period",
+    "1s",
+    "--health-timeout",
+    "2s",
     "--publish",
     "127.0.0.1::3000",
     "--volume",
@@ -77,6 +107,28 @@ async function waitFor(url, expectedStatus) {
   throw new Error(`Timed out waiting for ${url}: ${lastStatus}`);
 }
 
+async function waitForContainerHealth(name, expectedStatus) {
+  const deadline = Date.now() + 75_000;
+  let lastStatus = "unavailable";
+  while (Date.now() < deadline) {
+    const remaining = Math.max(1, deadline - Date.now());
+    lastStatus = run(
+      [
+        "inspect",
+        "--format",
+        "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}",
+        name,
+      ],
+      { timeout: remaining },
+    );
+    if (lastStatus === expectedStatus) return;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(
+    `${name} health remained ${lastStatus}; expected ${expectedStatus}`,
+  );
+}
+
 function stopCleanly(name) {
   run(["stop", "--time", "10", name]);
   const exitCode = run(["inspect", "--format", "{{.State.ExitCode}}", name]);
@@ -87,8 +139,11 @@ try {
   run(["build", "--tag", image, "--file", "Containerfile", "."], {
     stdio: "inherit",
   });
+  imageCreated = true;
   run(["network", "create", network]);
+  networkCreated = true;
   run(["volume", "create", appState]);
+  appStateCreated = true;
   postgres = await startPostgres({ engine, network });
 
   startContainer(readyContainer, postgres.containerConnectionString);
@@ -101,6 +156,7 @@ try {
   ) {
     throw new Error("Container readiness did not report PostgreSQL durability");
   }
+  await waitForContainerHealth(readyContainer, "healthy");
   await waitFor(`${readyOrigin}/`, 200);
   const uid = run([
     "exec",
@@ -138,6 +194,7 @@ try {
   startContainer(readyContainer, postgres.containerConnectionString);
   readyOrigin = containerOrigin(readyContainer);
   await waitFor(`${readyOrigin}/readyz`, 200);
+  await waitForContainerHealth(readyContainer, "healthy");
   const resumed = await fetch(`${readyOrigin}/api/games/${created.game_id}`, {
     headers: { cookie },
   });
@@ -159,29 +216,59 @@ try {
   const unavailable = await waitFor(`${unavailableOrigin}/readyz`, 503);
   if ((await unavailable.json()).status !== "unavailable")
     throw new Error("Unavailable dependency did not fail readiness safely");
+  await waitForContainerHealth(unavailableContainer, "unhealthy");
   stopCleanly(unavailableContainer);
 
   console.log(
     `Container smoke passed with ${engine}: non-root ${uid}:${gid}, PostgreSQL restart resume, fail-closed readiness, clean shutdown`,
   );
+} catch (error) {
+  failure = error;
 } finally {
+  const cleanupErrors = [];
   for (const name of new Set(createdContainers)) {
     try {
-      run(["rm", "--force", name], { stdio: "ignore" });
-    } catch {
-      // Preserve the original validation error.
+      run(["rm", "--force", name]);
+    } catch (error) {
+      cleanupErrors.push(
+        new Error(`Failed to remove container ${name}`, { cause: error }),
+      );
     }
   }
-  postgres?.stop();
-  for (const args of [
-    ["volume", "rm", "--force", appState],
-    ["network", "rm", network],
-    ["image", "rm", "--force", image],
-  ]) {
+  try {
+    postgres?.stop();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to stop the PostgreSQL container", { cause: error }),
+    );
+  }
+  const createdResources = [];
+  if (appStateCreated)
+    createdResources.push(["volume", "rm", "--force", appState]);
+  if (networkCreated) createdResources.push(["network", "rm", network]);
+  if (imageCreated) createdResources.push(["image", "rm", "--force", image]);
+  for (const args of createdResources) {
     try {
-      run(args, { stdio: "ignore" });
-    } catch {
-      // Preserve the original validation error.
+      run(args);
+    } catch (error) {
+      cleanupErrors.push(
+        new Error(`Failed to clean up ${args.join(" ")}`, { cause: error }),
+      );
     }
+  }
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors,
+      "Container smoke cleanup failed",
+    );
+    failure =
+      failure === undefined
+        ? cleanupFailure
+        : new AggregateError(
+            [failure, cleanupFailure],
+            "Container smoke validation and cleanup failed",
+          );
   }
 }
+
+if (failure !== undefined) throw failure;

@@ -15,7 +15,9 @@ ReadOnly=true
 Tmpfs=/tmp
 NoNewPrivileges=true
 DropCapability=all
-HealthCmd=node -e "fetch('http://127.0.0.1:3000/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+# Keep this command argument-safe. An inline `node -e` expression loses its
+# closing quote in older Quadlet generators.
+HealthCmd=node apps/server/dist/readiness-healthcheck.js
 HealthInterval=10s
 HealthTimeout=3s
 HealthRetries=6

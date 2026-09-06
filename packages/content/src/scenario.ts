@@ -1,9 +1,10 @@
 import type { HexCoordinate, Side } from "@gettysburg/game";
 
 import { FIXTURE_HEXES } from "./board.js";
+import { BOARD_TERRAIN } from "./terrain.js";
 import type { ScenarioHex, ScenarioUnit, UnitKind } from "./types.js";
 
-export const SCENARIO_CONTENT_REVISION = "gettysburg-source-cards-v1";
+export const SCENARIO_CONTENT_REVISION = "gettysburg-painted-board-v2";
 
 type UnitTuple = readonly [
   id: string,
@@ -25,7 +26,10 @@ function units(
     ([id, label, organization, kind, combat, movement, turn, hex]) =>
       ({
         combat,
-        entry_hexes: turn === null ? [] : [hex],
+        entry_hexes:
+          turn === null
+            ? []
+            : [hex === "U7" ? "W7" : hex === "U10" ? "W10" : hex],
         entry_turn: turn,
         id,
         kind,
@@ -206,16 +210,14 @@ const OBJECTIVE_VALUES = new Map<HexCoordinate, number>([
   ["L6", 1],
   ["L7", 1],
   ["M7", 1],
-  ["M9", 3],
+  ["R10", 3],
 ]);
 
-// The scan proves the coordinate labels and printed objective values, but a reviewed per-hex terrain
-// transcription is still required. Keeping the explicit sentinel prevents the
-// Phase 2 rules-light renderer from presenting generated terrain as source fact.
+// Owner-approved painted board. Culp's Hill moves to R10; point values remain.
 export const SCENARIO_HEXES: readonly ScenarioHex[] = FIXTURE_HEXES.map(
   ({ coordinate }) => ({
     coordinate,
     objective_value: OBJECTIVE_VALUES.get(coordinate) ?? null,
-    terrain: "unverified",
+    terrain: BOARD_TERRAIN[coordinate].kind,
   }),
 );

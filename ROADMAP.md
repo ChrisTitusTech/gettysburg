@@ -8,6 +8,11 @@ The source material, product direction, architecture, deployment target, risks,
 and ordered implementation work are documented well enough to begin without
 inventing missing game behavior.
 
+### Current status
+
+Complete. PR #1 established the planning foundation and passed its exact-head
+documentation gate.
+
 ### Included work
 
 - Inventory and checksum the supplied board, rules, and orders of battle.
@@ -54,6 +59,12 @@ production service is changed by this phase.
 Two browsers can create or join one private room, take opposing seats, and move
 two fixture counters on a calibrated board through a server-authoritative state
 that survives reconnect.
+
+### Current status
+
+Implementation and validation are merged into `main`. Formal phase closure still
+requires the project owner's recorded review of the interpretation and rights
+ledger; no Phase 1 code or local-validation failure remains.
 
 ### Included work
 
@@ -112,10 +123,23 @@ Two players can play the complete approved scenario as a rules-light digital
 tabletop with all counters, turns, reinforcements, server dice, saved state, and
 an auditable action log.
 
+### Current status
+
+Implementation, the human acceptance game, and the PR #3 battle/review cleanup
+are merged. PR #4 repairs the post-merge Application CI and malformed container
+health-probe failures; its validated implementation head passed Application and
+Documentation CI. The final PR head and resulting `main` commit must each pass
+their workflows. Operational closeout remains open until the final PR head
+passes a non-rate-limited independent review and the repair merges, and until
+private staging moves from the older Phase 2 revision through the required
+backup and repeat release gate. `TASKS.md` records the current evidence.
+
 ### Included work
 
-- Encode the complete approved map, terrain, units, counter steps, setup, and
-  reinforcement schedule as typed content with provenance.
+- Encode the complete approved map geometry, units, counter steps, setup, and
+  reinforcement schedule as typed content with provenance. Keep painted terrain
+  presentation-only until the per-hex terrain and edge transcription is reviewed
+  for Phase 3.
 - Add full/reduced/eliminated counter state and required general stacking support.
 - Implement all phase transitions across 24 turns and identify night turns.
 - Add automatic server dice and unit-factor combat results, confirmation,
@@ -172,15 +196,31 @@ The server guides and enforces the approved movement, stacking, combat,
 reinforcement, night, objective, and victory rules without blocking recovery
 from a connection or persistence failure.
 
+### Current status
+
+Terrain-defense work started on 2026-09-06 with approved A-W data and authorized
+best-guess connections. This does not complete Phase 3. Phase 2 pulled forward
+several movement, stacking,
+combat, and core night rules, but Phase 3 remains gated on Phase 2 operational
+closeout, owner-approved per-hex terrain data, and optional-rule decisions. The
+coordinate-by-coordinate review worksheet is in
+`docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
+Forest/hill links feed combat; road/rail/stream estimates await movement rules.
+TASKS.md records validation, review, and remaining owner acceptance.
+
 ### Included work
 
 - Extend the Phase 2 one-point-per-hex movement budget with path cost, roads,
   terrain, streams, zones of control, generals, and stacking validation.
 - Extend adjacent contact discovery, same-hex grouping, and capped unit-factor
-  modifiers with complete ZOC grouping, terrain modifiers, die interpretation,
-  defender tie, loss thresholds, allocation, retreat, and advance.
-- Implement reinforcement entry, night-turn behavior, objective control, and
-  final victory evaluation.
+  results with complete rule-derived ZOC behavior, authoritative terrain
+  modifiers, retreat priority, forced off-board retreat, and any remaining
+  advance legality. Phase 2 already enforces defender-wins-ties, loss thresholds,
+  loss allocation, connected retreat, and eligible advance.
+- Complete any remaining reinforcement restrictions, nighttime reorganization,
+  and source-approved objective and victory edge cases. Phase 2 already enforces
+  scheduled entry, objective control, casualty scoring, automatic-victory checks,
+  and the turn-24 result.
   - Core night withdrawal, prohibition on entering enemy ZOC, and combat for
     trapped units only were pulled forward as a Phase 2 correctness fix.
     Remaining work includes nighttime reorganization and complete advanced ZOC
@@ -220,6 +260,13 @@ remain on their starting rules version or are explicitly declared incompatible.
 The game has an original, polished, rights-safe presentation and an operated
 production service with measured capacity, accessibility, recovery, and release
 controls.
+
+### Current status
+
+Not started as a production-release phase. Existing staging, backup, restore,
+original-board, and browser evidence are inputs to this phase, not substitutes
+for its rights, accessibility, security, capacity, reboot, and final acceptance
+gates.
 
 ### Included work
 

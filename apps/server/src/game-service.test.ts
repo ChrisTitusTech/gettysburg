@@ -167,7 +167,14 @@ describe("in-memory game lifecycle", () => {
     const game = service.createGame("union");
     const state = service.getGameState(game.gameId);
 
-    expect(state.ruleset_version).toBe("phase-2-tabletop-v2");
+    expect(state.ruleset_version).toBe("gettysburg-terrain-v3");
+    expect(Object.keys(state.terrain ?? {})).toHaveLength(253);
+    expect(state.terrain?.B2).toMatchObject({ kind: "woods", defense: 2 });
+    expect(state.terrain?.F11).toMatchObject({ kind: "woods", defense: 2 });
+    expect(state.objectives.R10?.value).toBe(3);
+    expect(state.objectives.M9).toBeUndefined();
+    expect(state.units["c-stuart"]?.entry_hexes).toEqual(["W7"]);
+    expect(state.units["c-early"]?.entry_hexes).toEqual(["W10"]);
     expect(state.units["u-wadsworth"]).toMatchObject({
       combat: 3,
       reduced_combat: 2,

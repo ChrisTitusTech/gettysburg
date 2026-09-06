@@ -19,17 +19,36 @@ created content.
 
 ## Approved repository artwork
 
-The following clean-room presentation asset is intentionally tracked. It is not
-a supplied scan and does not contain bytes copied from the local-only reference
-files.
+The following presentation artwork and derived verification asset are
+intentionally tracked. They are not supplied scans and do not contain bytes
+copied from the local-only reference files. Public-release rights remain governed
+by the unresolved decision recorded below.
 
 | File | Creator and derivation | Permission and attribution | Approval | Dimensions/bytes | SHA-256 |
 | --- | --- | --- | --- | --- | --- |
 | `apps/web/src/assets/gettysburg-board-deluxe.png` | OpenAI built-in image generation, iteratively directed from the project's original procedural board and owner-authored terrain mock | Owner-approved for this project; no attribution requirement specified | ChrisTitusTech, 2026-08-16 | 1658 x 949 PNG; 2,988,216 bytes | `f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91` |
+| `apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png` | Deterministic `A-1` through `U-11` label overlay derived from the approved PNG and the client board calibration | Inherits the approved board's project-use boundary; no separate public-release approval | Requested by ChrisTitusTech for terrain review, 2026-08-17 | 1658 x 949 PNG; 2,981,672 bytes | `8ec3fb767b65ad06d98900acfca32a196f6f762c1bdd0666f9ed6b6978fb782d` |
 
-The approved revision supplies presentation only. Authoritative coordinates,
-movement, combat, and future terrain modifiers remain typed independently of
-the pixels.
+The approved revision is the project's visual board. Coordinates, movement,
+combat, and terrain modifiers remain typed independently of the pixels, but this
+PNG controls which terrain is visually present in a hex and whether painted
+terrain continues across a hex side. The owner-reviewed typed transcription will
+become runtime rules data in Phase 3.
+
+The protected `gameboard.jpg` is not used to approve the worksheet's display
+coordinates, terrain placement, or forest connections. The September terrain
+review found 23 painted columns, not 21. The interactive renderer now uses 253
+A-W coordinates. The old `with-hexvalues` derivative retains displaced A-U
+labels and is obsolete as a verification surface; its provenance remains above.
+
+On 2026-09-06, ChrisTitusTech approved every worksheet hex, corrected B2 and F11
+to woods +2, and authorized best-guess forest links and completion of the terrain
+work. `TERRAIN_CONNECTIONS.md` records inferred links and scenario adaptations.
+Rules2.pdf rule 4b4 supplies town +1; rule 4b2 supplies connected-hill cancellation.
+The owner overrides the printed woods +1 with +2 and assigns rough heights +4.
+The +4 wooded-height split and strongest-hex mixed-terrain policy are explicitly
+recorded implementation assumptions. This does not approve optional rules,
+reduced-face artwork, or public rights.
 
 ### Artwork generation record
 
@@ -37,12 +56,14 @@ The owner directed an iterative built-in image-generation and editing process.
 The visual brief called for a 231-hex, hand-painted Gettysburg landscape with
 edge-to-edge roads and streams, rocky Round Tops, southern woods, named
 landmarks, no Time Record Track, and no center-bottom A/B markers. The protected
-`gameboard.jpg` was used as a private visual/geographic reference at the owner's
-request; subsequent edits used generated board variants and the owner's
-`mock.png` paint-over. Neither reference file is embedded in or tracked beside
-the approved PNG. The final selected bytes came from the generated revision
-named `exec-6d2c04a2-841a-46ff-aaec-61b75b54a6d3.png`, and the owner explicitly
-approved that exact revision for the cleanup pull request on 2026-08-16.
+`gameboard.jpg` was available as a private visual/geographic reference during
+generation; subsequent edits used generated board variants and the owner's
+`mock.png` paint-over. It did not define the per-hex terrain worksheet and is not
+the terrain approval surface for the finished project board. Neither reference
+file is embedded in or tracked beside the approved PNG. The final selected bytes
+came from the generated revision named
+`exec-6d2c04a2-841a-46ff-aaec-61b75b54a6d3.png`, and the owner explicitly approved
+that exact revision for the cleanup pull request on 2026-08-16.
 
 The committed asset is original generated presentation artwork rather than a
 reproduction of the scan. This is a project provenance record, not a legal
@@ -124,13 +145,41 @@ counter backs.
 
 - Complete counter sheets including every reduced-face artwork treatment
 - Optional rules and whether they are in scope
-- Reviewed per-hex terrain transcription for the irregular board
+- Movement-edge and full gameplay acceptance of the inferred connections;
+  terrain values are approved in `TERRAIN_ADJUSTMENTS.md`
 - Rights or licensing basis for any public use of the supplied scans, names,
   artwork, or wording
 
 The approved formula may supply Phase 2 reduced combat data. Any remaining
 fixture values must be visibly labelled and must not be presented as final game
 content.
+
+## Current decision status
+
+The Battle Manual, board, and orders of battle now support the approved Phase 2
+Scenario Five setup, 82 source-card counter fronts, reinforcement schedule,
+night turns, objectives, casualty scoring, automatic-victory checks, and final
+victory comparison. The owner-approved reduced-value formula supplies gameplay
+data, and the tracked deluxe board is approved original presentation artwork.
+Those decisions close the earlier Phase 2 setup, objective, victory, and front-
+value questions.
+
+The owner also confirmed one Phase 3 terrain interpretation: woods provide no
+defense adjustment when a participating attacker and defender occupy the same
+connected forest. `TERRAIN_ADJUSTMENTS.md` defines the connected-region boundary
+and mixed-forest skirmish handling, while preserving hill defense as a separate
+component. Forest continuity must be transcribed from woods artwork crossing a
+shared hex side; mere hex adjacency does not establish a connection. This
+decision does not approve any unchecked per-hex or per-hex-side transcription or
+unresolved exact landmark value.
+
+The remaining owner gates are narrower but still release-blocking: record the
+formal review of this interpretation/rights ledger, complete gameplay acceptance
+of the inferred terrain links and scenario adaptations, finish movement-rule
+interpretations before full Phase 3 enforcement, decide optional-rule
+and additional-scenario scope, decide the reduced-face presentation, and
+establish a rights or clean-room basis for every name, artwork element, and
+explanation shipped in the first public release.
 
 ## Phase 1 interpretation and rights ledger
 
@@ -162,8 +211,13 @@ set -euo pipefail
 printf '%s  %s\n' \
   f3ce38715cf8d4f9b997635d4ecf70e283e20398f3d55be8c2c5c7857f52ab91 \
   apps/web/src/assets/gettysburg-board-deluxe.png | sha256sum --check --strict
+printf '%s  %s\n' \
+  8ec3fb767b65ad06d98900acfca32a196f6f762c1bdd0666f9ed6b6978fb782d \
+  apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png | \
+  sha256sum --check --strict
 git ls-files --error-unmatch \
-  apps/web/src/assets/gettysburg-board-deluxe.png >/dev/null
+  apps/web/src/assets/gettysburg-board-deluxe.png \
+  apps/web/src/assets/gettysburg-board-deluxe-with-hexvalues.png >/dev/null
 file gameboard.jpg Rules1.pdf Rules2.pdf OOP-Union.pdf OOP-Confederate.pdf \
   gettysburg-battle-manual_OCR.pdf mock.png
 sha256sum --check --strict <<'EOF'

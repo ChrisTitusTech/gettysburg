@@ -45,9 +45,13 @@ async function waitForReadiness(origin, serverOutput) {
   throw new Error(`Browser server did not become ready:\n${serverOutput()}`);
 }
 
-async function stopServer(server) {
+async function stopServer(server, serverOutput) {
   if (server.exitCode !== null || server.signalCode !== null) {
-    assert.equal(server.exitCode, 0);
+    if (server.exitCode !== 0) {
+      throw new Error(
+        `Browser server exited before cleanup with code ${String(server.exitCode)} and signal ${String(server.signalCode)}:\n${serverOutput()}`,
+      );
+    }
     return;
   }
   let escalated = false;
@@ -382,6 +386,7 @@ let postgres;
 let runtimeDirectory;
 let server;
 let browser;
+let failure;
 try {
   if (configuredOrigin === undefined) {
     postgres = await startPostgres();
@@ -427,13 +432,56 @@ try {
     `Browser acceptance passed at desktop and tablet widths; evidence: ${evidenceDirectory}`,
   );
 } catch (error) {
-  throw new Error(`Browser acceptance failed; server output:\n${output}`, {
+  failure = new Error(`Browser acceptance failed; server output:\n${output}`, {
     cause: error,
   });
 } finally {
-  await browser?.close();
-  if (server !== undefined) await stopServer(server);
-  postgres?.stop();
-  if (runtimeDirectory !== undefined)
-    await rm(runtimeDirectory, { force: true, recursive: true });
+  const cleanupErrors = [];
+  try {
+    await browser?.close();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to close the browser", { cause: error }),
+    );
+  }
+  if (server !== undefined) {
+    try {
+      await stopServer(server, () => output);
+    } catch (error) {
+      cleanupErrors.push(error);
+    }
+  }
+  try {
+    postgres?.stop();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to stop the PostgreSQL test service", { cause: error }),
+    );
+  }
+  if (runtimeDirectory !== undefined) {
+    try {
+      await rm(runtimeDirectory, { force: true, recursive: true });
+    } catch (error) {
+      cleanupErrors.push(
+        new Error("Failed to remove the browser runtime directory", {
+          cause: error,
+        }),
+      );
+    }
+  }
+  if (cleanupErrors.length > 0) {
+    const cleanupFailure = new AggregateError(
+      cleanupErrors,
+      "Browser acceptance cleanup failed",
+    );
+    failure =
+      failure === undefined
+        ? cleanupFailure
+        : new AggregateError(
+            [failure, cleanupFailure],
+            "Browser acceptance and cleanup failed",
+          );
+  }
 }
+
+if (failure !== undefined) throw failure;

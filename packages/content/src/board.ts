@@ -53,7 +53,7 @@ export const FIXTURE_HEX_BY_COORDINATE = new Map(
 
 export const BOARD_VIEW_BOX = {
   height: BOARD_PADDING * 2 + HEX_VERTICAL_SPACING * 10.5,
-  width: BOARD_PADDING * 2 + HEX_HORIZONTAL_SPACING * 20,
+  width: BOARD_PADDING * 2 + HEX_HORIZONTAL_SPACING * 22,
 } as const;
 
 export function hexPolygonPoints(point: BoardPoint): string {

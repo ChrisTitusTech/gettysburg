@@ -122,8 +122,8 @@ postgres("PostgreSQL durability", () => {
     );
     expect(rows.rows[0]).toMatchObject({
       action_count: "1",
-      content_revision: "gettysburg-source-cards-v1",
-      ruleset_version: "phase-2-tabletop-v2",
+      content_revision: "gettysburg-painted-board-v2",
+      ruleset_version: "gettysburg-terrain-v3",
       snapshot_count: "2",
     });
     await restarted.close();
