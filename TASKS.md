@@ -479,6 +479,27 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory retreat geometry, forced choices, and browser controls.
+  - Scope: A shared pure calculator prefers viable non-enemy-ZOC steps, permits
+    enemy ZOC only when necessary, continues through friendly stacks to the first
+    empty hex or edge exit, and enforces artillery terrain restrictions. Complete
+    route reachability prevents friendly dead ends and cycles from being mistaken
+    for an escape. Invalid input or missing terrain never authorizes extra loss.
+  - Boundary: This preparatory increment does not activate mandatory-v4 or change
+    legacy retreat commands. Pending-choice authorization, whole-original-stack
+    enforcement, extra-loss allocation, free exits, advance, and browser controls
+    remain separate integration work. The calculator supplies deterministic
+    complete suggestions, not exhaustive routes to every clicked destination.
+  - Acceptance: Fifteen focused tests cover ZOC priority, terrain, friendly
+    transit/dead ends/cycles, edge choices, empty endpoints, budgets, stacks,
+    generals, invalid inputs, and deterministic suggestions at all 253 hexes.
+    Independent review caught an open-edge shortcut: direct exits now require no
+    viable on-board first step; exits through friendly chains remain available.
+    Frozen install, format, lint, typecheck, 349 default workspace tests plus six
+    harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
+    server tests pass. Desktop/tablet and full-game regression pass with evidence
+    in `test-results/retreat-path-rules`. Independent review and exact-head CI
+    remain required before merge.
 - [ ] Complete permanent board exit and its browser control.
   - Scope: An edge exit spends one normal movement point, obeys the active-group
     boundary and source capacity, and permanently removes counters from play.
@@ -499,8 +520,9 @@ validation remain separate gates.
     workspace tests plus six harness tests, build, smoke, Markdown lint, and
     all 93 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
     regression pass after review fixes (`test-results/voluntary-board-exit-review`).
-    Independent review
-    and exact-head CI remain required before merge.
+    PR #13 merged as `622c525` after fresh independent built-in review and
+    exact-head CI passed; both hosted review threads are resolved. CodeRabbit
+    was limited on the final head and skipped per owner direction.
 - [ ] Complete mandatory reinforcement entry and browser controls.
   - Scope: Charge terrain or explicitly connected off-board-road entry costs;
     replace enemy-occupied/ZOC entries with nearest safe board-edge alternatives.
@@ -516,8 +538,10 @@ validation remain separate gates.
     isolation. Frozen install, format, lint, typecheck, 321 default workspace
     tests plus six harness tests, build, smoke, Markdown lint, and all 92
     isolated PostgreSQL server tests pass. Desktop/tablet and full-game
-    regression pass (`test-results/reinforcement-entry-rules`). Independent
-    review and exact-head CI remain required before merge.
+    regression pass (`test-results/reinforcement-entry-rules`). PR #12 merged as
+    `2be8453` after independent built-in review and exact-head CI passed.
+    CodeRabbit was limited and skipped per owner direction; no unresolved
+    review threads remained.
 - [ ] Complete mandatory lone-general capture integration.
   - Scope: Eliminate unsupported generals in enemy combat ZOC; retain combat
     support and ignore general-only ZOC. Settle every normal-movement step and
