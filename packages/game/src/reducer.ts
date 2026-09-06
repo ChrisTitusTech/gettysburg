@@ -5,6 +5,7 @@ import { enemyZoneOfControl, movementPath } from "./zoc.js";
 import { prepareNormalMovement } from "./movement-validation.js";
 import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
+import { prepareReinforcement } from "./reinforcements.js";
 import type {
   CombatState,
   CommandFailure,
@@ -426,6 +427,14 @@ function enterReinforcement(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "enterReinforcement" }>,
 ): ReducerResult {
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+    return mandatoryReinforcement(
+      state,
+      actorSide,
+      [command.payload.unit_id],
+      command.payload.destination,
+    );
+  }
   const unauthorized = phaseAuthorization(state, actorSide, "movement");
   if (unauthorized !== null) return unauthorized;
   const { destination, unit_id: unitId } = command.payload;
@@ -484,6 +493,29 @@ function enterReinforcement(
     },
     `${unit.label} entered at ${destination}`,
   );
+}
+
+function mandatoryReinforcement(
+  state: GameState,
+  side: Side,
+  ids: readonly string[],
+  destination: HexCoordinate,
+): ReducerResult {
+  if (state.ruleset_version !== MANDATORY_RULESET_VERSION) {
+    return failure(
+      state,
+      "phase_invalid",
+      "Joint reinforcement entry requires the mandatory ruleset.",
+    );
+  }
+  const prepared = prepareReinforcement(state, side, ids, destination);
+  return prepared.ok
+    ? accepted(
+        state,
+        prepared.patch,
+        `${ids.length} reinforcement counter${ids.length === 1 ? "" : "s"} entered at ${destination} (${prepared.cost} movement)`,
+      )
+    : failure(state, prepared.error, prepared.message);
 }
 
 function declareCombat(
@@ -1412,6 +1444,13 @@ export function reduceGameplayCommand(
       return moveStack(state, actorSide, command);
     case "enterReinforcement":
       return enterReinforcement(state, actorSide, command);
+    case "enterReinforcementStack":
+      return mandatoryReinforcement(
+        state,
+        actorSide,
+        command.payload.unit_ids,
+        command.payload.destination,
+      );
     case "declareCombat":
       return declareCombat(state, actorSide, command, options.dice);
     case "rollCombat":

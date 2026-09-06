@@ -29,7 +29,7 @@ function reject(
   return { ok: false, error, message };
 }
 
-function stackFits(units: readonly UnitState[]): boolean {
+export function movementStackFits(units: readonly UnitState[]): boolean {
   const generals = units.filter((unit) => unit.kind === "general").length;
   return generals <= 1 && units.length - generals <= (generals === 1 ? 2 : 1);
 }
@@ -97,8 +97,8 @@ export function prepareNormalMovement(
   if (destinationUnits.some((unit) => unit.side !== side))
     return reject("occupied", "An enemy occupies that hex.");
   if (
-    !stackFits([...destinationUnits, ...movers]) ||
-    !stackFits(remaining.filter((unit) => unit.location === origin))
+    !movementStackFits([...destinationUnits, ...movers]) ||
+    !movementStackFits(remaining.filter((unit) => unit.location === origin))
   ) {
     return reject(
       "occupied",

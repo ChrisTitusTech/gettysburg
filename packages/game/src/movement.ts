@@ -19,6 +19,20 @@ export interface MovementStep {
   readonly zoc: number;
 }
 
+/** Terrain entry only; roads, streams, and ZOC are applied by the caller. */
+export function terrainMovementCost(
+  state: GameState,
+  kinds: readonly UnitKind[],
+  destination: HexCoordinate,
+): number | null {
+  const terrain = state.terrain?.[destination];
+  const woods = terrain?.woods === true || terrain?.kind === "woods";
+  const rough = terrain?.kind === "rough_hill";
+  return woods && rough && kinds.includes("artillery")
+    ? null
+    : 1 + Number(woods) + Number(rough);
+}
+
 function linked(
   edges: MovementEdges["roads"],
   origin: HexCoordinate,
@@ -71,17 +85,14 @@ function stepCalculator(
     ) {
       return null;
     }
-    const terrain = state.terrain?.[destination];
-    const woods = terrain?.woods === true || terrain?.kind === "woods";
-    const rough = terrain?.kind === "rough_hill";
-    if (woods && rough && kinds.includes("artillery")) return null;
+    const terrainCost = terrainMovementCost(state, kinds, destination);
+    if (terrainCost === null) return null;
     const road =
       !zoc.has(origin) &&
       !zoc.has(destination) &&
       (linked(edges.roads, origin, destination) ||
         linked(edges.railroads, origin, destination));
     if (road) return { cost: 0.5, road: true, terrain: 0.5, stream: 0, zoc: 0 };
-    const terrainCost = 1 + Number(woods) + Number(rough);
     const streamCost = Number(linked(edges.streams, origin, destination));
     const zocCost = Number(zoc.has(destination));
     return {

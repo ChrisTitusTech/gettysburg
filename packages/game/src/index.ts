@@ -8,3 +8,4 @@ export * from "./movement.js";
 export * from "./normal-move.js";
 export * from "./movement-validation.js";
 export * from "./generals.js";
+export * from "./reinforcements.js";
