@@ -28,7 +28,39 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Current staging exception: 2026-08-16
+## Verified development rollout: 2026-09-06
+
+PR #4 merged and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`
+after independent review and passing Application/Documentation CI on both the
+PR head and merge commit. Runtime image:
+`8dfe5b28877de4548c4c2fe4c724ee10e09fd1002586eb3cde875644a15b5fcd`.
+Rollback record: `/srv/gettysburg/backups/deploy-20260906T215510Z`.
+
+The owner authorized retirement of exactly five old development games, not a
+database wipe. Encrypted pre-retirement backup `20260906T214315Z` and
+post-retirement backup `20260906T214944Z` passed isolated restore and off-host
+verification. Audited host recovery and normal deletion retired the five games;
+the ledger moved from 15 to 20. The database and encrypted backups were retained.
+Do not restore the old application against new terrain games without following
+the maintenance/backup rollback contract below.
+
+The deployment script's local/public readiness, non-root image validation, and
+two-client HTTPS/WebSocket smoke passed. Both containers report healthy; the app
+runs as UID/GID 1000. Live browser acceptance passed with two independent
+sessions at desktop 1440x900 and tablet 1024x768, with inspected screenshots under
+`test-results/phase-2-rollout-20260906`. After another verified off-host backup
+(`20260906T215812Z`), a VPS application restart preserved both credentials and
+the exact saved terrain state; both clients synchronized moves before and after
+restart. A final database audit found that the browser harness had left its two
+games active despite reporting success. Audited operator recovery and normal
+host deletion cleaned them up; a follow-up in `TASKS.md` requires the harness to
+wait for persisted deletion. The deployment and restart smoke games deleted
+themselves normally. Final backup `20260906T220219Z` passed isolated restore and
+off-host verification after cleanup, with acknowledged deletion watermark 24.
+This closes the Phase 2 operational exception below, not the remaining owner
+terrain-gameplay, dependency-security, or public-release gates in `TASKS.md`.
+
+## Historical staging exception: 2026-08-16
 
 The successful deployment evidence above is historical acceptance for revision
 `f6a9ec27927d756daf5711188edbe4d564fed373`; it is not a current healthy-service

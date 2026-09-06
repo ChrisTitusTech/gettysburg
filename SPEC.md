@@ -32,16 +32,18 @@ hill links drive combat; road/rail/stream links are transcribed but variable
 movement costs remain future work. See `docs/references/TERRAIN_ADJUSTMENTS.md`
 and `docs/references/TERRAIN_CONNECTIONS.md` for exact rules and assumptions.
 The owner confirmed this is not live/production and old development games need
-not remain compatible. No stored data is deleted or migrated by this work.
+not remain compatible. The owner subsequently authorized retirement of five old
+development games after encrypted backup verification. Normal audited deletion
+retired those games; the database was preserved.
 
 The merged application implements the Phase 2 Scenario Five rules-light digital
 tabletop, durable PostgreSQL state, recovery, and private-staging workflow. That
 evidence does not claim complete Phase 3 terrain/rule enforcement or Phase 4
-production readiness. Phase 2 operational closeout is also still active. PR #4's
-validated implementation head has green Application and Documentation CI for
-the current-main repair, but the final PR head and resulting `main` commit must
-each pass their workflows. The final PR head still needs independent review
-before merge, and the deployed older revision currently fails readiness.
+production readiness. Phase 2 operational closeout completed on 2026-09-06:
+PR #4 passed independent review and exact-head CI, merged with passing post-merge
+CI, and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Public readiness,
+encrypted backup/restore, desktop/tablet two-client workflows, and application
+restart/resume passed.
 `TASKS.md` owns the live status so temporary operational facts do not weaken the
 requirements below.
 

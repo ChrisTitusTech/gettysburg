@@ -13,16 +13,14 @@ application candidate implements the Phase 2 rules-light tabletop in
 
 ## Current status
 
-Phase 2 code and its battle/review cleanup are merged through PR #3. PR #4's
-validated implementation head has green Application and Documentation CI for
-the operational repair, but the final PR head and resulting `main` commit must
-each pass their workflows. The final PR head also needs independent review before
-merge. Operational closeout is still active: the private staging service must
-receive the current reviewed revision and repeat the complete health, readiness,
-WebSocket, restart/resume, and two-client release gate. The currently deployed
-older revision is live for liveness but unavailable for readiness. See
-`TASKS.md` for the dated evidence; do not infer production readiness from the
-existence of the public staging URL.
+PR #4 merged on 2026-09-06. Its reviewed terrain and operational repairs are
+deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`, with passing exact-head
+and post-merge CI, healthy containers, public readiness, verified encrypted
+backups, desktop/tablet two-player browser checks, and application restart/resume.
+Phase 2 operational closeout is complete. Phase 3 movement rules, owner terrain
+gameplay acceptance, dependency alerts, and public-release gates remain open.
+See `TASKS.md` for dated evidence; this is a development deployment, not a claim
+of production readiness.
 
 ## Project documents
 

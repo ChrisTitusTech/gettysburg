@@ -126,13 +126,12 @@ an auditable action log.
 ### Current status
 
 Implementation, the human acceptance game, and the PR #3 battle/review cleanup
-are merged. PR #4 repairs the post-merge Application CI and malformed container
-health-probe failures; its validated implementation head passed Application and
-Documentation CI. The final PR head and resulting `main` commit must each pass
-their workflows. Operational closeout remains open until the final PR head
-passes a non-rate-limited independent review and the repair merges, and until
-private staging moves from the older Phase 2 revision through the required
-backup and repeat release gate. `TASKS.md` records the current evidence.
+are merged. PR #4's terrain and operational repairs merged and deployed on
+2026-09-06 as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Independent review,
+PR-head/post-merge CI, encrypted backup/restore, public health/readiness,
+desktop/tablet two-client workflows, and application restart/resume passed.
+Phase 2 operational closeout is complete. `TASKS.md` records the evidence and
+the separate Phase 3/public-release gates.
 
 ### Included work
 
@@ -201,8 +200,9 @@ from a connection or persistence failure.
 Terrain-defense work started on 2026-09-06 with approved A-W data and authorized
 best-guess connections. This does not complete Phase 3. Phase 2 pulled forward
 several movement, stacking,
-combat, and core night rules, but Phase 3 remains gated on Phase 2 operational
-closeout, owner-approved per-hex terrain data, and optional-rule decisions. The
+combat, and core night rules. Phase 2 operational closeout and owner per-hex
+approval are complete; terrain gameplay acceptance, movement rules, and
+optional-rule decisions remain open. The
 coordinate-by-coordinate review worksheet is in
 `docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
 Forest/hill links feed combat; road/rail/stream estimates await movement rules.

@@ -38,48 +38,73 @@
 
 | Remaining gate | Responsible owner | Attempted result | Reason and follow-up |
 | --- | --- | --- | --- |
-| Exact-head CI and rollout | ChrisTitusTech | Local gates and independent reviews passed; pre-retirement encrypted backup restored and copied off-host | Delivery authorized; verify both workflows on the published head, merge PR #4, retire the five old development games, refresh the verified backup, deploy merged main, and verify remote health/readiness and client workflows |
 | Owner terrain gameplay | ChrisTitusTech | Automated desktop/tablet flows and visual inspection passed | Manually play representative forest/hill/town combats and inspect R10/W7/W10 adaptations before release |
 | Complete Phase 3 | ChrisTitusTech | Terrain defense implemented; phase not complete | Finish movement costs, remaining rules, and full rules-enforced acceptance game |
 
 This follow-up supersedes earlier terrain-unverified, fixed-M9, and 231-hex
 calibration statements below. The August operational entries are historical
-evidence, not a claim that this development project is in production. No remote
+evidence, not a claim that this development project is in production. Remote
 status in the August entries must not be treated as current deployment evidence.
 
-## Current phase: Phase 2 operational closeout
+## Delivery closeout: 2026-09-06
 
-Phase 2 implementation merged through PR #2 as
-`e0ba1f65ca310acbeed9dcffae693506abeb9aa8`. Its battle-rules and review cleanup
-merged through PR #3 as `c6f406f56541ab1e9b08db6ef860b7cedaa164fb` on
-2026-08-16 after the pull-request head passed Application CI, Documentation CI,
-and CodeRabbit review. At the evidence capture, local `main` was clean and
-matched `origin/main`.
+- [x] Commit, push, merge open PRs, and deploy the reviewed application.
+  - PR #4 was the only open PR. Its final implementation head
+    `00450ecb86507d26b1a4121d496e8eaace3a2007` passed Application CI,
+    Documentation CI, built-in Codex review, and independent CodeRabbit review.
+    Hosted CodeRabbit status was successful and all five review threads resolved.
+  - Merge/application revision: `40cff572aab183660dfeee188c4b6acddb2b1de5`.
+    Both post-merge workflows passed before deployment. The merge has the same
+    tree as the reviewed PR head. No open PRs remain; the merged feature branch
+    was removed. Historical local branches are retained rather than force-deleted.
+  - The owner explicitly authorized retiring the five old development games.
+    Pre-retirement backup `20260906T214315Z` and post-retirement backup
+    `20260906T214944Z` passed encrypted checksums, isolated restore, and off-host
+    verification. Audited host recovery followed by normal `deleteGame` retired
+    exactly those five games, raised the deletion ledger from 15 to 20, and
+    preserved the database. No compatibility migration or database wipe occurred.
+  - `scripts/vps-deploy.sh` deployed image
+    `8dfe5b28877de4548c4c2fe4c724ee10e09fd1002586eb3cde875644a15b5fcd`.
+    Rollback files and the retained prior image are recorded under
+    `/srv/gettysburg/backups/deploy-20260906T215510Z`. Do not restart the older
+    ruleset against new terrain games; follow the runbook's maintenance/restore
+    procedure if rollback is needed.
+  - Public `/healthz` and `/readyz` passed; app and database containers are
+    healthy. The app runs as UID/GID 1000. Deployment's public two-client
+    WebSocket smoke passed. OCI build warnings about image health metadata are
+    benign here: the Quadlet supplies the working, verified health probe.
+  - `GETTYSBURG_ACCEPTANCE_ORIGIN=https://gettysburg.christitus.com
+    GETTYSBURG_EVIDENCE_DIR=test-results/phase-2-rollout-20260906
+    pnpm browser:acceptance` passed with two independent sessions at 1440x900
+    and 1024x768. Desktop/tablet fit screenshots were visually inspected.
+    Final SQL audit found its two games still active after the harness reported
+    success. Their creation times, movement versions, and lack of deletion
+    receipts identified them as this run's games. Operator recovery plus normal
+    deletion cleaned them up; this limits the harness's cleanup evidence, not
+    the verified synchronization and browser-resume results.
+  - After backup `20260906T215812Z`, an additional two-client test moved a unit,
+    restarted the VPS application, verified both credentials resumed the exact
+    saved state including terrain, and synchronized another move. Its game and
+    all browser/deployment smoke games were retired through the normal workflow.
+    Final backup `20260906T220219Z` passed isolated restore and off-host
+    verification after cleanup; the acknowledged deletion watermark is 24.
+  - These results close Phase 2's operational gate. They do not replace the
+    owner's remaining terrain-gameplay acceptance or claim Phase 3/4 completion.
+    This documentation-only closeout does not change the deployed application.
 
-Phase 2 remains open for operational closeout. Post-merge Documentation CI
-passed on `c6f406f`, but post-merge Application CI failed while the browser
-acceptance harness asserted that its server exited with status 1 during
-`stopServer`. PR #4 repairs that harness and the malformed container health
-probe. Its implementation head `405df158c32588438f2748e312146363b67796cb`
-passed Application and Documentation CI on 2026-08-16. Any later status-only
-commit must repeat both exact-head workflows before merge. Current `main`
-remains at `c6f406f` until the repair is reviewed and merged, and its separate
-post-merge workflows remain required.
+- [ ] Triage the three existing GitHub dependency alerts before public release.
+  - Owner: ChrisTitusTech. Read-only inspection found `shell-quote` 1.8.3
+    (critical/high, through development-only `concurrently`) and `qs` 6.15.3
+    (moderate, through runtime Express/body-parser). These pre-existing alerts
+    were not introduced or fixed by the terrain PR. Review affected usage,
+    update dependencies, and repeat validation in the next authorized work item.
 
-All four hosted CodeRabbit threads on PR #4 are resolved. The final local
-built-in review passed after the fixes, while the hosted exact-head CodeRabbit
-status completed as `Review rate limited` without a new review. A non-rate-
-limited independent review of the final PR head remains required before merge.
-
-Private staging at `https://gettysburg.christitus.com` is still running revision
-`f6a9ec27927d756daf5711188edbe4d564fed373`, not current `main`. Public
-`/healthz` returns 200, but `/readyz` returns 503 because the deployed revision
-checks the deletion ledger continuously and its verified off-host watermark is
-13 while the database watermark is 14. The application container also reports
-unhealthy because its generated Quadlet health command fails with an
-`Unterminated quoted string` shell error. Phase 2 cannot be marked complete until
-the current-main CI, backup watermark, deployment, health, readiness, WebSocket,
-restart/resume, and two-client gates pass.
+- [ ] Make browser acceptance await persisted deletion before closing contexts.
+  - Owner: ChrisTitusTech. The deployed desktop/tablet scenarios passed, but both
+    test games remained active at the final database audit. The current final
+    heading wait does not prove the deletion request committed. Add response
+    and durable-deletion assertions in the next authorized maintenance item;
+    the rollout's separately audited cleanup retired both games.
 
 ## Phase 1 open gates
 
@@ -231,7 +256,7 @@ implementation or local-validation failure remains.
 
 ### Phase 2
 
-- [ ] Complete the Phase 2 post-merge battle and operational cleanup.
+- [x] Complete the Phase 2 post-merge battle and operational cleanup.
   - Scope: Block movement and retreat through enemy-occupied hexes while
     preserving legal daytime attack approach into enemy zones of control;
     eliminate an unsupported general with its defeated combat stack; make the
@@ -246,7 +271,10 @@ implementation or local-validation failure remains.
     `main` is deployed. Local/public health and readiness, container health,
     exact running revision, WebSocket, restart/resume, and two-client state
     synchronization must then pass.
-  - Status: The code and review cleanup merged through PR #3 as `c6f406f`.
+  - Completion: The 2026-09-06 delivery closeout above supersedes this historical
+    status: PR #4 merged, exact-head and post-merge CI passed, and VPS release
+    gates passed on `40cff57`.
+  - Historical status: The code and review cleanup merged through PR #3 as `c6f406f`.
     PR #4 on `codex/phase-2-operational-repair` replaces the quote-fragile
     Quadlet expression with a compiled readiness probe, makes container smoke
     assert healthy and intentionally unhealthy states, and preserves the primary
