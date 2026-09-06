@@ -5,3 +5,4 @@ export * from "./reducer.js";
 export * from "./zoc.js";
 export * from "./terrain.js";
 export * from "./movement.js";
+export * from "./normal-move.js";
