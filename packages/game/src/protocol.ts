@@ -104,6 +104,9 @@ export interface NormalMovementActivation {
 }
 
 export interface MovementEdges {
+  // Explicit connections across the board boundary, not inferred from a road
+  // that merely touches an edge hex. Omitted means no off-board road links.
+  readonly entry_roads?: readonly HexCoordinate[];
   readonly roads: readonly (readonly [HexCoordinate, HexCoordinate])[];
   readonly railroads: readonly (readonly [HexCoordinate, HexCoordinate])[];
   readonly streams: readonly (readonly [HexCoordinate, HexCoordinate])[];
@@ -150,6 +153,7 @@ export const moveStackPayloadSchema = z
   })
   .strict();
 export const enterReinforcementPayloadSchema = moveUnitPayloadSchema;
+export const enterReinforcementStackPayloadSchema = moveStackPayloadSchema;
 export const declareCombatPayloadSchema = z
   .object({
     attackers: z.array(unitIdSchema).min(1),
@@ -215,6 +219,7 @@ export const commandPayloadSchemas = {
   declareCombat: declareCombatPayloadSchema,
   endPhase: endPhasePayloadSchema,
   enterReinforcement: enterReinforcementPayloadSchema,
+  enterReinforcementStack: enterReinforcementStackPayloadSchema,
   moveStack: moveStackPayloadSchema,
   moveUnit: moveUnitPayloadSchema,
   retreatStack: retreatStackPayloadSchema,
@@ -254,6 +259,13 @@ export const gameplayCommandSchema = z.discriminatedUnion("command_name", [
       ...baseEnvelope,
       command_name: z.literal("enterReinforcement"),
       payload: enterReinforcementPayloadSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...baseEnvelope,
+      command_name: z.literal("enterReinforcementStack"),
+      payload: enterReinforcementStackPayloadSchema,
     })
     .strict(),
   z

@@ -129,3 +129,14 @@ export function shortestHexPath(
   }
   return [origin];
 }
+
+export const BOARD_HEXES: readonly HexCoordinate[] = BOARD_COLUMNS.flatMap(
+  (column) =>
+    Array.from(
+      { length: 11 },
+      (_, row) => `${column}${row + 1}` as HexCoordinate,
+    ),
+);
+export const BOARD_EDGE_HEXES: readonly HexCoordinate[] = BOARD_HEXES.filter(
+  (hex) => adjacentHexes(hex).length < 6,
+);

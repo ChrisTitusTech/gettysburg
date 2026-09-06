@@ -477,6 +477,23 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory reinforcement entry and browser controls.
+  - Scope: Charge terrain or explicitly connected off-board-road entry costs;
+    replace enemy-occupied/ZOC entries with nearest safe board-edge alternatives.
+    Friendly congestion requires waiting, not an invented alternate entry.
+    Joint entry lets a general accompany up to two combat counters from their
+    first step; entry spends movement and changes the active move group.
+  - Boundary: `enterReinforcementStack` is schema-validated but rejected by
+    existing rulesets. Mandatory-v4 remains unavailable for new games. Browser
+    controls and the explicit off-board-road content bundle remain to be wired.
+  - Acceptance: Cover schedules, blocked-entry ties, friendly congestion, all
+    edges blocked, road/terrain costs, artillery, accompaniment, atomicity,
+    activation changes, protocol validation, capture previews, and legacy
+    isolation. Frozen install, format, lint, typecheck, 321 default workspace
+    tests plus six harness tests, build, smoke, Markdown lint, and all 92
+    isolated PostgreSQL server tests pass. Desktop/tablet and full-game
+    regression pass (`test-results/reinforcement-entry-rules`). Independent
+    review and exact-head CI remain required before merge.
 - [ ] Complete mandatory lone-general capture integration.
   - Scope: Eliminate unsupported generals in enemy combat ZOC; retain combat
     support and ignore general-only ZOC. Settle every normal-movement step and
@@ -490,8 +507,9 @@ validation remain separate gates.
     frozen install, format, lint, typecheck, 307 default workspace tests plus
     six harness tests, build, smoke, Markdown lint, and all 92 isolated
     PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
-    (`test-results/lone-general-capture`). Independent review and exact-head
-    CI remain required before merge.
+    (`test-results/lone-general-capture`). PR #11 merged as `b280cbf` after
+    independent built-in review and exact-head CI passed. CodeRabbit was limited
+    and skipped per owner direction; no unresolved threads remained.
 - [ ] Integrate mandatory movement validation and browser previews.
   - Scope: Share terrain routing, budgets, accompaniment, activation, ownership,
     and endpoint stacking checks. Apply a successful proposal atomically through
@@ -508,8 +526,9 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 296 default workspace tests plus
     six harness tests, build, smoke, Markdown lint, and all 92 isolated
     PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
-    (`test-results/mandatory-movement-validator`). Independent review and
-    exact-head CI remain required before merge.
+    (`test-results/mandatory-movement-validator`). PR #10 merged as `5ad7cd5`
+    after independent built-in review and exact-head CI passed. CodeRabbit was
+    limited and skipped per owner direction; no unresolved threads remained.
 - [ ] Persist and enforce the approved continuous-move policy.
   - Scope: A pure proposal tracks the active exact unit/stack group, previously
     closed groups, and full-move general accompaniment. Reordering IDs preserves
@@ -525,8 +544,9 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 284 default workspace tests plus
     six harness tests, build, smoke, Markdown lint, and all 92 isolated
     PostgreSQL server tests pass. Desktop/tablet and full-game regression pass
-    (`test-results/continuous-movement-policy`). Independent review and
-    exact-head CI remain required before merge.
+    (`test-results/continuous-movement-policy`). PR #9 merged as `4940533` after
+    independent built-in review and exact-head CI passed. CodeRabbit was limited
+    and skipped per owner direction; no unresolved threads remained.
 - [ ] Deliver the mandatory movement calculator and then activate it.
   - Scope: Pure adjacent-step costs and deterministic least-cost routing for
     clear/hill/town, woods/rough heights, explicit road/rail/stream links, day
@@ -539,9 +559,11 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 273 default workspace tests plus
     six harness tests, build, smoke, and Markdown lint pass. All 92 server tests
     also pass with isolated PostgreSQL. Desktop/tablet and full-game acceptance
-    pass (`test-results/movement-calculator`). Independent review and exact-head
-    CI remain required before merge. Follow with general accompaniment, continuous
-    move boundaries, and matching authoritative/browser integration.
+    pass (`test-results/movement-calculator`). PR #8 merged as `cb79dfa` after
+    independent built-in review and exact-head CI passed. CodeRabbit was limited
+    and skipped per owner direction; no unresolved threads remained. General
+    accompaniment and server validation now have separate preparatory increments;
+    browser integration and ruleset activation remain.
 - [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
