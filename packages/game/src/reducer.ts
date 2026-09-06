@@ -7,6 +7,11 @@ import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
 import { prepareBoardExit } from "./board-exit.js";
+import {
+  prepareForcedRetreat,
+  prepareTrappedLoss,
+  type PreparedForcedRetreat,
+} from "./forced-retreat.js";
 import type {
   CombatState,
   CommandFailure,
@@ -804,9 +809,23 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
         (id) => state.units[id]?.status === "deployed",
       );
       const ids = stackedUnitsForSide(state, combatIds, state.active_side!);
-      if (ids.length > 0)
+      const destinations = (combat.defender_hexes ?? []).filter(
+        (hex) =>
+          state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+          !Object.values(state.units).some(
+            (unit) =>
+              unit.status === "deployed" &&
+              unit.location === hex &&
+              unit.side !== state.active_side,
+          ),
+      );
+      if (
+        ids.length > 0 &&
+        (state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+          destinations.length > 0)
+      )
         choice = {
-          destination_hexes: combat.defender_hexes ?? [],
+          destination_hexes: destinations,
           eligible_unit_ids: ids,
           kind: "advance",
           side: state.active_side!,
@@ -996,6 +1015,20 @@ function retreatUnit(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "retreatUnit" }>,
 ): ReducerResult {
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+    const source = state.units[command.payload.unit_id]?.location;
+    return applyForcedRetreat(
+      state,
+      command.payload.combat_id,
+      prepareForcedRetreat(
+        state,
+        actorSide,
+        command.payload.combat_id,
+        [command.payload.unit_id],
+        source ? [source, command.payload.destination] : [],
+      ),
+    );
+  }
   const combat = state.combats[command.payload.combat_id];
   const choice = combat?.pending_choice;
   const unit = state.units[command.payload.unit_id];
@@ -1036,6 +1069,18 @@ function retreatStack(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "retreatStack" }>,
 ): ReducerResult {
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION)
+    return applyForcedRetreat(
+      state,
+      command.payload.combat_id,
+      prepareForcedRetreat(
+        state,
+        actorSide,
+        command.payload.combat_id,
+        command.payload.unit_ids,
+        command.payload.path,
+      ),
+    );
   const combat = state.combats[command.payload.combat_id];
   const choice = combat?.pending_choice;
   if (
@@ -1081,6 +1126,41 @@ function retreatStack(
     );
   }
   return moveRetreatGroup(state, combat, choice, movers, path);
+}
+
+function applyForcedRetreat(
+  state: GameState,
+  combatId: string,
+  prepared: PreparedForcedRetreat,
+): ReducerResult {
+  if (!prepared.ok) return failure(state, prepared.error, prepared.message);
+  const combat = state.combats[combatId]!;
+  const choice = combat.pending_choice!;
+  if (choice.kind !== "retreat")
+    return failure(state, "pending_choice", "No retreat is pending.");
+  const remaining = choice.unit_ids.filter(
+    (id) =>
+      !prepared.unit_ids.includes(id) &&
+      prepared.patch.units[id]?.status === "deployed",
+  );
+  const next =
+    remaining.length > 0
+      ? { ...combat, pending_choice: { ...choice, unit_ids: remaining } }
+      : nextChoice(
+          { ...state, ...prepared.patch },
+          {
+            ...combat,
+            pending_choice: null,
+            ...(choice.side === state.active_side
+              ? { attacker_retreated: true }
+              : { defender_retreated: true }),
+          },
+        );
+  return accepted(
+    state,
+    { ...prepared.patch, combats: { ...state.combats, [combatId]: next } },
+    prepared.summary,
+  );
 }
 
 function moveRetreatGroup(
@@ -1486,6 +1566,30 @@ export function reduceGameplayCommand(
   } = {},
 ): ReducerResult {
   switch (command.command_name) {
+    case "acceptTrappedLoss":
+      return applyForcedRetreat(
+        state,
+        command.payload.combat_id,
+        prepareTrappedLoss(
+          state,
+          actorSide,
+          command.payload.combat_id,
+          command.payload.unit_id,
+        ),
+      );
+    case "retreatOffBoard":
+      return applyForcedRetreat(
+        state,
+        command.payload.combat_id,
+        prepareForcedRetreat(
+          state,
+          actorSide,
+          command.payload.combat_id,
+          command.payload.unit_ids,
+          command.payload.path,
+          true,
+        ),
+      );
     case "exitBoard":
       return exitBoard(state, actorSide, command.payload.unit_ids);
     case "moveUnit":
