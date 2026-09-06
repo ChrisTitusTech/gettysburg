@@ -2,6 +2,8 @@ import { adjacentHexes, hexDistance, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
 import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
 import { enemyZoneOfControl, movementPath } from "./zoc.js";
+import { prepareNormalMovement } from "./movement-validation.js";
+import { MANDATORY_RULESET_VERSION } from "./protocol.js";
 import type {
   CombatState,
   CommandFailure,
@@ -165,6 +167,14 @@ function moveUnit(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "moveUnit" }>,
 ): ReducerResult {
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+    return mandatoryMovement(
+      state,
+      actorSide,
+      [command.payload.unit_id],
+      command.payload.destination,
+    );
+  }
   const unauthorized = phaseAuthorization(state, actorSide, "movement");
   if (unauthorized !== null) return unauthorized;
   const { destination, unit_id: unitId } = command.payload;
@@ -234,6 +244,14 @@ function moveStack(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "moveStack" }>,
 ): ReducerResult {
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+    return mandatoryMovement(
+      state,
+      actorSide,
+      command.payload.unit_ids,
+      command.payload.destination,
+    );
+  }
   const unauthorized = phaseAuthorization(state, actorSide, "movement");
   if (unauthorized !== null) return unauthorized;
   const { destination, unit_ids: unitIds } = command.payload;
@@ -327,6 +345,22 @@ function resetMovementForSide(state: GameState, side: Side) {
       unit.side === side ? { ...unit, movement_spent: 0 } : unit,
     ]),
   );
+}
+
+function mandatoryMovement(
+  state: GameState,
+  side: Side,
+  unitIds: readonly string[],
+  destination: HexCoordinate,
+): ReducerResult {
+  const prepared = prepareNormalMovement(state, side, unitIds, destination);
+  return prepared.ok
+    ? accepted(
+        state,
+        prepared.patch,
+        `${unitIds.length} counter${unitIds.length === 1 ? "" : "s"} moved to ${destination} (${prepared.route.cost} movement)`,
+      )
+    : failure(state, prepared.error, prepared.message);
 }
 
 function isEligibleCombatUnit(unit: UnitState): boolean {
@@ -1180,6 +1214,15 @@ function finishSideTurn(
         combats: {},
         phase: "movement",
         units: resetMovementForSide(state, "union"),
+        ...(state.ruleset_version === MANDATORY_RULESET_VERSION
+          ? {
+              normal_movement: {
+                active_unit_ids: [],
+                closed_unit_ids: [],
+                bonus_unit_ids: [],
+              },
+            }
+          : {}),
       },
       combatSkipped
         ? "Confederate had no adjacent enemy units; combat skipped and Union movement began"
@@ -1229,6 +1272,15 @@ function finishSideTurn(
       phase: "movement",
       turn: state.turn + 1,
       units: resetMovementForSide(state, "confederate"),
+      ...(state.ruleset_version === MANDATORY_RULESET_VERSION
+        ? {
+            normal_movement: {
+              active_unit_ids: [],
+              closed_unit_ids: [],
+              bonus_unit_ids: [],
+            },
+          }
+        : {}),
     },
     combatSkipped
       ? `Union had no adjacent enemy units; combat skipped and turn ${state.turn + 1} began`

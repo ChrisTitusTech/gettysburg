@@ -1,13 +1,9 @@
 import { adjacentHexes, isHexCoordinate } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
-import type { GameState, Side, UnitKind } from "./protocol.js";
+import type { GameState, MovementEdges, Side, UnitKind } from "./protocol.js";
 import { enemyZoneOfControl } from "./zoc.js";
 
-export interface MovementEdges {
-  readonly roads: readonly (readonly [HexCoordinate, HexCoordinate])[];
-  readonly railroads: readonly (readonly [HexCoordinate, HexCoordinate])[];
-  readonly streams: readonly (readonly [HexCoordinate, HexCoordinate])[];
-}
+export type { MovementEdges } from "./protocol.js";
 
 export interface MovementRoute {
   readonly path: readonly HexCoordinate[];
