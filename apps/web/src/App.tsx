@@ -30,6 +30,7 @@ import {
 } from "./api";
 import { Board } from "./Board";
 import { invitationUrl, type SecretGrantFragment } from "./invitation";
+import { leaveOpenRoom } from "./room-lifecycle";
 import { TabletopControls } from "./TabletopControls";
 
 interface AppProps {
@@ -215,7 +216,7 @@ export function App({
         gameId: activeGame.game_id,
       });
       if (!active) {
-        await connectedRoom.leave(true);
+        await leaveOpenRoom(connectedRoom);
         return;
       }
 
@@ -357,7 +358,7 @@ export function App({
       active = false;
       roomReference.current = null;
       if (connectedRoom !== undefined && !serverEvicting) {
-        void connectedRoom.leave(true);
+        void leaveOpenRoom(connectedRoom);
       }
     };
   }, [activeGame?.game_id, activeGame?.seat, enterGame, reconnectAttempt]);
@@ -583,7 +584,6 @@ export function App({
       window.localStorage.removeItem(LAST_GAME_KEY);
       window.history.replaceState(null, "", "/");
       setActiveGame(null);
-      void roomReference.current?.leave(true);
     } catch (deleteError) {
       setError(
         deleteError instanceof Error

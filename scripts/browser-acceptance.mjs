@@ -7,6 +7,7 @@ import { join, resolve } from "node:path";
 
 import { chromium } from "@playwright/test";
 
+import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -305,11 +306,7 @@ async function runScenario(browser, origin, options) {
     await cleanupHostPage
       .getByRole("heading", { name: "Host controls recovered" })
       .waitFor();
-    cleanupHostPage.once("dialog", (dialog) => dialog.accept());
-    await cleanupHostPage.getByRole("button", { name: "Delete game" }).click();
-    await cleanupHostPage
-      .getByRole("heading", { name: "Gettysburg" })
-      .waitFor();
+    await deleteAcceptanceGame(cleanupHostPage);
     assert.deepEqual(issues, []);
   } catch (error) {
     throw new Error(
@@ -365,11 +362,10 @@ async function runFullGame(browser, origin) {
       ),
     );
     await unionPage.locator("main").screenshot({
+      mask: [unionPage.getByLabel("One-time invitation URL")],
       path: resolve(evidenceDirectory, "live-full-game-complete.png"),
     });
-    unionPage.once("dialog", (dialog) => dialog.accept());
-    await unionPage.getByRole("button", { name: "Delete game" }).click();
-    await unionPage.getByRole("heading", { name: "Gettysburg" }).waitFor();
+    await deleteAcceptanceGame(unionPage);
     assert.deepEqual(issues, []);
   } finally {
     await unionContext.close().catch(() => {});
