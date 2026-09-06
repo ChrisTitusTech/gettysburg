@@ -5,3 +5,8 @@ packages:
 allowBuilds:
   esbuild: true
   msgpackr-extract: false
+
+# Keep transitive runtime/development parsers outside the reviewed advisory ranges.
+overrides:
+  qs: 6.16.0
+  shell-quote: 1.9.0
