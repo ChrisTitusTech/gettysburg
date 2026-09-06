@@ -10,3 +10,4 @@ export * from "./movement-validation.js";
 export * from "./generals.js";
 export * from "./reinforcements.js";
 export * from "./board-exit.js";
+export * from "./retreat.js";

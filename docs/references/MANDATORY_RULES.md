@@ -74,6 +74,11 @@ On 2026-09-06 the owner approved the same extra-loss/edge-exit rule when
 impassable terrain makes retreat impossible on the expanded board. This includes
 artillery trapped by wooded rough hills, rather than only enemy-surrounded
 stacks. It is an explicit board-adaptation decision, not a copied printed rule.
+The retreat calculator checks complete routes through friendly occupied hexes
+before declaring a stack trapped. ZOC priority applies among viable next steps;
+a safe neighboring dead end does not block an otherwise legal retreat. Paths
+cannot loop or continue past the first empty hex. A friendly occupied edge hex
+can continue off-board; an empty edge hex is the on-board retreat endpoint.
 
 Night turns remain 8, 16, and 24. Require withdrawal when a legal move exists,
 forbid entry into enemy ZOC, and allow combat only for trapped active-side combat
