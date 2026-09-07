@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { expect } from "@playwright/test";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
+import { createCommandPacer } from "./browser-command-pacing.mjs";
 
 // All mutations use player-visible controls. Authenticated reads only verify
 // committed results; no fixture state, commands, or dice enter the live server.
@@ -66,7 +67,9 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
     assert.equal(results[0].version, version);
     state = results[0];
   };
+  const paceCommand = createCommandPacer();
   const commit = async (operation) => {
+    await paceCommand();
     const version = state.version;
     await operation();
     await synchronize(version + 1);

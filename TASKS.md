@@ -525,6 +525,22 @@ validation remain separate gates.
     not rerun the browser suites covered above. Exact-head CI follows before
     merge. Responsible owner: ChrisTitusTech. CodeRabbit remains skipped under
     the owner's limited-plan instruction.
+    PR #29 head `b467678` passed Application (`34083239002`) in 11m39s and
+    Documentation (`34083238994`). Hosted review still identified insufficient
+    overall CI headroom and a possible room-limit rejection on fast runners.
+    The job now allows 20 minutes while preserving each game's five-minute
+    bound. A monotonic pacer spaces sequential commands by at least 400ms,
+    including time spent in UI/persistence work, without changing server limits.
+    Three deterministic tests cover first-command latency, fast ten-second
+    windows, and credit for elapsed work; they are included in `pnpm test`.
+    The repaired full local gate passes with 540 workspace and nine harness
+    tests. Both paced full games pass in `test-results/enforced-combat-game-paced`;
+    movement fixtures pass again in
+    `test-results/enforced-combat-game-paced-fixtures-final`. Server source is
+    unchanged from the passing 167-test PostgreSQL run. Fresh independent review
+    found no actionable defects and reran all nine harness tests/whitespace;
+    browser evidence is from the separate runs above. Exact-head CI remains
+    required after pushing this repair and resolving its two hosted threads.
 - [ ] Deliver read-only replay controls and finish replay acceptance.
   - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
     and latest events. Inspect either side, pan/zoom, and read recorded combat
