@@ -4,11 +4,13 @@ import userEvent from "@testing-library/user-event";
 import { createMandatoryInitialState } from "@gettysburg/content";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SpectatorApp } from "./SpectatorApp";
+import { ApiResponseError } from "./api";
 
 const mocks = vi.hoisted(() => ({
   join: vi.fn(),
   resume: vi.fn(),
   claim: vi.fn(),
+  replay: vi.fn(),
 }));
 vi.mock("@colyseus/sdk", () => ({
   Client: class {
@@ -19,6 +21,7 @@ vi.mock("./api", async (original) => ({
   ...(await original<typeof import("./api")>()),
   resumeSpectator: mocks.resume,
   claimSpectatorInvitation: mocks.claim,
+  getReplay: mocks.replay,
 }));
 const id = "11111111-1111-4111-8111-111111111111";
 function snapshot(sequence = 0) {
@@ -60,6 +63,11 @@ beforeEach(() => {
   rooms = [];
   mocks.resume.mockResolvedValue(snapshot());
   mocks.claim.mockResolvedValue(snapshot());
+  mocks.replay.mockResolvedValue({
+    state: snapshot().state,
+    sequence: 0,
+    latest_sequence: 0,
+  });
   mocks.join.mockImplementation(async () => {
     const room = fakeRoom();
     rooms.push(room);
@@ -67,6 +75,64 @@ beforeEach(() => {
   });
 });
 describe("read-only spectator browser", () => {
+  it.each([401, 403, 404, 410, 409, 429, 500])(
+    "handles replay failure %s without retaining unauthorized live access",
+    async (status) => {
+      const user = userEvent.setup();
+      mocks.replay.mockRejectedValue(
+        new ApiResponseError("Replay failure", status),
+      );
+      render(<SpectatorApp />);
+      await screen.findByText("connected", { exact: true });
+      const room = rooms.at(-1)!;
+      await user.click(screen.getByRole("button", { name: "View replay" }));
+      await screen.findByRole("alert");
+      if ([401, 403, 404, 410].includes(status)) {
+        expect(screen.getByText("disconnected", { exact: true })).toBeVisible();
+        expect(
+          screen.queryByRole("region", { name: "Observer game status" }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("region", { name: "Read-only game replay" }),
+        ).not.toBeInTheDocument();
+        expect(room.leave).toHaveBeenCalledOnce();
+        await act(async () =>
+          room.handlers.get("snapshot")?.(snapshot(1).state),
+        );
+        expect(
+          screen.queryByText(/Read-only live board;/),
+        ).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText("connected", { exact: true })).toBeVisible();
+        expect(room.leave).not.toHaveBeenCalled();
+        await user.click(
+          screen.getByRole("button", { name: "Return to live observation" }),
+        );
+        expect(
+          screen.getByText("Read-only live board; no commands are sent."),
+        ).toBeVisible();
+      }
+    },
+  );
+
+  it("ignores a cancelled replay request's late access failure", async () => {
+    const user = userEvent.setup();
+    let reject!: (error: Error) => void;
+    mocks.replay.mockReturnValueOnce(
+      new Promise((_resolve, fail) => {
+        reject = fail;
+      }),
+    );
+    render(<SpectatorApp />);
+    await screen.findByText("connected", { exact: true });
+    await user.click(screen.getByRole("button", { name: "View replay" }));
+    await user.click(
+      screen.getByRole("button", { name: "Return to live observation" }),
+    );
+    await act(async () => reject(new ApiResponseError("Old failure", 401)));
+    expect(screen.getByText("connected", { exact: true })).toBeVisible();
+    expect(rooms.at(-1)!.leave).not.toHaveBeenCalled();
+  });
   it("resumes explicitly as an observer, inspects either side, and never sends commands", async () => {
     const user = userEvent.setup();
     window.localStorage.setItem("gettysburg:last-game-id", "other-player-game");

@@ -109,6 +109,33 @@ export async function checkSpectatorManagement(
     await observer
       .getByRole("button", { name: "Return to live observation" })
       .click();
+    // Inject a definitive replay denial while the live socket is idle. The
+    // observer must clear both cached views, then explicitly reauthorize.
+    const replayRoute = `**/api/games/${gameId}/replay*`;
+    await observer.route(replayRoute, (route) =>
+      route.fulfill({
+        status: 401,
+        contentType: "application/json",
+        body: JSON.stringify({
+          error: "unauthorized",
+          message: "Access ended",
+        }),
+      }),
+    );
+    await observer
+      .getByRole("button", { name: "View replay", exact: true })
+      .click();
+    await observer.getByText("disconnected", { exact: true }).waitFor();
+    assert.equal(await observer.getByLabel(/^Read-only live board/).count(), 0);
+    assert.equal(
+      await observer
+        .getByRole("region", { name: "Read-only game replay" })
+        .count(),
+      0,
+    );
+    await observer.unroute(replayRoute);
+    await observer.getByRole("button", { name: "Reconnect spectator" }).click();
+    await observer.getByText("connected", { exact: true }).waitFor();
     await observer.screenshot({
       path: resolve(evidence, `${options.label}-live-observer.png`),
       fullPage: true,

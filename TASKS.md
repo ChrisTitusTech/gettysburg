@@ -1771,6 +1771,29 @@ validation remain separate gates.
 
 ### Observer browser implementation
 
+Latest integration review: The reviewed transport handshake fix is integrated.
+The full local gate passes 613 workspace/nine harness tests; transport's 219
+PostgreSQL tests cover unchanged backend code. Both widths completed full games,
+reload, exact replay, and input fixtures in `test-results/spectator-joined-integration`
+and its `-fixtures` directory (desktop covered all three choices). Fresh review
+found replay authorization failures retained the surrounding cached live view.
+The repair propagates definitive access/deletion failures to the observer
+disconnect handler, clearing both views and closing the socket. Eight added
+tests distinguish access denial from 409/429/500 and ignore cancelled replay
+failures; all 132 web tests and typecheck pass. The real browser harness now
+injects an idle-socket replay 401, verifies both views clear, and explicitly
+reauthorizes. Full gates, fresh review, browser evidence, and exact-head CI must
+repeat before publication/merge; no release gate is waived.
+The replay-denial repair passes the complete local gate (621 workspace/nine
+harness tests), with the prior 219 PostgreSQL tests covering unchanged backend
+code. Fresh independent review found no actionable defects and reran 132 web
+tests. Desktop/tablet full games, pending-result reload/exact replay, live and
+replay access clearing after an injected 401, explicit reauthorization, and
+input fixtures pass in `test-results/spectator-replay-denial` and its `-fixtures`
+directory (all three choices on tablet). Publish this observer repair; the base
+transport's newly reported queued-checkout cancellation issue and final
+exact-head CI/review checks still prevent the dependent PR merge.
+
 - [ ] Add the separate read-only observer screen.
   - Scope: Fragment-only private claim links, stable claim retry UUIDs, explicit
     observer role, reload/bookmark resume, monotonic state/events with gap

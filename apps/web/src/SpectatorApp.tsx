@@ -1,8 +1,10 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
 import type { ActionEvent, GameState } from "@gettysburg/game";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ApiResponseError,
   claimSpectatorInvitation,
+  getReplay,
   resumeSpectator,
   type SpectatorResponse,
 } from "./api";
@@ -43,6 +45,23 @@ export function SpectatorApp({
   const [replay, setReplay] = useState(false);
   const claimId = useRef(crypto.randomUUID());
   const mounted = useRef(true);
+  const replayAccessLost = useRef<(() => void) | null>(null);
+  const loadReplay = useCallback(
+    async (...args: Parameters<typeof getReplay>) => {
+      try {
+        return await getReplay(...args);
+      } catch (failure) {
+        if (
+          !args[2]?.aborted &&
+          failure instanceof ApiResponseError &&
+          [401, 403, 404, 410].includes(failure.status)
+        )
+          replayAccessLost.current?.();
+        throw failure;
+      }
+    },
+    [],
+  );
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -95,6 +114,11 @@ export function SpectatorApp({
       setStatus("disconnected");
       setError(message);
     };
+    const accessLost = () => {
+      disconnect("Spectator access ended or the game was deleted.");
+      if (room && !serverClosing) void leaveOpenRoom(room);
+    };
+    replayAccessLost.current = accessLost;
     const refresh = async () => {
       const result = await resumeSpectator(gameId, controller.signal);
       if (!active) return;
@@ -205,6 +229,8 @@ export function SpectatorApp({
     return () => {
       active = false;
       controller.abort();
+      if (replayAccessLost.current === accessLost)
+        replayAccessLost.current = null;
       if (room && !serverClosing) void leaveOpenRoom(room);
     };
   }, [gameId, retry]);
@@ -269,6 +295,7 @@ export function SpectatorApp({
               key={gameId}
               gameId={view.game_id}
               latestSequence={view.state.event_sequence}
+              load={loadReplay}
             />
           ) : (
             <Board

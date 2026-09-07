@@ -841,6 +841,12 @@ removes the secret fragment before rendering. Claim retries reuse one request
 UUID; successful claims replace that route with `/observe/game/:gameId`, which
 can be bookmarked and reloaded using the existing secure browser session.
 
+A definitive replay access failure (401/403/404/410) also clears the surrounding
+live observer view and closes its socket; returning from replay cannot reveal
+cached state after access was denied. Rate limits, history-verification errors,
+and transient failures stay local to replay. Cancelled replay requests cannot
+invalidate a later view.
+
 The screen explicitly requests the spectator room role. It exposes pan, zoom,
 counter inspection, public scores/actions, and read-only replay, but no gameplay
 or host command controls. Snapshot/event chronology never moves backward;
