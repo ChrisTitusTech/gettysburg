@@ -11,6 +11,22 @@ import {
 } from "./game-service.js";
 import { InMemoryAsyncGameService } from "./postgres-store.js";
 
+function expectRetryCookie(response: Response, original: string | null): void {
+  const retried = response.headers.get("set-cookie");
+  expect(original).not.toBeNull();
+  expect(retried).not.toBeNull();
+  // Time can cross a second boundary between requests. Identity/security
+  // attributes stay exact while the authoritative remaining lifetime decreases.
+  const maxAge = /Max-Age=(\d+)/;
+  expect(retried!.replace(maxAge, "Max-Age=remaining")).toBe(
+    original!.replace(maxAge, "Max-Age=remaining"),
+  );
+  const initialAge = Number(maxAge.exec(original!)?.[1]);
+  const retryAge = Number(maxAge.exec(retried!)?.[1]);
+  expect(retryAge).toBeGreaterThan(0);
+  expect(retryAge).toBeLessThanOrEqual(initialAge);
+}
+
 async function withServer(
   isReady: boolean | (() => boolean),
   assertion: (origin: string) => Promise<void>,
@@ -194,7 +210,7 @@ describe("service health", () => {
         ]);
         expect(JSON.stringify(view)).not.toContain(issued.invitation!.secret);
         const retry = await claim(input);
-        expect(retry.headers.get("set-cookie")).toBe(cookie);
+        expectRetryCookie(retry, cookie);
         const headers = { cookie: cookie.split(";", 1)[0]! };
         const read = (path: string) =>
           fetch(`${origin}/api/games/${host.gameId}${path}`, { headers });
@@ -488,9 +504,7 @@ describe("HTTP game lifecycle", () => {
 
         expect(replay.status).toBe(201);
         expect(await replay.json()).toEqual(firstBody);
-        expect(replay.headers.get("set-cookie")).toBe(
-          first.headers.get("set-cookie"),
-        );
+        expectRetryCookie(replay, first.headers.get("set-cookie"));
         expect(service.service.exportSnapshot().games).toHaveLength(1);
       },
       service,

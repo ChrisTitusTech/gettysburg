@@ -1,12 +1,24 @@
-import { Room, type AuthContext, type Client } from "@colyseus/core";
+import {
+  Room,
+  ClientState,
+  type AuthContext,
+  type Client,
+} from "@colyseus/core";
 import {
   commandPayloadSchemas,
   type CommandFailure,
   type ManagementEvent,
+  type ActionEvent,
+  type GameState,
 } from "@gettysburg/game";
 
 import type { GameEventBus } from "./event-bus.js";
-import { ServiceError, type GameAuthorization } from "./game-service.js";
+import { withinDeliveryDeadline } from "./delivery-deadline.js";
+import {
+  ServiceError,
+  type GameAuthorization,
+  type SpectatorAuthorization,
+} from "./game-service.js";
 import {
   readSessionCredentialFromCookieHeader,
   type ReadinessState,
@@ -15,6 +27,17 @@ import type { GameService } from "./postgres-store.js";
 
 export interface GameRoomOptions {
   readonly gameId: string;
+  readonly spectator?: boolean;
+}
+
+type RoomAuthorization = GameAuthorization | SpectatorAuthorization;
+type DeliveryMessage =
+  | readonly ["snapshot", GameState]
+  | readonly ["gameplayEvent" | "managementEvent" | "auditEvent", ActionEvent];
+function isSpectator(
+  authorization: RoomAuthorization,
+): authorization is SpectatorAuthorization {
+  return "kind" in authorization && authorization.kind === "spectator";
 }
 
 type GameRoomConstructor = new () => Room;
@@ -50,6 +73,32 @@ function failure(error: ServiceError): CommandFailure {
   };
 }
 
+function waitForJoined(client: Client, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      client.ref.removeListener("message", onMessage);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const check = () => {
+      if (signal.aborted) return onAbort();
+      if (client.state === ClientState.JOINED) {
+        cleanup();
+        resolve();
+      }
+    };
+    // Colyseus processes the acknowledgement in its own message listener.
+    // Check after every listener has run, without decoding private wire data.
+    const onMessage = () => queueMicrotask(check);
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("Room handshake was cancelled."));
+    };
+    client.ref.on("message", onMessage);
+    signal.addEventListener("abort", onAbort, { once: true });
+    check();
+  });
+}
+
 export function createGettysburgRoom(
   gameService: GameService,
   readiness: ReadinessState,
@@ -60,22 +109,154 @@ export function createGettysburgRoom(
     { count: number; windowStartedAt: number }
   >();
   let lastCommandWindowPruneAt = 0;
+  const activeRooms = new Map<string, object>();
   return class GettysburgRoom extends Room {
     // Keep the room matchable while a reload overlaps the old socket. onJoin
     // replaces the prior connection for the same binding, so stable occupancy
-    // remains one client per seat and all broadcasts stay in one room.
-    override maxClients = 4;
+    // remains one client per binding and all broadcasts stay in one room.
+    // Two seats, eight observers, and two overlapping reloads; capacity still
+    // requires the separately planned VPS measurement.
+    override maxClients = 12;
     #gameId = "";
     #unsubscribeAudit: (() => void) | undefined;
     #unsubscribeManagement: (() => void) | undefined;
+    readonly #retiredBindings = new Set<string>();
+    #delivery: Promise<void> = Promise.resolve();
+    readonly #deliveredSequence = new WeakMap<Client, number>();
+    readonly #deliveryClosed = new WeakSet<Client>();
+    readonly #joining = new WeakMap<Client, AbortController>();
+
+    #retireBinding(bindingId: string): void {
+      this.#retiredBindings.add(bindingId);
+      for (const client of [...this.clients]) {
+        if (
+          (client.auth as RoomAuthorization | undefined)?.bindingId ===
+          bindingId
+        )
+          client.leave(4001);
+      }
+    }
+
+    #canReceive(client: Client): boolean {
+      if (this.#deliveryClosed.has(client)) return false;
+      const authorization = client.auth as RoomAuthorization | undefined;
+      if (authorization === undefined) return false;
+      if (this.#retiredBindings.has(authorization.bindingId)) return false;
+      return true;
+    }
+
+    #broadcastAuthorized(messages: readonly DeliveryMessage[]): Promise<void> {
+      return this.#enqueueDelivery(() => this.#deliverAuthorized(messages));
+    }
+
+    #enqueueDelivery(operation: () => Promise<void>): Promise<void> {
+      const delivery = this.#delivery.then(operation);
+      this.#delivery = delivery.catch(() => {});
+      return delivery;
+    }
+
+    async #deliverAuthorized(
+      messages: readonly DeliveryMessage[],
+    ): Promise<void> {
+      const authorizations = [...this.clients].flatMap((client) => {
+        const authorization = client.auth as RoomAuthorization | undefined;
+        return authorization !== undefined &&
+          isSpectator(authorization) &&
+          this.#canReceive(client) &&
+          Number.isFinite(this.#deliveredSequence.get(client))
+          ? [authorization]
+          : [];
+      });
+      if (authorizations.length > 0) {
+        try {
+          await withinDeliveryDeadline((signal) =>
+            gameService.deliverAuthorizedSpectators(
+              authorizations,
+              (allowed) => {
+                if (signal.aborted) return;
+                const permitted = new Set(allowed);
+                for (const authorization of authorizations)
+                  if (!permitted.has(authorization.bindingId))
+                    this.#retireBinding(authorization.bindingId);
+                this.#sendAuthorized(messages, permitted);
+              },
+              signal,
+            ),
+          );
+          return;
+        } catch {
+          // An unavailable authorization read must never fall back to cached
+          // spectator access or leave observers silently connected to stale
+          // state. Close this connection, not the binding: a new join can
+          // reauthorize and load fresh state after the read service recovers.
+          for (const client of [...this.clients]) {
+            const authorization = client.auth as RoomAuthorization | undefined;
+            if (authorization !== undefined && isSpectator(authorization)) {
+              this.#deliveryClosed.add(client);
+              client.leave(4002);
+            }
+          }
+        }
+      }
+      this.#sendAuthorized(messages, new Set());
+    }
+
+    #sendAuthorized(
+      messages: readonly DeliveryMessage[],
+      permitted: ReadonlySet<string>,
+    ): void {
+      const sequence = messages[0]?.[1].event_sequence ?? 0;
+      for (const client of [...this.clients]) {
+        const authorization = client.auth as RoomAuthorization | undefined;
+        if (
+          authorization === undefined ||
+          sequence <= (this.#deliveredSequence.get(client) ?? 0) ||
+          !this.#canReceive(client) ||
+          (isSpectator(authorization) &&
+            !permitted.has(authorization.bindingId))
+        )
+          continue;
+        for (const [type, message] of messages) client.send(type, message);
+        this.#deliveredSequence.set(client, sequence);
+      }
+    }
 
     override async onCreate(options: GameRoomOptions): Promise<void> {
       this.#gameId = options.gameId;
-      await gameService.getGameState(this.#gameId);
+      // Matchmaking may try to create another room when overlapping reloads
+      // fill the first. Reject that attempt instead of splitting gameplay.
+      if (activeRooms.has(this.#gameId))
+        throw new Error(
+          "This game already has a room. Retry joining when a slot is available.",
+        );
+      activeRooms.set(this.#gameId, this);
+      try {
+        await withinDeliveryDeadline((signal) =>
+          gameService.verifyRoomGame(this.#gameId, signal),
+        );
+      } catch (error) {
+        if (activeRooms.get(this.#gameId) === this)
+          activeRooms.delete(this.#gameId);
+        throw error;
+      }
       this.setMetadata({ gameId: this.#gameId });
       this.#unsubscribeManagement = eventBus?.subscribeManagement(
         this.#gameId,
-        (event: ManagementEvent) => this.broadcast("managementEvent", event),
+        (event: ManagementEvent, revokedSpectatorBindingId?: string) => {
+          if (revokedSpectatorBindingId !== undefined)
+            this.#retireBinding(revokedSpectatorBindingId);
+          if (event.command_name === "deleteGame") {
+            for (const client of [...this.clients]) {
+              const authorization = client.auth as
+                RoomAuthorization | undefined;
+              if (authorization !== undefined && isSpectator(authorization))
+                this.#retireBinding(authorization.bindingId);
+            }
+          }
+          void this.#broadcastAuthorized([["managementEvent", event]]).catch(
+            () => console.error("Management event delivery failed."),
+          );
+        },
       );
       this.#unsubscribeAudit = eventBus?.subscribeAudit(
         this.#gameId,
@@ -86,11 +267,15 @@ export function createGettysburgRoom(
                 (client.auth as GameAuthorization | undefined)?.side ===
                 revokedSeat
               ) {
-                client.leave(4001);
+                this.#retireBinding(
+                  (client.auth as GameAuthorization).bindingId,
+                );
               }
             }
           }
-          this.broadcast("auditEvent", event);
+          void this.#broadcastAuthorized([["auditEvent", event]]).catch(() =>
+            console.error("Audit event delivery failed."),
+          );
         },
       );
 
@@ -98,7 +283,8 @@ export function createGettysburgRoom(
       for (const commandName of commandNames) {
         this.onMessage(commandName, async (client, message: unknown) => {
           try {
-            const authorization = client.auth as GameAuthorization;
+            if (!this.#canReceive(client)) return;
+            const authorization = client.auth as RoomAuthorization;
             const now = Date.now();
             if (now - lastCommandWindowPruneAt >= ROOM_COMMAND_WINDOW_MS) {
               pruneExpiredCommandWindows(commandWindows, now);
@@ -121,6 +307,11 @@ export function createGettysburgRoom(
             }
             window.count += 1;
             commandWindows.set(authorization.bindingId, window);
+            if (isSpectator(authorization))
+              throw new ServiceError(
+                "unauthorized",
+                "Spectators cannot send gameplay commands.",
+              );
             if (!(await readiness.isReady())) {
               client.send("commandResult", {
                 current_version: 0,
@@ -136,13 +327,19 @@ export function createGettysburgRoom(
               message,
               { afterCommit: () => (committed = true) },
             );
-            client.send("commandResult", result);
             if (result.ok && committed) {
-              this.broadcast("gameplayEvent", result.event);
-              this.broadcast("snapshot", result.state);
-              if (result.event.command_name === "surrenderSeat") {
-                client.leave(4001);
-              }
+              await this.#broadcastAuthorized([
+                ["gameplayEvent", result.event],
+                ["snapshot", result.state],
+              ]);
+            }
+            client.send("commandResult", result);
+            if (
+              result.ok &&
+              committed &&
+              result.event.command_name === "surrenderSeat"
+            ) {
+              client.leave(4001);
             }
           } catch (error) {
             if (error instanceof ServiceError) {
@@ -162,15 +359,23 @@ export function createGettysburgRoom(
     }
 
     override onDispose(): void {
+      if (activeRooms.get(this.#gameId) === this)
+        activeRooms.delete(this.#gameId);
       this.#unsubscribeAudit?.();
       this.#unsubscribeManagement?.();
+    }
+
+    override onLeave(client: Client): void {
+      this.#deliveryClosed.add(client);
+      this.#joining.get(client)?.abort();
+      this.#joining.delete(client);
     }
 
     override async onAuth(
       _client: Client,
       options: GameRoomOptions,
       context: AuthContext,
-    ): Promise<GameAuthorization> {
+    ): Promise<RoomAuthorization> {
       if (!(await readiness.isReady())) {
         throw new Error("The game service is temporarily unavailable.");
       }
@@ -181,29 +386,85 @@ export function createGettysburgRoom(
         );
       }
 
-      return await gameService.authenticate(
-        readSessionCredentialFromCookieHeader(
-          context.headers.get("cookie") ?? undefined,
-        ),
-        this.#gameId,
+      const credential = readSessionCredentialFromCookieHeader(
+        context.headers.get("cookie") ?? undefined,
       );
+      return options.spectator === true
+        ? await gameService.authenticateSpectator(credential, this.#gameId)
+        : await gameService.authenticate(credential, this.#gameId);
     }
 
     override async onJoin(client: Client): Promise<void> {
-      const authorization = client.auth as GameAuthorization;
+      // A queued batch may predate the initial snapshot returned by this join.
+      // Earlier queued batches can be skipped because the initial read follows
+      // them. Later batches wait behind that read, so none can disappear while
+      // a captured (potentially older) snapshot is still loading.
+      this.#deliveredSequence.set(client, Infinity);
+      const cancelled = new AbortController();
+      this.#joining.set(client, cancelled);
+      // Colyseus defers onLeave until onJoin settles. Observe the socket itself
+      // so an abandoned initial read releases its database lock immediately.
+      const onClose = () => {
+        this.#deliveryClosed.add(client);
+        cancelled.abort();
+      };
+      client.ref.once("close", onClose);
+      const authorization = client.auth as RoomAuthorization;
       for (const existing of [...this.clients]) {
         if (
           existing !== client &&
-          (existing.auth as GameAuthorization | undefined)?.bindingId ===
+          (existing.auth as RoomAuthorization | undefined)?.bindingId ===
             authorization.bindingId
         ) {
           existing.leave(4000);
+          this.#deliveryClosed.add(existing);
+          this.#joining.get(existing)?.abort();
         }
       }
-      client.send(
-        "snapshot",
-        await gameService.getAuthorizedState(authorization),
-      );
+      const deliver = async () => {
+        await this.#enqueueDelivery(async () => {
+          if (cancelled.signal.aborted || !this.#canReceive(client)) return;
+          await withinDeliveryDeadline(
+            (signal) =>
+              gameService.deliverAuthorizedState(
+                authorization,
+                (state) => {
+                  if (!signal.aborted && this.#canReceive(client)) {
+                    client.send("snapshot", state);
+                    this.#deliveredSequence.set(client, state.event_sequence);
+                  }
+                },
+                signal,
+              ),
+            cancelled.signal,
+          );
+        });
+      };
+      const cleanup = () => {
+        client.ref.removeListener("close", onClose);
+        this.#joining.delete(client);
+      };
+      if (isSpectator(authorization)) {
+        // onJoin must return before Colyseus accepts the client acknowledgement.
+        // Never enqueue private state in its JOINING transport buffer: authorize
+        // only after JOINED, when send writes immediately under the read lock.
+        void withinDeliveryDeadline(
+          (signal) => waitForJoined(client, signal),
+          cancelled.signal,
+        )
+          .then(deliver)
+          .catch((error: unknown) => {
+            this.#deliveryClosed.add(client);
+            client.leave(error instanceof ServiceError ? 4001 : 4002);
+          })
+          .finally(cleanup);
+        return;
+      }
+      try {
+        await deliver();
+      } finally {
+        cleanup();
+      }
     }
   };
 }
