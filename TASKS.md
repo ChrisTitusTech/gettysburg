@@ -11,8 +11,8 @@ and evidence; they do not supersede this current status or close owner gates.
 | Phases 0-2 | Complete; last verified VPS revision is `40cff572aab183660dfeee188c4b6acddb2b1de5` | New source is not yet a new VPS rollout |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
-| Private spectators | Claims, revocable HTTP/replay access, and host grant management are merged through PR #38 | Live transport, host link creation, and observer browser PRs remain unmerged; integration review gates apply |
-| Opt-in browser push | Owner approved; targeting-policy PR #41 remains unmerged and does not send notifications | Protected subscriptions, durable delivery/retries, opt-out, and real provider/device acceptance |
+| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49 | Browser consent UI, key backup/restore, Home Screen installability, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -27,6 +27,22 @@ PostgreSQL and desktop/tablet evidence; no fresh database or browser run is
 claimed for this documentation update. Fresh independent review found no
 actionable defects. PR #42 head `5461aaa` passed Application `34105452083` and
 Documentation `34105452277`, had no unresolved threads, and merged as `3c61850`.
+
+Subsequent merge closeout (2026-09-07): each exact head passed Application and
+Documentation, independent review was clean, and final unresolved-thread
+inspection was empty before a separate merge call. The implementation notes
+below retain earlier evidence and pending steps, superseded by this rollup.
+
+| PR | Exact head | Application / Documentation | Merge |
+| --- | --- | --- | --- |
+| #40 observer browser | `9ad2f66` | `34113686517` / `34113686564` | `3d10581` |
+| #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
+| #43 protected subscriptions | `e1991d1` | `34112288240` / `34112288184` | `fc70599` |
+| #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
+| #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
+| #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
+| #48 optional startup | `d7c0d4c` | `34117338015` / `34117337993` | `2afd7ef` |
+| #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1492,7 +1508,14 @@ validation remain separate gates.
     All three late PR #34 threads were resolved; a separate final PR #35 check
     found no review threads before merge `823e41d6cfdc4c1758b6d708ba86c699f68cf3a9`.
     CodeRabbit was limit-skipped as authorized. No VPS rollout occurred.
-- [ ] Add live read-only spectator room authorization and immediate revocation.
+- [x] Add live read-only spectator room authorization and immediate revocation.
+  - Merged PR #37 on 2026-09-07 as `790da61192c3314df2359a334761cea4bb4da5a3`.
+    Exact head `d100b2a` passed Application `34110333243` and Documentation
+    `34110333427`; final read-only thread inspection was empty before merge.
+    Full local gates pass 603 workspace/nine harness tests and 224 PostgreSQL
+    tests. Latest independent review found no actionable defects. Historical
+    validation/fix notes below are retained; their pending merge steps are now
+    superseded by this closeout. The separate observer UI remains PR #40.
   - Scope: Explicit observer role, repeated authorization at join and before
     broadcast batches, one shared room for two players/eight observers plus
     reload overlap, command rejection, expiry, and fail-closed reads. Private
@@ -1861,6 +1884,151 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Container vulnerability closeout (release gate open)
+
+Integrated startup and notification-worker code from merged PRs #48/#49 passes
+739 workspace/13 harness tests, build, smoke, lint, typecheck, and formatting.
+Markdown initially rejected two long rollup lines; both were wrapped and the
+complete Markdown check then passed. Fresh independent review found no defects.
+Image `e111ed6d767d1a82148706083a59118bb7ea2f87655a1080ba83cedc8b8869d0`
+passes the exact-image scanner with zero HIGH/CRITICAL findings across 18 OS/359
+Node packages (`/tmp/gettysburg-scanner.K2VSLN/startup-worker-image.json`). Its
+actual-image browser run passes notification display/tag coalescing, both
+24-turn games, pending-result reload, exact replay, and spectator workflows in
+`test-results/alpine-startup-worker-image`. Desktop covers all three combat
+choices and tablet loss/advance. A separate container-smoke rebuild of the same
+application source (`a8001345b15d17740f23523f2ff880e10b810edbf8a3604d013807cdf2615adf`)
+passes non-root execution, PostgreSQL restart/resume, fail-closed readiness, and
+clean shutdown. These are distinct image IDs, not a claim of one identical
+artifact for both runs. Final exact-head CI and a newly built release-image scan
+remain required; no VPS deployment or production push enablement occurred.
+
+Hosted review identified that a later VPS rebuild was not covered by a local
+candidate scan. The deployment now scans its exact newly built image ID before
+maintenance, unit/secret installation, or the service-changing rollback trap.
+It requires a verified scanner binary checksum, scans OS/library HIGH/CRITICAL
+findings with fresh database updates and no ignore/config/environment overrides,
+and preserves the report/version/checksum with rollout metadata. No rebuild
+occurs between scanning and installing that immutable ID. Bash syntax,
+ShellCheck, shfmt, four controlled helper tests, and the full local gate
+(719 workspace/13 harness tests) pass. The actual helper scans image `3120b0d`
+successfully with isolated scanner configuration; report:
+`/tmp/gettysburg-scanner.K2VSLN/deploy-helper-isolated.json`. Fresh independent
+review found no actionable defects and reran the four helper/shell checks.
+Exact-head CI follows. VPS provisioning/rollout remains unattempted and
+approval-gated; no production service or secret changed.
+PLAN/ROADMAP now distinguish the merged worker from open startup/browser work.
+Further hosted review adds a five-second forced-kill grace to all archive and
+scanner deadlines, and preserves rejected-image findings in the protected
+rollout `image-scan/` directory rather than deleting them with temporary files.
+Only the helper's exported archive is temporary. All four helper tests, Bash
+syntax, ShellCheck, shfmt, documentation checks, and fresh independent review
+pass. The root deployment remains unexecuted; exact-head CI follows.
+
+Merged worker integration passes the full gate (719 workspace/nine harness
+tests). Image `3120b0d4a36277199abd42ed06e061c72084d88c9d836f113b9a619c78965978`
+passes non-root container smoke and HIGH/CRITICAL scanning with zero findings
+across 18 OS/359 Node packages (`/tmp/gettysburg-scanner.K2VSLN/worker-image.json`).
+The worker still has no startup caller in this container candidate. Previously
+recorded actual-image browser evidence covers unchanged active runtime/UI;
+exact-head CI must pass and the final release image must be scanned again.
+
+Hosted review found exact OpenSSL package pins could disappear from Alpine's
+moving stable repository. Replace them with minimum fixed versions plus upgrade;
+later repository revisions remain installable without weakening the security
+floor. This deliberately does not claim reproducible source builds: preserve
+the reviewed image for rollback and rescan every new image. A cache-free build
+produces `a89caa552399c65c97df7f712c5ba88e4006c2ce74e024240626452dc957d80a`;
+container smoke and a fresh HIGH/CRITICAL scan pass with zero findings across
+18 OS/359 Node packages. Raw evidence:
+`/tmp/gettysburg-scanner.K2VSLN/rebuildable-image.json`. The initial scan command
+used an unsupported OCI archive input and failed before scanning; exporting a
+Docker archive and rerunning passed. Fresh independent review found no defects.
+Previously recorded actual-image browser evidence covers the same installed
+package versions and unchanged application code. Exact-head CI follows.
+The two hosted stale-rollup findings are addressed by the current source table.
+
+After merging provider dependencies, the full local gate passes 715 workspace/
+nine harness tests. Image
+`6385b2b523511a7834f5d256ee2ec254f7b112cd016464238f0915c91649e6a3`
+passes container smoke and the HIGH/CRITICAL scan with zero findings across
+18 OS and 359 Node packages (`/tmp/gettysburg-scanner.K2VSLN/provider-image.json`).
+The provider has no startup caller in this candidate; the actual-image observer
+and full-game browser evidence below covers unchanged UI and active runtime
+flows. New exact-head CI must rerun all integrated gates; the final release
+image still needs its own scan. No VPS changes have been made.
+
+Current combined candidate includes the reviewed observer UI and notification
+outbox/receipts. Full local gates pass 673 workspace/nine harness tests; fresh
+independent review against the observer base found no actionable defects.
+Immutable image `02c52cf098e99c228a3e3dda900a5d9d740bb3adf4f319148428fa6a123e66d0`
+passes the HIGH/CRITICAL scan with zero findings (raw local evidence:
+`/tmp/gettysburg-scanner.K2VSLN/observer-outbox.json`), container smoke, and actual
+image desktop/tablet 24-turn games, reload, exact replay, and observer workflows
+in `test-results/alpine-observer-outbox-image`. Both current games cover
+loss/advance; preceding actual-image evidence covers retreat. Input fixtures
+pass in `test-results/alpine-observer-outbox-inputs`. Final exact-head CI and
+release-image scanning remain required; no VPS deployment is implied.
+
+- [ ] Refresh and scan the immutable Node 24 container base and application.
+  - The 2026-09-07 complete and production-only pnpm audits report no known
+    vulnerabilities. They do not cover OS packages or bundled global tools.
+  - Provisioned Trivy 0.74.0 in a task-local directory from its official
+    GitHub release. Verified the Linux archive against GitHub's published
+    SHA-256 `2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a`
+    before extracting/running the named binary. No global host package changed.
+  - The pinned base `85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e`
+    fails the HIGH/CRITICAL scan: 62 OS findings (six critical, six with fixes)
+    and 15 bundled Node-tool findings (one critical, all with fixes).
+    Raw local JSON: `/tmp/gettysburg-scanner.K2VSLN/pinned-base.json`.
+  - Current Node 24.18.0 Bookworm slim was also scanned at immutable digest
+    `6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d`:
+    56 OS findings without listed fixes (four critical) and nine bundled-tool
+    findings with fixes (one critical). This is not a passing release result.
+  - Plan: Compare supported current bases, minimize unused runtime tools,
+    validate the real container entrypoint/readiness/restart/durability, and
+    scan the final immutable application image. Preserve non-root execution,
+    reviewed source boundaries, full local/browser gates, independent review,
+    and exact-head CI. Owner: ChrisTitusTech. No VPS rollout or release approval
+    is implied by local image work; unresolved findings remain visible.
+  - Candidate: Node 24.18.0 Alpine 3.24.1 at digest
+    `a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd`.
+    Its initial scan found two high OpenSSL package findings, both fixed by
+    `libcrypto3`/`libssl3` 3.5.8-r0, plus the same nine global-tool findings.
+    Require those minimum security versions and remove unused npm/Corepack/Yarn
+    from the runtime layer only. Builder and runtime share the same Alpine
+    base so native dependency targets match. The glibc-to-musl change requires
+    actual container build/startup/restart/persistence validation, not only
+    host tests.
+  - Candidate image `0c898aa8c42633c9b4e00600b762136e84260f64ed9d828cae686b6fe86c7c67`
+    passes Trivy 0.74.0 HIGH/CRITICAL scanning on 2026-09-07: zero findings
+    across 18 OS packages and 344 Node packages. Raw local evidence is
+    `/tmp/gettysburg-scanner.K2VSLN/candidate.json`. This is a severity-bounded
+    scan, not a claim of zero vulnerabilities of every severity. The scanner's
+    Alpine EOL-metadata warning was checked against the official release table;
+    Alpine 3.24 main support ends 2028-06-01.
+  - Full local gates pass 584 workspace/nine harness tests. Container smoke
+    proves UID 1000, database restart/resume, readiness failure, and shutdown.
+    The actual immutable candidate (not the host Node server) completes two
+    24-turn browser games at desktop/tablet widths, all three combat choices,
+    pending-result reload, and exact replay in
+    `test-results/alpine-image-acceptance`. The first ad-hoc harness attempt
+    failed before startup because this Podman rejected tmpfs ownership options;
+    rerunning with a task-owned named volume passed and cleaned its resources.
+  - Independent review found no actionable defects. Final documentation checks,
+    integration with merged application work, exact-head CI, and a scan of the
+    final merged release image remain required. No VPS changes were made.
+  - Integrated candidate includes merged PRs #37/#39. Full local gates now pass
+    606 workspace/nine harness tests. Fresh independent review remains clean.
+    Image `74f59538feb7a804ad176d8a40dda7eae5ade5fde8244dfa11601560a4051579`
+    passes container smoke and the same HIGH/CRITICAL scan with zero findings
+    (`/tmp/gettysburg-scanner.K2VSLN/integrated-candidate.json`). Both actual-image
+    desktop/tablet runs complete 24 turns, loss/advance, reload, and exact replay
+    in `test-results/alpine-integrated-image`; the preceding actual-image run
+    covers retreat on both widths. Host input fixtures pass in
+    `test-results/alpine-host-input-fixtures`. Exact-head CI and final release
+    image scanning remain open; this does not complete the release gate.
+
 ### Observer browser implementation
 
 Latest integration review: The reviewed transport handshake fix is integrated.
@@ -1886,7 +2054,7 @@ directory (all three choices on tablet). Publish this observer repair; the base
 transport's newly reported queued-checkout cancellation issue and final
 exact-head CI/review checks still prevent the dependent PR merge.
 
-- [ ] Add the separate read-only observer screen.
+- [x] Add the separate read-only observer screen.
   - Scope: Fragment-only private claim links, stable claim retry UUIDs, explicit
     observer role, reload/bookmark resume, monotonic state/events with gap
     repair, read-only counter inspection and replay, and fail-closed clearing
@@ -1976,7 +2144,7 @@ The later connection-reuse integration preserves those UI/protocol paths and
 adds a separately verified database regression. Exact-head CI and final review
 threads are required before merge; this foundation still sends no notifications.
 
-- [ ] Store per-seat browser push consent and encrypted subscription credentials.
+- [x] Store per-seat browser push consent and encrypted subscription credentials.
   - Scope: Canonical HTTPS endpoints for the Chrome/Firefox/Safari production
     push providers, valid P-256/auth keys, one subscription per current seat
     binding, session/subscription expiry, metadata-only status, and same-browser
@@ -2174,7 +2342,7 @@ tests. Fresh independent review found no actionable defects and reran 248 server
 tests. Existing desktop/tablet full-game and fixture evidence covers unchanged
 browser and room behavior; new exact-head CI must rerun the integrated gates.
 
-- [ ] Persist notification work atomically with accepted gameplay commands.
+- [x] Persist notification work atomically with accepted gameplay commands.
   - Integrated closeout: full local gates pass 647 workspace/nine harness
     tests, all 270 PostgreSQL tests pass, and fresh independent review passes
     246 server tests without actionable findings. Subscription and transport
@@ -2223,7 +2391,7 @@ paths are covered by full desktop/tablet games and input fixtures in
 The prior policy head `a14fa93` passed Application `34105754831` and
 Documentation `34105754816`; this integration requires new exact-head checks.
 
-- [ ] Add deterministic turn-notification targeting.
+- [x] Add deterministic turn-notification targeting.
   - Scope: Pure server policy for consecutive compatible mandatory-game
     snapshots. Notify the other seat only when a newly required decision
     appears, including combat choices and ending combat after the opponent's
@@ -2276,7 +2444,11 @@ directory. The previous published head `e2725bb` passed Application
 `34106079859` and Documentation `34106079858`. Publish this integration and
 require its exact-head checks/final threads before merge; transport merges first.
 
-- [ ] Add visible host creation, copying, and hiding of private spectator links.
+- [x] Add visible host creation, copying, and hiding of private spectator links.
+  - Merged PR #39 on 2026-09-07 as `c3942ef5acc97eeb6e273a90446d1a79d737b76b`.
+    Exact head `4968920` passed Application `34110530019` and Documentation
+    `34110529936`; final thread inspection was empty before the separate merge.
+    Historical pending integration steps below are superseded by this closeout.
   - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
     component memory and URL fragments only; never persist them in browser
     storage. Show a selectable URL when clipboard access is unavailable.
