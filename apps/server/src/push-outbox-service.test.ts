@@ -44,6 +44,42 @@ function fixture() {
 }
 
 describe("transaction-owned notification work", () => {
+  it("retires matching gone consent after its decision was pruned and the service restarted", () => {
+    const f = fixture();
+    f.service.setPushSubscription(
+      f.guest.credential,
+      f.host.gameId,
+      f.subscription,
+    );
+    expect(f.move().ok).toBe(true);
+    const claim = f.service.claimPushDelivery()!;
+    expect(
+      f.service.executeCommand(
+        f.service.authenticate(f.guest.credential, f.host.gameId),
+        { ...f.command, command_id: randomUUID(), expected_version: 1 },
+      ).ok,
+    ).toBe(true);
+    const snapshot = f.service.exportSnapshot();
+    expect(snapshot.pushOutbox).toBeUndefined();
+    expect(snapshot.pushDeliveryReceipts).toHaveLength(1);
+    const restarted = f.restore();
+    restarted.finishPushDelivery(claim.intent.id, randomUUID(), "gone");
+    expect(
+      restarted.getPushSubscriptionStatus(f.guest.credential, f.host.gameId)
+        .enabled,
+    ).toBe(true);
+    restarted.finishPushDelivery(
+      claim.intent.id,
+      claim.intent.leaseToken!,
+      "gone",
+    );
+    expect(
+      restarted.getPushSubscriptionStatus(f.guest.credential, f.host.gameId)
+        .enabled,
+    ).toBe(false);
+    expect(restarted.exportSnapshot().pushDeliveryReceipts).toBeUndefined();
+  });
+
   it("enqueues only consented recipients once and resumes a private claim without changing replay", () => {
     const f = fixture();
     f.service.setPushSubscription(

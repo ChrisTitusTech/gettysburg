@@ -1924,6 +1924,17 @@ fixtures in `test-results/push-provider-transport` and its `-fixtures` directory
 Exact-head CI remains required. No runtime worker calls this module yet; no real
 push-provider request or deployed VAPID credential was used.
 
+PR #44 second review follow-up: lease-bounded private completion receipts retain
+consent identity after decision pruning or replacement by newer reminder work.
+A matching provider-gone outcome retires only unchanged consent; stale tokens,
+expired receipts, opt-out, and replacement subscriptions remain protected.
+Receipts survive canonical snapshot restart but are excluded from game/recovery
+exports. Full local gates pass 655 workspace/nine harness tests and 275 real
+PostgreSQL tests. Fresh independent review found no actionable defects and
+reran 251 server tests/typecheck. The database regression now also advances the
+recipient's decision before applying its gone outcome. Existing full-game and
+fixture evidence covers unchanged UI/protocol behavior; exact-head CI follows.
+
 PR #44 review follow-up: persisted work now carries a deterministic fingerprint
 of its originating required decisions. Pruning rejects it when the same seat
 advances to a different decision, even if that seat still has an action to take.
