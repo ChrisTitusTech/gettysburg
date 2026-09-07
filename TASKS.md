@@ -1429,6 +1429,25 @@ validation remain separate gates.
     vulnerabilities; container scanning remains open (Trivy is not installed
     locally; owner ChrisTitusTech, follow-up: provision a verified scanner and
     scan the final immutable release image). No VPS change occurred.
+  - PR #37 initial head `c92be8d4e21a52b41613a760d23f27c012c5f55d` failed
+    Application run `34096300104`: a legacy retry test required the entire
+    Set-Cookie header to stay byte-identical even when remaining Max-Age correctly
+    decreased by one second. Creation and observer retry assertions now compare
+    unchanged cookie identity/security attributes and a positive non-increasing
+    lifetime; the frozen-clock one-hour expiry regression remains exact.
+    Other warnings were action-runtime deprecations, isolated test-database trust
+    and locale setup, or deliberate authorization/failure injection. Later build,
+    browser and container CI steps were skipped, not passed. Local container
+    smoke on that head passed non-root 1000:1000, PostgreSQL restart/resume,
+    fail-closed readiness, and clean shutdown. OCI ignores the image HEALTHCHECK;
+    the tested runtime/Quadlet supplies its explicit health command. Fresh local
+    validation, independent review, and exact-head CI are required for the repair.
+    Repair validation passes the complete local gate (582 workspace/nine harness
+    tests), all 203 PostgreSQL tests, and fresh independent review (187 server
+    tests; its database skips are covered separately). Only test assertions and
+    this ledger changed; the already verified desktop/tablet and container
+    evidence above applies to unchanged application code. Exact-head CI must
+    rerun the complete application workflow before merge.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host
