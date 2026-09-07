@@ -1346,7 +1346,8 @@ validation remain separate gates.
     cap outstanding grants at eight, preserve command-id retries with sealed
     secrets, and support host-only issue/revoke events without gameplay-version
     changes. Persist the optional collection in canonical PostgreSQL snapshots;
-    remove invitations/secrets on deletion and external-ledger restore. Verify
+    revoke invitations and destroy secrets on soft deletion/external-ledger
+    restore, retain hashes for 30 days, then remove them on hard purge. Verify
     issue/revoke evidence during mandatory replay.
   - Boundary: No spectator claim endpoint, binding, room access, or UI yet.
     Follow with read-only claiming/authorization, immediate revocation of live
@@ -1366,6 +1367,19 @@ validation remain separate gates.
     independent review found no actionable regressions and reran typecheck and
     169 server tests; its 15 database skips are covered above. There is no new
     spectator UI to inspect in this increment; existing browser workflows passed.
+  - Review follow-up: Two hosted findings required retaining hashed invitation
+    evidence through soft deletion and rejecting orphan issue/revocation records
+    during full replay. Added regressions for soft/hard deletion and external
+    ledger restore, missing/out-of-range evidence, and legitimate historical
+    prefixes. The earlier deletion assertion intentionally changes to the
+    specified 30-day retention contract. Fresh full local validation passes with
+    565 workspace/nine harness tests and all 185 PostgreSQL tests. Desktop and
+    tablet full enforced games, reload/exact replay, and input fixtures pass in
+    `test-results/spectator-evidence-retention` and its `-fixtures` directory;
+    tablet covered all three pending choice types. Independent local review
+    found no actionable regressions and reran 170 server tests/whitespace;
+    its 15 database skips are covered above. Exact-head CI and thread resolution
+    remain required before merge; Phase 4 remains open.
 - [x] Consolidate ordinary resume into one authorized snapshot read.
   - Scope: Replace the response's four/five independent snapshot hydrations with
     one read for current host/seat access, public action events, host-only

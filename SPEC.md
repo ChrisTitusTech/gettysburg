@@ -721,10 +721,15 @@ use a separate verifier domain, stay out of persisted action results/public
 events, and are sealed only for authorized same-command retries. Revocation,
 expiry cleanup, and game deletion destroy the retrievable secret. Canonical
 PostgreSQL snapshots retain the new optional invitation collection without a
-schema rewrite; old snapshots default to no spectator invitations.
+schema rewrite; old snapshots default to no spectator invitations. Soft deletion
+revokes invitations and removes retrievable secrets but retains hashed records
+with the tombstone for 30 days; hard purge removes those records. Applying an
+external deletion ledger enforces the same retention boundary.
 
 Mandatory replay verifies spectator issue/revoke metadata, lifetime, capacity,
 host attribution, hashes, and event sequence without exposing private evidence.
+Full replay accounts for every retained issue and revocation record; historical
+prefixes allow evidence belonging to later audited actions.
 This preparatory increment does not yet expose spectator claiming, bindings,
 room authorization, live viewing, or browser controls. A spectator invitation
 cannot claim a player seat. Those separate delivery gates must pass before

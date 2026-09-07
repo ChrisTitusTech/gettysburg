@@ -170,21 +170,96 @@ describe("host-managed spectator invitations", () => {
     expect(f.service.getActions(f.host.gameId)).toHaveLength(1);
   });
 
-  it("removes spectator invitations during deletion and external-ledger restore", () => {
+  it("retains revoked hashes through soft deletion and removes them on hard purge", () => {
     const f = fixture();
     f.issue();
     const before = f.service.exportSnapshot();
     expect(f.execute(f.command("deleteGame", { confirm: true })).ok).toBe(true);
-    expect(f.service.exportSnapshot().spectatorInvitations).toEqual([]);
+    expect(f.service.exportSnapshot().spectatorInvitations).toEqual([
+      [
+        before.spectatorInvitations![0]![0],
+        {
+          ...before.spectatorInvitations![0]![1],
+          revokedAt: f.clock.now,
+          revokedAtSequence: 2,
+        },
+      ],
+    ]);
     const restored = new InMemoryGameService({
       pepper: f.pepper,
       snapshot: before,
       now: () => f.clock.now,
     });
     restored.synchronizeDeletionLedger(f.service.getDeletionLedger());
-    expect(restored.exportSnapshot().spectatorInvitations).toEqual([]);
+    expect(restored.exportSnapshot().spectatorInvitations).toEqual([
+      [
+        before.spectatorInvitations![0]![0],
+        {
+          ...before.spectatorInvitations![0]![1],
+          revokedAt: f.clock.now,
+        },
+      ],
+    ]);
     expect(JSON.stringify(restored.exportSnapshot())).not.toContain(
       "sealedInvitationSecret",
+    );
+    expect(() =>
+      restored.getReplay(f.host.credential, f.host.gameId),
+    ).toThrow();
+    f.clock.now += 31 * 24 * 60 * 60 * 1000;
+    f.service.purgeDeletedGames();
+    expect(f.service.exportSnapshot().spectatorInvitations).toEqual([]);
+    restored.synchronizeDeletionLedger(f.service.getDeletionLedger());
+    expect(restored.exportSnapshot().spectatorInvitations).toEqual([]);
+  });
+
+  it("rejects orphan issue and revocation records without breaking valid prefixes", () => {
+    const f = fixture();
+    const issued = f.issue();
+    const snapshot = f.service.exportSnapshot();
+    const [id, record] = snapshot.spectatorInvitations![0]!;
+    const missingSequence = { ...record };
+    delete missingSequence.activeAfterSequence;
+    for (const orphan of [
+      missingSequence,
+      { ...record, lookupId: randomUUID() },
+      { ...record, lookupId: randomUUID(), activeAfterSequence: 2 },
+      { ...record, revokedAt: f.clock.now, revokedAtSequence: 2 },
+    ]) {
+      const restored = new InMemoryGameService({
+        pepper: f.pepper,
+        now: () => f.clock.now,
+        snapshot: {
+          ...snapshot,
+          spectatorInvitations:
+            orphan.lookupId === id
+              ? [[id, orphan]]
+              : [
+                  [id, record],
+                  [orphan.lookupId, orphan],
+                ],
+        },
+      });
+      expect(() =>
+        restored.getReplay(f.host.credential, f.host.gameId),
+      ).toThrow(/Replay is unavailable/);
+      expect(
+        restored.getGameView(f.host.credential, f.host.gameId).state,
+      ).toEqual(f.service.getGameState(f.host.gameId));
+    }
+    f.execute(
+      f.command("revokeSpectatorInvitation", {
+        lookup_id: issued.invitation.lookup_id,
+      }),
+    );
+    expect(
+      f.service.getReplay(f.host.credential, f.host.gameId, 0).sequence,
+    ).toBe(0);
+    expect(
+      f.service.getReplay(f.host.credential, f.host.gameId, 1).sequence,
+    ).toBe(1);
+    expect(f.service.getReplay(f.host.credential, f.host.gameId).sequence).toBe(
+      2,
     );
   });
 

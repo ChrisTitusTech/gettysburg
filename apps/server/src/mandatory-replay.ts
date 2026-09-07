@@ -296,7 +296,19 @@ export function replayMandatoryActions(
     );
     const spectatorBySequence = new Map<number, typeof spectators>();
     const spectatorById = new Map<string, typeof spectators>();
+    const consumedSpectatorIssues = new Set<string>();
+    const consumedSpectatorRevocations = new Set<string>();
     for (const invitation of spectators) {
+      if (
+        !Number.isSafeInteger(invitation.activeAfterSequence) ||
+        invitation.activeAfterSequence! < 1 ||
+        (invitation.revokedAt === null
+          ? invitation.revokedAtSequence !== undefined
+          : !Number.isFinite(invitation.revokedAt) ||
+            !Number.isSafeInteger(invitation.revokedAtSequence) ||
+            invitation.revokedAtSequence! <= invitation.activeAfterSequence!)
+      )
+        throw new ReplayError(0, "spectator invitation chronology unavailable");
       spectatorById.set(invitation.lookupId, [
         ...(spectatorById.get(invitation.lookupId) ?? []),
         invitation,
@@ -397,6 +409,7 @@ export function replayMandatoryActions(
               "spectator invitation limit exceeded",
             );
             activeSpectators.set(invitation.lookupId, invitation);
+            consumedSpectatorIssues.add(invitation.lookupId);
           }
           if (host.command_name === "revokeSpectatorInvitation") {
             const targets = spectatorById.get(host.payload.lookup_id) ?? [];
@@ -415,6 +428,7 @@ export function replayMandatoryActions(
               "spectator invitation was not available",
             );
             activeSpectators.delete(target.lookupId);
+            consumedSpectatorRevocations.add(target.lookupId);
           }
           if (host.command_name === "issueInvitation") {
             const issued = issuedInvitations.get(sequence) ?? [];
@@ -491,6 +505,16 @@ export function replayMandatoryActions(
             "duplicate command identifier",
           );
           commandIds.add(action.commandId!);
+          if (host.command_name === "deleteGame") {
+            for (const invitation of activeSpectators.values()) {
+              assertReplay(
+                invitation.revokedAtSequence === sequence &&
+                  invitation.revokedAt !== null,
+                "deletion did not retire its spectator invitations",
+              );
+              consumedSpectatorRevocations.add(invitation.lookupId);
+            }
+          }
           deleted = action.commandName === "deleteGame";
         } else {
           assertReplay(
@@ -707,6 +731,29 @@ export function replayMandatoryActions(
         state = reduced.state;
       }
       assertReplay(equal(state, result.state), "resulting state mismatch");
+    }
+    // Prefixes may legitimately receive the latest snapshot's future records.
+    // Full replay must account for every retained spectator issue/revocation.
+    for (const invitation of spectators) {
+      if (
+        (expectedFinal !== undefined ||
+          invitation.activeAfterSequence! <= state.event_sequence) &&
+        !consumedSpectatorIssues.has(invitation.lookupId)
+      )
+        throw new ReplayError(
+          state.event_sequence,
+          "spectator invitation has no matching issue action",
+        );
+      if (
+        invitation.revokedAtSequence !== undefined &&
+        (expectedFinal !== undefined ||
+          invitation.revokedAtSequence <= state.event_sequence) &&
+        !consumedSpectatorRevocations.has(invitation.lookupId)
+      )
+        throw new ReplayError(
+          state.event_sequence,
+          "spectator invitation has no matching revoke action",
+        );
     }
     if (expectedFinal !== undefined && !equal(state, expectedFinal))
       throw new ReplayError(state.event_sequence, "final snapshot mismatch");

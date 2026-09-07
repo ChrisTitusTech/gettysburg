@@ -881,9 +881,9 @@ export class InMemoryGameService {
       const cloned = structuredClone(receipt);
       this.#deletionLedger.push(cloned);
       applied.push(cloned);
-      this.#dropSpectatorInvitations(receipt.gameId);
       const game = this.#games.get(receipt.gameId);
       if (receipt.purgedAt === null) {
+        this.#retireSpectatorInvitations(receipt.gameId, receipt.deletedAt);
         if (game !== undefined) {
           game.deletedAt = receipt.deletedAt;
           game.deletedBy = receipt.actor;
@@ -911,6 +911,7 @@ export class InMemoryGameService {
             grant.revokedAt = receipt.deletedAt;
         }
       } else {
+        this.#dropSpectatorInvitations(receipt.gameId);
         this.#games.delete(receipt.gameId);
         for (const [lookupId, invitation] of this.#invitations) {
           if (invitation.gameId === receipt.gameId)
@@ -1628,6 +1629,11 @@ export class InMemoryGameService {
         break;
       }
       case "deleteGame":
+        this.#retireSpectatorInvitations(
+          authorization.gameId,
+          now,
+          game.state.event_sequence + 1,
+        );
         terminalCredentialHash = this.#sessionsById.get(
           authorization.sessionId,
         )?.credentialHash;
@@ -2531,7 +2537,6 @@ export class InMemoryGameService {
   }
 
   #dropBindingsForGame(gameId: string): void {
-    this.#dropSpectatorInvitations(gameId);
     for (let index = this.#hostBindings.length - 1; index >= 0; index -= 1) {
       if (this.#hostBindings[index]?.gameId === gameId)
         this.#hostBindings.splice(index, 1);
@@ -2558,6 +2563,23 @@ export class InMemoryGameService {
         this.#destroyInvitationSecret(lookupId);
         this.#spectatorInvitations.delete(lookupId);
       }
+    }
+  }
+
+  #retireSpectatorInvitations(
+    gameId: string,
+    revokedAt: number,
+    sequence?: number,
+  ): void {
+    for (const invitation of this.#spectatorInvitations.values()) {
+      if (invitation.gameId !== gameId) continue;
+      if (invitation.revokedAt === null) {
+        invitation.revokedAt = revokedAt;
+        if (sequence === undefined) delete invitation.revokedAtSequence;
+        else invitation.revokedAtSequence = sequence;
+      }
+      delete invitation.sealedClaimCredential;
+      this.#destroyInvitationSecret(invitation.lookupId);
     }
   }
 
