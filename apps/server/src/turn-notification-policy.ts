@@ -53,6 +53,10 @@ function requiredDecisions(state: GameState): Record<Side, Set<string>> {
   return decisions;
 }
 
+export function hasRequiredTurnDecision(state: GameState, side: Side): boolean {
+  return requiredDecisions(state)[side].size > 0;
+}
+
 // Called only with the before/after snapshots of a newly committed gameplay
 // command. Subscription authorization and durable outbox delivery are separate.
 export function turnNotificationIntents(

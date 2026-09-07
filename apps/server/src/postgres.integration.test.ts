@@ -67,6 +67,95 @@ postgres("PostgreSQL durability", () => {
     await administration.end();
   });
 
+  it("commits reminder intents with gameplay, rolls back both, and serializes worker claims", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await first.migrate();
+      const host = await first.createGame("union");
+      const guest = await first.claimInvitation({
+        lookupId: host.invitation.lookup_id,
+        secret: host.invitation.secret,
+      });
+      const key = createECDH("prime256v1");
+      key.generateKeys();
+      await first.setPushSubscription(guest.credential, host.gameId, {
+        endpoint: "https://fcm.googleapis.com/fcm/send/atomic-test",
+        expirationTime: null,
+        keys: {
+          auth: randomBytes(16).toString("base64url"),
+          p256dh: key.getPublicKey().toString("base64url"),
+        },
+      });
+      const authorization = await first.authenticate(
+        host.credential,
+        host.gameId,
+      );
+      const command = {
+        command_id: randomUUID(),
+        command_name: "endPhase",
+        payload: {},
+        game_id: host.gameId,
+        expected_version: 0,
+        schema: COMMAND_SCHEMA_VERSION,
+      };
+      const original = PgClient.prototype.query;
+      let failCommit = true;
+      const failure = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          if (failCommit && args[0] === "COMMIT") {
+            failCommit = false;
+            return Promise.reject(new Error("Injected outbox commit failure"));
+          }
+          return Reflect.apply(original, this, args);
+        } as PgClient["query"]);
+      try {
+        await expect(
+          first.executeCommand(authorization, command),
+        ).rejects.toThrow(/Injected/);
+      } finally {
+        failure.mockRestore();
+      }
+      expect(await restarted.getGameState(host.gameId)).toEqual(host.state);
+      expect(await restarted.getActions(host.gameId)).toEqual([]);
+      expect(await restarted.claimPushDelivery()).toBeUndefined();
+      const result = await first.executeCommand(authorization, command);
+      expect(result.ok).toBe(true);
+      expect(await first.executeCommand(authorization, command)).toEqual(
+        result,
+      );
+      const claims = await Promise.all([
+        first.claimPushDelivery(),
+        restarted.claimPushDelivery(),
+      ]);
+      const claimed = claims.filter((item) => item !== undefined);
+      expect(claimed).toHaveLength(1);
+      const intent = claimed[0]!.intent;
+      expect(intent).toMatchObject({
+        gameId: host.gameId,
+        eventSequence: 1,
+        attempts: 1,
+      });
+      await restarted.finishPushDelivery(intent.id, randomUUID(), "gone");
+      expect(
+        await first.getPushSubscriptionStatus(guest.credential, host.gameId),
+      ).toMatchObject({ enabled: true });
+      await restarted.finishPushDelivery(intent.id, intent.leaseToken!, "sent");
+      expect(await first.claimPushDelivery()).toBeUndefined();
+      expect(await restarted.getActions(host.gameId)).toHaveLength(1);
+      expect((await restarted.getGameState(host.gameId)).version).toBe(1);
+    } finally {
+      await Promise.all([first.close(), restarted.close()]);
+    }
+  });
+
   it("persists encrypted push consent across restart and rolls back failed opt-out", async () => {
     const first = new PostgresGameService({
       connectionString: connectionString!,

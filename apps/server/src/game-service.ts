@@ -42,6 +42,16 @@ import { hasPinnedMandatoryContent } from "./mandatory-content.js";
 import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
 import { publicActionLog } from "./public-action-log.js";
 import {
+  PushOutbox,
+  type StoredPushIntent,
+  type PushDeliveryOutcome,
+} from "./push-outbox.js";
+import {
+  hasRequiredTurnDecision,
+  turnNotificationIntents,
+} from "./turn-notification-policy.js";
+import {
+  type BrowserPushSubscription,
   openPushSubscription,
   parsePushSubscription,
   sealPushSubscription,
@@ -154,6 +164,10 @@ export interface StoredPushSubscription {
   readonly bindingId: string;
   readonly expiresAt: number;
   readonly sealed: string;
+}
+export interface PushDelivery {
+  readonly intent: StoredPushIntent;
+  readonly subscription: BrowserPushSubscription;
 }
 export type PushSubscriptionStatus =
   | { readonly enabled: false }
@@ -277,6 +291,7 @@ export interface GameServiceSnapshot {
   readonly spectatorInvitations?: readonly [string, SpectatorInvitation][];
   readonly spectatorBindings?: readonly SpectatorBinding[];
   readonly pushSubscriptions?: readonly StoredPushSubscription[];
+  readonly pushOutbox?: readonly StoredPushIntent[];
   readonly recoveryGrants: readonly [string, RecoveryGrant][];
   readonly seatBindings: readonly SeatBinding[];
   readonly sessions: readonly BrowserSession[];
@@ -740,6 +755,7 @@ export class InMemoryGameService {
   readonly #spectatorInvitations = new Map<string, SpectatorInvitation>();
   readonly #spectatorBindings: SpectatorBinding[] = [];
   readonly #pushSubscriptions = new Map<string, StoredPushSubscription>();
+  readonly #pushOutbox = new PushOutbox();
   readonly #pepper: Uint8Array;
   readonly #recoveryGrants = new Map<string, RecoveryGrant>();
   readonly #seatBindings: SeatBinding[] = [];
@@ -872,11 +888,15 @@ export class InMemoryGameService {
         }
       }
       this.#prunePushSubscriptions();
+      this.#pushOutbox = new PushOutbox(options.snapshot.pushOutbox);
+      this.#prunePushOutbox();
     }
   }
 
   exportSnapshot(): GameServiceSnapshot {
     this.#prunePushSubscriptions();
+    this.#prunePushOutbox();
+    const pushOutbox = this.#pushOutbox.snapshot();
     return structuredClone({
       games: [...this.#games].map(([gameId, game]) => [
         gameId,
@@ -898,10 +918,68 @@ export class InMemoryGameService {
       ...(this.#pushSubscriptions.size === 0
         ? {}
         : { pushSubscriptions: [...this.#pushSubscriptions.values()] }),
+      ...(pushOutbox.length === 0 ? {} : { pushOutbox }),
       recoveryGrants: [...this.#recoveryGrants],
       seatBindings: this.#seatBindings,
       sessions: [...this.#sessionsById.values()],
     });
+  }
+
+  #prunePushOutbox(): void {
+    this.#pushOutbox.prune(this.#now(), (intent) => {
+      const consent = this.#pushSubscriptions.get(intent.bindingId);
+      const binding = this.#seatBindings.find(
+        (item) => item.id === intent.bindingId && item.revokedAt === null,
+      );
+      const game = this.#games.get(intent.gameId);
+      return (
+        consent !== undefined &&
+        binding !== undefined &&
+        binding.gameId === intent.gameId &&
+        game !== undefined &&
+        game.deletedAt === null &&
+        intent.eventSequence <= game.state.event_sequence &&
+        intent.createdAt <= this.#now() &&
+        intent.expiresAt <= consent.expiresAt &&
+        intent.consentTag ===
+          createHash("sha256").update(consent.sealed).digest("hex") &&
+        hasRequiredTurnDecision(game.state, binding.side)
+      );
+    });
+  }
+
+  // Internal worker API only. The PostgreSQL adapter persists claims/outcomes
+  // atomically; no HTTP route exposes decrypted subscription credentials.
+  claimPushDelivery(): PushDelivery | undefined {
+    this.#prunePushSubscriptions();
+    this.#prunePushOutbox();
+    const intent = this.#pushOutbox.claim(this.#now());
+    if (!intent) return undefined;
+    return {
+      intent,
+      subscription: openPushSubscription(
+        this.#pepper,
+        intent.bindingId,
+        this.#pushSubscriptions.get(intent.bindingId)!.sealed,
+      ),
+    };
+  }
+
+  finishPushDelivery(
+    id: string,
+    leaseToken: string,
+    outcome: PushDeliveryOutcome,
+  ): void {
+    this.#prunePushSubscriptions();
+    this.#prunePushOutbox();
+    const bindingId = this.#pushOutbox.finish(
+      id,
+      leaseToken,
+      outcome,
+      this.#now(),
+    );
+    if (bindingId && outcome === "gone")
+      this.#pushSubscriptions.delete(bindingId);
   }
 
   setPushSubscription(
@@ -2467,6 +2545,7 @@ export class InMemoryGameService {
       return reduced.failure;
     }
 
+    const before = game.state;
     const result = toCommandSuccess(reduced.state, command, reduced.summary);
     game.state = reduced.state;
     game.commandResults.set(command.command_id, {
@@ -2495,6 +2574,34 @@ export class InMemoryGameService {
       rulesetVersion: game.state.ruleset_version,
     });
 
+    this.#prunePushSubscriptions();
+    this.#prunePushOutbox();
+    for (const intent of turnNotificationIntents(
+      before,
+      game.state,
+      authorization.side,
+    )) {
+      const binding = this.#seatBindings.find(
+        (item) =>
+          item.gameId === intent.gameId &&
+          item.side === intent.side &&
+          item.revokedAt === null,
+      );
+      const consent = binding && this.#pushSubscriptions.get(binding.id);
+      if (binding && consent)
+        this.#pushOutbox.enqueue(
+          {
+            gameId: intent.gameId,
+            bindingId: binding.id,
+            eventSequence: intent.eventSequence,
+            consentTag: createHash("sha256")
+              .update(consent.sealed)
+              .digest("hex"),
+          },
+          this.#now(),
+          consent.expiresAt,
+        );
+    }
     options.afterCommit?.();
     return structuredClone(result);
   }

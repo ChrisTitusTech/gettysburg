@@ -1880,6 +1880,29 @@ validation remain separate gates.
 
 ### Browser push foundation
 
+- [ ] Persist notification work atomically with accepted gameplay commands.
+  - Scope: One pending reminder per consented binding, coalesced to its newest
+    required decision; 24-hour maximum lifetime capped by consent expiry.
+    Internal delivery claims use expiring leases, bounded retries, and fresh
+    binding/session/game/consent authorization. Opt-out, recovery, completion,
+    and deletion remove pending work. No provider calls in this increment.
+  - Validation plan: Duplicate-command, rollback, restart, concurrent claim,
+    expired lease, stale acknowledgement, retry exhaustion, and retention tests;
+    complete local/database/browser gates, fresh independent review, and
+    exact-head CI before merge. Owner: ChrisTitusTech. Browser/device delivery
+    remains a separate release gate.
+
+  - Validation: Full local gates pass 647 workspace/nine harness tests, all
+    269 PostgreSQL tests, and fresh independent review with 10 focused outbox
+    tests/typechecking and no actionable findings. PostgreSQL proves atomic
+    command/outbox rollback, restart, exact-command deduplication, and competing
+    worker claims. Desktop/tablet full games cover all three choices, pending
+    reload, exact replay, and input fixtures in `test-results/push-outbox-atomic`
+    and its `-fixtures` directory. No provider requests or worker loop run yet.
+    A readonly-array fixture cast initially failed typechecking and was corrected
+    before all gates passed. Integrate the reviewed transport connection-reuse
+    fix and subscription base, then require exact-head CI/final threads.
+
 Integration evidence: PR #41 head `19ba6e8` passed Application `34102616922`
 and Documentation `34102617045`. With the reviewed transport handshake repair,
 the full local gate passes 608 workspace/nine harness tests and all 227

@@ -872,6 +872,23 @@ VAPID configuration, worker registration, durable dispatch, bounded provider
 requests with public-address validation and no redirects, and actual-device
 acceptance remain required. No provider requests are made by this increment.
 
+The durable-outbox increment records reminder work in the same canonical
+transaction as each newly accepted gameplay command. Only consented current
+seats with a newly required decision receive work; exact command retries do not
+enqueue twice. At most one pending reminder per binding is retained, replaced
+by newer work. A reminder expires within 24 hours or sooner with its consent.
+Internal workers claim through 30-second leases and use fresh consent,
+binding, session, game, and required-decision checks. Outcomes must match the
+current unexpired lease; a stale worker cannot acknowledge newer work or remove
+replacement consent. Provider-gone outcomes retire the matching subscription.
+Retry delays are one minute, five minutes, 15 minutes, and one hour, with no
+more than five attempts including abandoned leases. Pending work and leases
+are private service records, not game actions or recovery exports. A crash
+after a provider accepts delivery but before its acknowledgement is persisted
+can cause a retry; the eventual browser worker must deduplicate using the
+stable reminder ID. Provider dispatch and actual notifications remain disabled
+until their separate implementation and acceptance gates pass.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
