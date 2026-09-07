@@ -1870,6 +1870,18 @@ validation remain separate gates.
 
 ### Container vulnerability closeout (release gate open)
 
+Current combined candidate includes the reviewed observer UI and notification
+outbox/receipts. Full local gates pass 673 workspace/nine harness tests; fresh
+independent review against the observer base found no actionable defects.
+Immutable image `02c52cf098e99c228a3e3dda900a5d9d740bb3adf4f319148428fa6a123e66d0`
+passes the HIGH/CRITICAL scan with zero findings (raw local evidence:
+`/tmp/gettysburg-scanner.K2VSLN/observer-outbox.json`), container smoke, and actual
+image desktop/tablet 24-turn games, reload, exact replay, and observer workflows
+in `test-results/alpine-observer-outbox-image`. Both current games cover
+loss/advance; preceding actual-image evidence covers retreat. Input fixtures
+pass in `test-results/alpine-observer-outbox-inputs`. Final exact-head CI and
+release-image scanning remain required; no VPS deployment is implied.
+
 - [ ] Refresh and scan the immutable Node 24 container base and application.
   - The 2026-09-07 complete and production-only pnpm audits report no known
     vulnerabilities. They do not cover OS packages or bundled global tools.
