@@ -1907,6 +1907,15 @@ games and input fixtures in `test-results/spectator-handshake-authorization`
 and its `-fixtures` directory. Publish the integration and verify exact-head
 CI, final review threads, and merge the transport base before this PR.
 
+The pending-ack isolation repair is integrated. Full local gates pass 611
+workspace/nine harness tests and all 231 PostgreSQL tests. Fresh independent
+review against the repaired transport found no actionable defects and reran
+210 server tests. The policy still has no runtime caller; unchanged browser
+paths are covered by full desktop/tablet games and input fixtures in
+`test-results/spectator-pending-ack-isolation` and its `-fixtures` directory.
+The prior policy head `a14fa93` passed Application `34105754831` and
+Documentation `34105754816`; this integration requires new exact-head checks.
+
 - [ ] Add deterministic turn-notification targeting.
   - Scope: Pure server policy for consecutive compatible mandatory-game
     snapshots. Notify the other seat only when a newly required decision
