@@ -132,6 +132,13 @@ export interface SpectatorBinding extends HostBinding {
 export interface SpectatorAuthorization extends HostAuthorization {
   readonly kind: "spectator";
 }
+export interface HostManagementCommitOptions {
+  // Private delivery metadata, never part of a persisted/public event or result.
+  readonly afterCommit?: (
+    event: ManagementEvent,
+    revokedSpectatorBindingId?: string,
+  ) => void;
+}
 
 export interface StoredAction {
   readonly authorizingId: string;
@@ -1358,6 +1365,49 @@ export class InMemoryGameService {
     return binding;
   }
 
+  getAuthorizedSpectatorState(
+    authorization: SpectatorAuthorization,
+  ): GameState {
+    this.#assertSpectatorAuthorization(authorization);
+    return cloneState(this.#requireActiveGame(authorization.gameId).state);
+  }
+
+  authorizeSpectatorDelivery(
+    authorizations: readonly SpectatorAuthorization[],
+  ): readonly string[] {
+    return authorizations.flatMap((authorization) => {
+      try {
+        this.#assertSpectatorAuthorization(authorization);
+        return [authorization.bindingId];
+      } catch (error) {
+        if (error instanceof ServiceError) return [];
+        throw error;
+      }
+    });
+  }
+
+  #assertSpectatorAuthorization(authorization: SpectatorAuthorization): void {
+    this.#requireActiveGame(authorization.gameId);
+    const session = this.#sessionsById.get(authorization.sessionId);
+    const binding = this.#findActiveSpectatorBinding(
+      authorization.sessionId,
+      authorization.gameId,
+    );
+    if (
+      binding === undefined ||
+      binding.id !== authorization.bindingId ||
+      binding.version !== authorization.bindingVersion ||
+      session === undefined ||
+      session.revokedAt !== null ||
+      !Number.isFinite(session.expiresAt) ||
+      session.expiresAt <= this.#now()
+    )
+      throw new ServiceError(
+        "unauthorized",
+        "Current spectator access is required.",
+      );
+  }
+
   claimInvitation(input: {
     claimId?: string;
     credential?: string;
@@ -1637,7 +1687,7 @@ export class InMemoryGameService {
   executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+    options: HostManagementCommitOptions = {},
   ): HostManagementResult {
     const game = this.#requireGame(authorization.gameId);
     const parsed = hostManagementCommandSchema.safeParse(input);
@@ -1771,6 +1821,7 @@ export class InMemoryGameService {
 
     let invitation: InvitationCredential | undefined;
     let terminalCredentialHash: string | undefined;
+    let revokedSpectatorBindingId: string | undefined;
     let summary: string;
     const now = this.#now();
     switch (command.command_name) {
@@ -1857,6 +1908,7 @@ export class InMemoryGameService {
         delete target.sealedClaimCredential;
         binding.revokedAt = now;
         binding.inactiveFromSequence = game.state.event_sequence + 1;
+        revokedSpectatorBindingId = binding.id;
         this.#destroyInvitationSecret(target.lookupId);
         summary = "Spectator access revoked";
         break;
@@ -2007,7 +2059,7 @@ export class InMemoryGameService {
       sequence: game.state.event_sequence,
       rulesetVersion: game.state.ruleset_version,
     });
-    options.afterCommit?.(result.event);
+    options.afterCommit?.(result.event, revokedSpectatorBindingId);
     if (command.command_name === "deleteGame") {
       this.#dropBindingsForGame(authorization.gameId);
     }

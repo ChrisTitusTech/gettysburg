@@ -13,6 +13,8 @@ import {
   type GameView,
   type SpectatorClaimResult,
   type SpectatorView,
+  type SpectatorAuthorization,
+  type HostManagementCommitOptions,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -35,6 +37,16 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  authorizeSpectatorDelivery(
+    authorizations: readonly SpectatorAuthorization[],
+  ): Promise<readonly string[]>;
+  authenticateSpectator(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<SpectatorAuthorization>;
+  getAuthorizedSpectatorState(
+    authorization: SpectatorAuthorization,
+  ): Promise<GameState>;
   claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ): Promise<SpectatorClaimResult>;
@@ -96,7 +108,7 @@ export interface GameService {
   executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options?: { afterCommit?: (event: ManagementEvent) => void },
+    options?: HostManagementCommitOptions,
   ): Promise<HostManagementResult>;
   getActions(gameId: string): Promise<readonly StoredAction[]>;
   getActiveInvitations(
@@ -135,6 +147,17 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async authorizeSpectatorDelivery(
+    authorizations: readonly SpectatorAuthorization[],
+  ) {
+    return this.service.authorizeSpectatorDelivery(authorizations);
+  }
+  async authenticateSpectator(credential: string | undefined, gameId: string) {
+    return this.service.authenticateSpectator(credential, gameId);
+  }
+  async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
+    return this.service.getAuthorizedSpectatorState(authorization);
+  }
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ) {
@@ -201,7 +224,7 @@ export class InMemoryAsyncGameService implements GameService {
   async executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+    options: HostManagementCommitOptions = {},
   ) {
     return this.service.executeHostCommand(authorization, input, options);
   }
@@ -254,6 +277,23 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #pepper: Uint8Array;
+  async authorizeSpectatorDelivery(
+    authorizations: readonly SpectatorAuthorization[],
+  ) {
+    return this.#read((service) =>
+      service.authorizeSpectatorDelivery(authorizations),
+    );
+  }
+  async authenticateSpectator(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.authenticateSpectator(credential, gameId),
+    );
+  }
+  async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
+    return this.#read((service) =>
+      service.getAuthorizedSpectatorState(authorization),
+    );
+  }
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ) {
@@ -514,19 +554,24 @@ export class PostgresGameService implements GameService {
   async executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+    options: HostManagementCommitOptions = {},
   ) {
     const execution = await this.#mutate((service) => {
       let committedEvent: ManagementEvent | undefined;
+      let revokedSpectatorBindingId: string | undefined;
       const result = service.executeHostCommand(authorization, input, {
-        afterCommit: (event) => {
+        afterCommit: (event, bindingId) => {
           committedEvent = event;
+          revokedSpectatorBindingId = bindingId;
         },
       });
-      return { committedEvent, result };
+      return { committedEvent, result, revokedSpectatorBindingId };
     });
     if (execution.committedEvent !== undefined) {
-      options.afterCommit?.(execution.committedEvent);
+      options.afterCommit?.(
+        execution.committedEvent,
+        execution.revokedSpectatorBindingId,
+      );
     }
     return execution.result;
   }

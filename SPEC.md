@@ -753,10 +753,30 @@ no compatibility inference is made for unreleased development spectator grants.
 PostgreSQL's session mirror retains canonical observer-only sessions through
 unrelated mutations and repairs missing mirror rows on subsequent mutations.
 
-Live room authorization, immediate socket revocation, host grant-list controls,
-and the spectator browser interface remain separate delivery gates. A spectator
-invitation cannot claim a player seat. Do not advertise usable live spectators
-until those gates and desktop/tablet acceptance pass.
+The live transport accepts an explicit spectator room role, authorizes its
+initial snapshot again after joining, and rejects every gameplay command from
+that role. Players and up to eight observers share one room; two extra slots
+allow overlapping reloads, replacing only the same binding. This is an initial
+occupancy bound, not a measured VPS capacity claim. Revocation passes private
+binding metadata only after database commit and excludes the closing socket
+before any later delivery. Each subsequent broadcast batch rechecks every
+observer in one fresh authorized snapshot read, including session expiry and
+deletion; failed reads never fall back to cached spectator access. This also
+closes affected observer sockets with retryable code 4002, so a fresh join must
+reauthorize and load current state rather than silently remaining stale. This
+protects against delayed revocation notifications. Retries do not republish a
+revocation, and a failed transaction does not disconnect an observer.
+Broadcast batches are serialized per room. Each client starts at its initial
+snapshot sequence, so reconnects cannot receive older queued state afterward.
+Initial snapshot reads share that queue: updates arriving while a captured
+snapshot is loading wait behind it and cannot be silently lost during joining.
+Session expiry is read from current authoritative records, including legitimate
+renewals, rather than cached at socket authentication.
+
+Host grant-list controls and the spectator browser interface remain separate
+delivery gates. A spectator invitation cannot claim a player seat. Do not
+advertise usable live spectators until those gates and desktop/tablet
+acceptance pass.
 
 ### Core records
 

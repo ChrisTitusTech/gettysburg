@@ -90,19 +90,70 @@ postgres("PostgreSQL durability", () => {
       expect(
         (await restarted.getReplay(observer.credential, host.gameId)).state,
       ).toEqual(observer.view.state);
+      const spectatorAuthorization = await restarted.authenticateSpectator(
+        observer.credential,
+        host.gameId,
+      );
       expect(
-        (
-          await restarted.executeHostCommand(
-            await restarted.authenticateHost(host.credential, host.gameId),
-            {
-              ...command,
-              command_id: randomUUID(),
-              command_name: "revokeSpectatorAccess",
-              payload: { lookup_id: input.lookupId },
-            },
-          )
-        ).ok,
-      ).toBe(true);
+        await restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).toEqual(observer.view.state);
+      const revokeCommand = {
+        ...command,
+        command_id: randomUUID(),
+        command_name: "revokeSpectatorAccess",
+        payload: { lookup_id: input.lookupId },
+      };
+      const hostAuthorization = await restarted.authenticateHost(
+        host.credential,
+        host.gameId,
+      );
+      const publish = vi.fn();
+      await administration.query(`
+        CREATE OR REPLACE FUNCTION gettysburg_reject_spectator_action() RETURNS trigger
+        LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected spectator action failure'; END $$;
+        CREATE TRIGGER reject_gettysburg_spectator_action BEFORE INSERT ON actions
+        FOR EACH ROW EXECUTE FUNCTION gettysburg_reject_spectator_action();
+      `);
+      try {
+        await expect(
+          restarted.executeHostCommand(hostAuthorization, revokeCommand, {
+            afterCommit: publish,
+          }),
+        ).rejects.toThrow("injected spectator action failure");
+      } finally {
+        await administration.query(
+          "DROP TRIGGER IF EXISTS reject_gettysburg_spectator_action ON actions",
+        );
+        await administration.query(
+          "DROP FUNCTION IF EXISTS gettysburg_reject_spectator_action()",
+        );
+      }
+      expect(publish).not.toHaveBeenCalled();
+      expect(
+        await restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).toEqual(observer.view.state);
+      const revoked = await restarted.executeHostCommand(
+        hostAuthorization,
+        revokeCommand,
+        { afterCommit: publish },
+      );
+      expect(revoked.ok).toBe(true);
+      expect(publish).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ command_name: "revokeSpectatorAccess" }),
+        spectatorAuthorization.bindingId,
+      );
+      expect(JSON.stringify(revoked)).not.toContain(
+        spectatorAuthorization.bindingId,
+      );
+      expect(
+        await restarted.executeHostCommand(hostAuthorization, revokeCommand, {
+          afterCommit: publish,
+        }),
+      ).toEqual(revoked);
+      expect(publish).toHaveBeenCalledOnce();
+      await expect(
+        restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).rejects.toThrow(/Current spectator access/);
       await expect(
         restarted.getSpectatorView(observer.credential, host.gameId),
       ).rejects.toThrow(/Current spectator access/);
