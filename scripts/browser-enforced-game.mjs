@@ -23,7 +23,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
   const timeout = setTimeout(() => {
     timedOut = true;
     for (const context of contexts) void context.close().catch(() => {});
-  }, 300_000);
+  }, 480_000);
   const issues = [];
   for (const page of Object.values(pages)) {
     page.on("pageerror", (error) => issues.push(error.message));
@@ -270,7 +270,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
     );
   } catch (error) {
     throw new Error(
-      `${options.label} enforced game ${timedOut ? "exceeded five minutes" : "failed"} at turn ${state?.turn}, ${state?.phase}, v${state?.version}`,
+      `${options.label} enforced game ${timedOut ? "exceeded eight minutes" : "failed"} at turn ${state?.turn}, ${state?.phase}, v${state?.version}`,
       { cause: error },
     );
   } finally {

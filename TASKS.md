@@ -541,6 +541,28 @@ validation remain separate gates.
     found no actionable defects and reran all nine harness tests/whitespace;
     browser evidence is from the separate runs above. Exact-head CI remains
     required after pushing this repair and resolving its two hosted threads.
+    Superseding head `8189bd0` failed Application run `34084873020`: desktop
+    completed successfully, but tablet reached turn 24/movement/v59 and exceeded
+    the five-minute per-game bound during an authenticated verification read.
+    Movement fixtures, startup smoke, and container smoke were skipped; this is
+    not complete CI evidence. Documentation run `34084872957` passed. The
+    timeout is now eight minutes per game and 25 minutes overall, retaining
+    all assertions, 15-second reads, pacing, and self-termination. Responsible
+    owner ChrisTitusTech must verify the repaired exact head before merge.
+    Local observation identified repeated whole-service snapshot hydration in
+    ordinary resume reads (roughly 9 MB across six acceptance games); a separate
+    Phase 4 performance repair will consolidate these reads. This is not a
+    measured capacity claim. Full local/browser validation and fresh review
+    follow this bounded timing repair before push.
+    The repaired full local gate passes (540 workspace/nine harness tests).
+    Both enforced games pass in `test-results/enforced-game-time-budget` with
+    pending-result reload and exact replay; tablet covered all three choices,
+    desktop retreat/advance. Server code is unchanged from the passing 167-test
+    PostgreSQL run. Fresh independent review found no actionable regressions,
+    checked JavaScript syntax/whitespace, and did not rerun browser/CI gates.
+    Mandatory browser input fixtures pass in
+    `test-results/enforced-game-time-budget-fixtures`. Reverify exact-head CI
+    before merge; the failed older run remains historical evidence.
 - [ ] Deliver read-only replay controls and finish replay acceptance.
   - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
     and latest events. Inspect either side, pan/zoom, and read recorded combat
