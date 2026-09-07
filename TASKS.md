@@ -1883,6 +1883,21 @@ validation remain separate gates.
 
 ### Container vulnerability closeout (release gate open)
 
+Hosted review found exact OpenSSL package pins could disappear from Alpine's
+moving stable repository. Replace them with minimum fixed versions plus upgrade;
+later repository revisions remain installable without weakening the security
+floor. This deliberately does not claim reproducible source builds: preserve
+the reviewed image for rollback and rescan every new image. A cache-free build
+produces `a89caa552399c65c97df7f712c5ba88e4006c2ce74e024240626452dc957d80a`;
+container smoke and a fresh HIGH/CRITICAL scan pass with zero findings across
+18 OS/359 Node packages. Raw evidence:
+`/tmp/gettysburg-scanner.K2VSLN/rebuildable-image.json`. The initial scan command
+used an unsupported OCI archive input and failed before scanning; exporting a
+Docker archive and rerunning passed. Fresh independent review found no defects.
+Previously recorded actual-image browser evidence covers the same installed
+package versions and unchanged application code. Exact-head CI follows.
+The two hosted stale-rollup findings are addressed by the current source table.
+
 After merging provider dependencies, the full local gate passes 715 workspace/
 nine harness tests. Image
 `6385b2b523511a7834f5d256ee2ec254f7b112cd016464238f0915c91649e6a3`
@@ -1930,7 +1945,7 @@ release-image scanning remain required; no VPS deployment is implied.
     `a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd`.
     Its initial scan found two high OpenSSL package findings, both fixed by
     `libcrypto3`/`libssl3` 3.5.8-r0, plus the same nine global-tool findings.
-    Pin those available security packages and remove unused npm/Corepack/Yarn
+    Require those minimum security versions and remove unused npm/Corepack/Yarn
     from the runtime layer only. Builder and runtime share the same Alpine
     base so native dependency targets match. The glibc-to-musl change requires
     actual container build/startup/restart/persistence validation, not only

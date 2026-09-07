@@ -1013,7 +1013,9 @@ commit only once.
 - Dependencies, container images, and migrations are reviewed before production
   deployment.
 - The application uses matching digest-pinned Node 24 Alpine build/runtime
-  stages, pinned OpenSSL security packages, and no runtime package managers.
+  stages, minimum fixed OpenSSL package versions, and no runtime Node package
+  managers. Alpine security packages come from its moving stable repository;
+  rebuilds are not bit-for-bit reproducible and need a fresh image scan.
   Scan the final immutable application image, including OS and Node packages,
   before release; a clean workspace dependency audit alone is insufficient.
 - Browser push dispatch pins a validated public provider address while retaining

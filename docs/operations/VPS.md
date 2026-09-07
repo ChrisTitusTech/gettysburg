@@ -297,8 +297,12 @@ application drops all capabilities. PostgreSQL drops the defaults and restores
 only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
 entrypoint needs to initialize the named volume and become the database user.
 The PostgreSQL and Node base images are pinned by digest. The application
-candidate uses Node 24.18.0 on Alpine 3.24 with pinned OpenSSL 3.5.8-r0 packages;
+candidate uses Node 24.18.0 on Alpine 3.24 with OpenSSL packages at least 3.5.8-r0;
 build and runtime stages share the same base to avoid native ABI mismatches.
+The stable Alpine repository can replace package revisions. Minimum-version
+constraints permit later fixes instead of requiring removed APKs. Only the base
+and resulting image IDs are immutable; source rebuilds are not bit-for-bit
+reproducible. Preserve the reviewed image for rollback and scan every new build.
 Runtime npm, Corepack, and Yarn are removed after the build. Alpine 3.24 has
 [main support through June 1, 2028](https://alpinelinux.org/releases/).
 For each base/package refresh, rerun the full container smoke and browser
