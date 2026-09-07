@@ -493,19 +493,23 @@ validation remain separate gates.
     replacement dice or use recorded resulting states as replay starting points.
     Authorized server/API integration, replay UI, retained-version behavior,
     and the full rules-enforced acceptance game remain open.
-  - Validation: Sixteen cases cover all 47 no-contact phase transitions across
+  - Validation: Nineteen cases cover all 47 no-contact phase transitions across
     24 turns, paid continuation and prefixes, recorded dice, two independent
     skirmishes with reordered keys, input isolation, recovered historical seats,
     surrendered seats, redacted management/audit records, corrupted state,
     malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
     The no-contact test is not a representative owner-adjudicated acceptance game.
-    Frozen install, format, lint, typecheck, 496 default tests plus six harness
-    tests, build, smoke, Markdown lint, and all 131 PostgreSQL tests pass.
+    Frozen install, format, lint, typecheck, 499 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 134 PostgreSQL tests pass.
     Two-session desktop/tablet and 24-turn regression pass
-    (`test-results/mandatory-replay-regression`); mandatory browser fixtures pass
-    (`test-results/mandatory-replay-fixtures`). Fresh independent built-in review
-    found no actionable defects. Exact-head CI and published review checks
-    remain required before merge.
+    (`test-results/mandatory-replay-review`); mandatory browser fixtures pass
+    (`test-results/mandatory-replay-review-fixtures`). Fresh independent built-in
+    review found no actionable defects. Hosted review then identified duplicate
+    operator request IDs and altered gameplay summaries that the verifier did
+    not reject. Both checks and three regression cases are added; the complete
+    local and browser gates pass again. Fresh independent built-in repair review
+    found no actionable defects. Exact-head CI must pass before merge.
+    CodeRabbit is limited and skipped per owner direction.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,

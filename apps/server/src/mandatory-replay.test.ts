@@ -62,6 +62,48 @@ function fixture() {
 }
 
 describe("deterministic mandatory action replay", () => {
+  it("rejects duplicated operator request IDs across separate recoveries", () => {
+    const f = fixture();
+    for (let step = 0; step < 2; step++) {
+      const grant = f.service.issueSeatRecovery(
+        f.created.gameId,
+        "union",
+        "test operator",
+      );
+      f.credentials.union = f.service.claimSeatRecovery({
+        lookupId: grant.lookup_id,
+        secret: grant.secret,
+      }).credential;
+    }
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    expect(() =>
+      f.replay([
+        actions[0]!,
+        { ...actions[1]!, operatorRequestId: actions[0]!.operatorRequestId },
+      ]),
+    ).toThrow(/duplicate operator request identifier/);
+  });
+
+  it.each(["moveUnit", "surrenderSeat"] as const)(
+    "rejects altered %s summaries",
+    (command) => {
+      const f = fixture();
+      f.act(
+        "union",
+        command,
+        command === "moveUnit" ? { unit_id: "u-devin", destination: "P7" } : {},
+      );
+      const actions = structuredClone(f.service.getActions(f.created.gameId));
+      const result = actions[0]!.result!;
+      if (!result.ok) throw new Error("Missing result");
+      Object.assign(result.event, {
+        summary: "An incorrect action log message",
+      });
+      expect(() => f.replay(actions)).toThrow(/gameplay summary mismatch/);
+    },
+  );
+
   it("replays the complete no-contact 24-turn transition sequence", () => {
     const f = fixture();
     expect(f.replay()).toEqual(f.state());

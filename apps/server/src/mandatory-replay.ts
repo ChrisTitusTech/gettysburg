@@ -85,6 +85,7 @@ export function replayMandatoryActions(
 ): GameState {
   let state = createMandatoryInitialState(gameId);
   const commandIds = new Set<string>();
+  const operatorRequestIds = new Set<string>();
   let sequence = 0;
   try {
     for (const action of actions) {
@@ -137,6 +138,11 @@ export function replayMandatoryActions(
               action.canonicalRequestHash === null,
             "invalid audit metadata",
           );
+          assertReplay(
+            !operatorRequestIds.has(action.operatorRequestId!),
+            "duplicate operator request identifier",
+          );
+          operatorRequestIds.add(action.operatorRequestId!);
         }
         // Private host/operator payloads are not replayed or exposed. Their only
         // gameplay-state effect is consuming a sequence number, not a version.
@@ -208,6 +214,10 @@ export function replayMandatoryActions(
       );
       if (command.command_name === "surrenderSeat") {
         assertReplay(
+          result.event.summary === `${actor[0]!.side} seat surrendered`,
+          "gameplay summary mismatch",
+        );
+        assertReplay(
           !Object.values(state.combats).some(
             (combat) => combat.pending_choice?.side === actor[0]!.side,
           ),
@@ -228,6 +238,10 @@ export function replayMandatoryActions(
         assertReplay(reduced.ok, "recorded command is illegal");
         if (!reduced.ok)
           throw new ReplayError(sequence, "recorded command is illegal");
+        assertReplay(
+          result.event.summary === reduced.summary,
+          "gameplay summary mismatch",
+        );
         state = reduced.state;
       }
       assertReplay(equal(state, result.state), "resulting state mismatch");
