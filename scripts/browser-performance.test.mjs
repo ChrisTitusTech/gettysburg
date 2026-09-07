@@ -8,7 +8,64 @@ import {
   performanceMode,
   summarizeResponseTimes,
   summarizeSessionTimings,
+  withMeasurementDeadline,
 } from "./browser-performance.mjs";
+
+test("external deadline aborts operations without a responsive renderer", async () => {
+  let signal;
+  await assert.rejects(
+    withMeasurementDeadline((value) => {
+      signal = value;
+      return new Promise(() => {});
+    }, 10),
+    /Measurement deadline exceeded/,
+  );
+  assert.equal(signal.aborted, true);
+  assert.equal(await withMeasurementDeadline(async () => 42), 42);
+});
+
+test(
+  "setup errors and frozen evaluations retain evidence in report mode",
+  { timeout: 5_000 },
+  async () => {
+    const directory = await mkdtemp(
+      join(tmpdir(), "gettysburg-frozen-timing-"),
+    );
+    try {
+      for (const stage of ["fit", "setup", "frozen"]) {
+        const button = {
+          click: async () => {
+            if (stage === "fit") throw new Error("Private setup error");
+          },
+          evaluate: async () => {
+            if (stage === "setup") throw new Error("Private setup error");
+          },
+        };
+        const page = {
+          getByRole: () => button,
+          evaluate: () =>
+            stage === "frozen" ? new Promise(() => {}) : Promise.resolve(),
+          context: () => ({ browser: () => ({ version: () => "fixture" }) }),
+          viewportSize: () => ({ width: 1440, height: 900 }),
+        };
+        await assert.rejects(
+          measureBoardResponse(page, directory, stage, "report"),
+          /incomplete board response/,
+        );
+        const raw = await readFile(
+          join(directory, `${stage}-performance.json`),
+          "utf8",
+        );
+        const evidence = JSON.parse(raw);
+        assert.equal(evidence.samples, 1);
+        assert.equal(evidence.failure, "measurement-input-or-page-failed");
+        assert.equal(raw.includes("Private"), false);
+      }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);
 
 test("performance mode defaults strict and rejects unknown settings", () => {
   assert.equal(performanceMode(), "strict");

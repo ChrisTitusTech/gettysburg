@@ -7,6 +7,25 @@ export function performanceMode(value = "strict") {
   return value;
 }
 
+// This timer lives outside the renderer, so a frozen page cannot suspend it.
+export async function withMeasurementDeadline(operation, timeoutMs = 2_000) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => operation(controller.signal)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Measurement deadline exceeded"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function summarizeSessionTimings(measurements) {
   const budgets = {
     initialInteractiveMs: 3_000,
@@ -82,57 +101,70 @@ export async function measureBoardResponse(
   mode = "strict",
 ) {
   performanceMode(mode);
-  await page.getByRole("button", { name: "Fit", exact: true }).click();
   const samples = [];
   const frameDiagnostics = [];
   let failure;
-  for (let index = 0; index < 20; index++) {
-    const zoomIn = index % 2 === 0;
-    const button = page.getByRole("button", {
-      name: zoomIn ? "Zoom in" : "Fit",
-      exact: true,
-    });
-    await button.evaluate(
-      (element, expectedZoom) => {
-        window.__gettysburgTiming = new Promise((resolveSample) => {
-          element.addEventListener(
-            "click",
-            () => {
-              const start = performance.now();
-              let confirmedAtMs = null;
-              const finish = (confirmed) => {
-                clearTimeout(timeout);
-                resolveSample({
-                  durationMs: performance.now() - start,
-                  confirmed,
-                  confirmedAtMs,
-                });
-              };
-              const timeout = setTimeout(() => finish(false), 2_000);
-              const observeUpdate = () => {
-                if (performance.now() - start > 2_000) {
-                  finish(false);
-                  return;
-                }
-                if (
-                  document.querySelector('[aria-label="Current zoom"]')
-                    ?.textContent === expectedZoom
-                ) {
-                  confirmedAtMs = performance.now() - start;
-                  requestAnimationFrame(() => finish(true));
-                } else requestAnimationFrame(observeUpdate);
-              };
-              requestAnimationFrame(observeUpdate);
-            },
-            { capture: true, once: true },
-          );
-        });
-      },
-      zoomIn ? "135%" : "100%",
+  try {
+    await withMeasurementDeadline(() =>
+      page
+        .getByRole("button", { name: "Fit", exact: true })
+        .click({ timeout: 2_000 }),
     );
+  } catch {
+    samples.push(2_000);
+    failure = "measurement-input-or-page-failed";
+  }
+  for (let index = 0; index < 20 && !failure; index++) {
     try {
-      await button.click({ timeout: 2_000 });
-      const sample = await page.evaluate(() => window.__gettysburgTiming);
+      const sample = await withMeasurementDeadline(async (signal) => {
+        const zoomIn = index % 2 === 0;
+        const button = page.getByRole("button", {
+          name: zoomIn ? "Zoom in" : "Fit",
+          exact: true,
+        });
+        await button.evaluate(
+          (element, expectedZoom) => {
+            window.__gettysburgTiming = new Promise((resolveSample) => {
+              element.addEventListener(
+                "click",
+                () => {
+                  const start = performance.now();
+                  let confirmedAtMs = null;
+                  const finish = (confirmed) => {
+                    clearTimeout(timeout);
+                    resolveSample({
+                      durationMs: performance.now() - start,
+                      confirmed,
+                      confirmedAtMs,
+                    });
+                  };
+                  const timeout = setTimeout(() => finish(false), 2_000);
+                  const observeUpdate = () => {
+                    if (performance.now() - start > 2_000) {
+                      finish(false);
+                      return;
+                    }
+                    if (
+                      document.querySelector('[aria-label="Current zoom"]')
+                        ?.textContent === expectedZoom
+                    ) {
+                      confirmedAtMs = performance.now() - start;
+                      requestAnimationFrame(() => finish(true));
+                    } else requestAnimationFrame(observeUpdate);
+                  };
+                  requestAnimationFrame(observeUpdate);
+                },
+                { capture: true, once: true },
+              );
+            });
+          },
+          zoomIn ? "135%" : "100%",
+        );
+        signal.throwIfAborted();
+        await button.click({ timeout: 2_000 });
+        signal.throwIfAborted();
+        return page.evaluate(() => window.__gettysburgTiming);
+      });
       samples.push(sample.durationMs);
       frameDiagnostics.push({
         confirmedAtMs: sample.confirmedAtMs ?? null,
@@ -143,11 +175,13 @@ export async function measureBoardResponse(
       samples.push(2_000);
       failure = "measurement-input-or-page-failed";
     } finally {
-      await page
-        .evaluate(() => {
-          delete window.__gettysburgTiming;
-        })
-        .catch(() => {});
+      await withMeasurementDeadline(
+        () =>
+          page.evaluate(() => {
+            delete window.__gettysburgTiming;
+          }),
+        100,
+      ).catch(() => {});
     }
     if (failure) break;
   }

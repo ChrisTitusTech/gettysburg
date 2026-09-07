@@ -16,6 +16,21 @@ checks in `test-results/performance-report-approved`. New mode regressions prove
 strict rejection, diagnostic retention, invalid-setting rejection, and failure
 on incomplete confirmation. Independent Codex review and CodeRabbit 0.7.6 review
 both found no actionable defects. No application runtime or deployment changed.
+Hosted review subsequently required a Node-side deadline (a frozen renderer can
+suspend its own timer) and failure evidence for initial Fit/locator setup.
+Bound the complete setup/click/evaluation externally, prevent delayed setup from
+clicking after cancellation, and bound best-effort cleanup too. Regressions
+cover setup failures, frozen evaluation/cleanup, and strict/report behavior.
+These repairs require fresh validation/review and published CI before merge.
+The deadline/setup repair passes full local gates (755 workspace/34 harness
+tests), fresh independent review, and both report-mode Chromium layouts in
+`test-results/performance-bounded-approved`. The preceding policy head also
+passes both strict-mode 24-turn games and input fixtures in
+`test-results/performance-strict-approved` and its `-fixtures` directory;
+tablet covers loss/advance/retreat, desktop loss/advance. These local checks do
+not claim calibrated-hardware or VPS acceptance. Application runtime is unchanged.
+CodeRabbit's second review also completed with zero findings on the three-file
+deadline/setup repair; hosted threads are resolved only after publishing it.
 
 This rollup distinguishes merged source from the last verified VPS deployment.
 Older incremental entries below preserve their contemporaneous stopping points
