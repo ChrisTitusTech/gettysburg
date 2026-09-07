@@ -89,7 +89,9 @@ used in CI: two independent live combat games through turn 24, one using desktop
 keyboard controls and one using tablet touch. Both reload with server dice
 awaiting confirmation, resolve available combat choices, verify final and
 historical replay, and await durable cleanup. The games have a five-minute
-per-game bound. These automated checks do not replace owner tabletop adjudication.
+per-game bound; commands are paced below the room's abuse limit even on fast
+runners. CI allows 20 minutes for these games plus the other required gates.
+These automated checks do not replace owner tabletop adjudication.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl

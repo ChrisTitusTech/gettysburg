@@ -17,7 +17,8 @@ jobs:
   validate:
     name: Validate workspace
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Two sequential games can each take five minutes, in addition to all gates.
+    timeout-minutes: 20
     env:
       GETTYSBURG_POSTGRES_TEST_URL: postgresql://gettysburg@127.0.0.1:5432/gettysburg_test
     services:
