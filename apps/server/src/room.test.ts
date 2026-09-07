@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import type { Client } from "@colyseus/core";
+import { ClientState, type Client } from "@colyseus/core";
 import { COMMAND_SCHEMA_VERSION, type ManagementEvent } from "@gettysburg/game";
 import { describe, expect, it, vi } from "vitest";
 
@@ -247,6 +247,7 @@ describe("authorized broadcast ordering", () => {
       const recoveredEvents: number[] = [];
       const recoveredObserver = {
         ref: new EventEmitter(),
+        state: ClientState.JOINED,
         auth: observerAuthorization,
         send: (_type: string, event: ManagementEvent) =>
           recoveredEvents.push(event.event_sequence),
@@ -263,6 +264,7 @@ describe("authorized broadcast ordering", () => {
         },
       );
       await room.onJoin!(recoveredObserver, {});
+      await vi.waitFor(() => expect(recoveredEvents).toEqual([3]));
       publish(4);
       await vi.waitFor(() => expect(recoveredEvents).toEqual([3, 4]));
       expect(observerEvents).toEqual([1, 2]);
