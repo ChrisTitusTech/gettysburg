@@ -1697,6 +1697,26 @@ validation remain separate gates.
     Both runs exercised loss/advance; earlier handshake runs covered retreat
     at both widths. Publish the repair, resolve the latest checkout thread,
     and verify exact-head CI/final threads before merge.
+  - Latest hosted review found that an observer waiting for the transport
+    acknowledgement still entered unrelated broadcast authorization reads,
+    despite its initial-snapshot cutoff preventing delivery. Exclude observers
+    until their initial snapshot is delivered. A real-SDK held-ack test must
+    prove player commands complete without observer reads, then deliver the
+    latest snapshot after acknowledgement. The fixture copies SDK buffer bytes
+    rather than retaining a mutable Buffer view; the older ordering fixture now
+    explicitly initializes its observer. Full gates, fresh independent review,
+    exact-head CI, and the hosted thread remain required before merge. Owner:
+    ChrisTitusTech. The prior head's Application `34107655449` and Documentation
+    `34107655461` passed, but that does not close this newly identified defect.
+    The repair passes the full local gate (603 workspace/nine harness tests),
+    all 223 PostgreSQL tests, and fresh independent review (202 server tests;
+    database skips covered separately). Desktop/tablet 24-turn games, pending
+    reload, exact replay, and input fixtures pass in
+    `test-results/spectator-pending-ack-isolation` and its `-fixtures` directory;
+    desktop exercised all three choices, tablet loss/advance with prior retreat
+    evidence retained. The production dependency audit reports no known
+    vulnerabilities. Publish and recheck exact-head CI/final threads.
+
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

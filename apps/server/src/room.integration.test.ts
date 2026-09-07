@@ -84,7 +84,13 @@ describe("Colyseus authoritative room", () => {
     }
   });
 
-  it.each(["expiry", "revocation", "timeout", "disconnect"])(
+  it.each([
+    "expiry",
+    "revocation",
+    "timeout",
+    "disconnect",
+    "player broadcast",
+  ])(
     "does not buffer observer state across delayed acknowledgement and %s",
     async (cause) => {
       let now = Date.now();
@@ -109,6 +115,7 @@ describe("Colyseus authoritative room", () => {
       });
       const service = new InMemoryAsyncGameService(memory);
       const read = vi.spyOn(service, "deliverAuthorizedState");
+      const broadcastRead = vi.spyOn(service, "deliverAuthorizedSpectators");
       const port = await reservePort();
       const origin = `http://127.0.0.1:${port}`;
       server = createGettysburgServer({
@@ -117,6 +124,23 @@ describe("Colyseus authoritative room", () => {
         trustedWebSocketOrigin: origin,
       });
       await server.listen(port, "127.0.0.1");
+      let player: ClientRoom | undefined;
+      if (cause === "player broadcast") {
+        memory.claimInvitation({
+          lookupId: host.invitation.lookup_id,
+          secret: host.invitation.secret,
+        });
+        player = await new ColyseusClient(origin, {
+          headers: {
+            origin,
+            cookie: `__Host-gettysburg-session=${host.credential}`,
+          },
+        }).joinOrCreate("game", { gameId: host.gameId });
+        rooms.push(player);
+        player.onMessage("snapshot", () => {});
+        player.onMessage("gameplayEvent", () => {});
+        read.mockClear();
+      }
       let acknowledge: (() => void) | undefined;
       const connect = ClientRoom.prototype.connect;
       vi.spyOn(ClientRoom.prototype, "connect").mockImplementationOnce(
@@ -125,7 +149,7 @@ describe("Colyseus authoritative room", () => {
           const send = this.connection.send.bind(this.connection);
           vi.spyOn(this.connection, "send").mockImplementation((data) => {
             if (data.length === 1 && data[0] === Protocol.JOIN_ROOM) {
-              const copy = data.slice();
+              const copy = Uint8Array.from(data);
               acknowledge = () => send(copy);
             } else send(data);
           });
@@ -144,6 +168,27 @@ describe("Colyseus authoritative room", () => {
       const closed = new Promise<number>((resolve) => room.onLeave(resolve));
       expect(acknowledge).toBeDefined();
       expect(read).not.toHaveBeenCalled();
+      if (player) {
+        const result = nextMessage<CommandResult>(player, "commandResult");
+        player.send("endPhase", {
+          ...command,
+          command_id: randomUUID(),
+          command_name: "endPhase",
+        });
+        expect(await result).toMatchObject({ ok: true });
+        expect(broadcastRead).not.toHaveBeenCalled();
+        expect(read).not.toHaveBeenCalled();
+        expect(received).not.toHaveBeenCalled();
+        acknowledge!();
+        await vi.waitFor(() => expect(read).toHaveBeenCalledOnce());
+        await vi.waitFor(() =>
+          expect(received).toHaveBeenCalledWith(
+            expect.objectContaining({ version: 1 }),
+          ),
+        );
+        expect(read).toHaveBeenCalledOnce();
+        return;
+      }
       if (cause === "timeout" || cause === "disconnect") {
         if (cause === "disconnect") await room.leave(true);
         const code = await closed;
