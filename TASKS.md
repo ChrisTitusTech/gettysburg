@@ -12,8 +12,9 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, and encrypted key-recovery wiring are merged through PRs #49-51 | Home Screen acceptance, actual VPS key recovery, and real provider/device acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
+| Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
+| Phase 4 release | Original presentation approved; supplied scans remain private; local candidate image scan and runtime evidence recorded below | Remaining accessibility/device/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
@@ -24,9 +25,10 @@ device/accessibility, and controlled-VPS checks without changing their scope.
 CI evidence correction: hosted review of the alternate-browser workflow found
 that default pull-request checkout uses GitHub's synthetic merge commit. Earlier
 Application results were associated with the listed PR head, but did not prove
-that exact checkout. Pin Application checkout to the PR head SHA (or push SHA),
-as Documentation already does, and rerun before merging the accessibility
-increment. The browser workflow receives the same correction separately.
+that exact checkout. PR #53 now pins Application checkout to the PR head SHA
+(or push SHA), as Documentation already does. PR #54 applies the same correction
+to the browser workflow. All final required jobs passed on those exact heads
+before either PR merged.
 Historical evidence is retained, not reclassified as an exact-head execution.
 No Phase 3/4 or new VPS/release completion is inferred from those earlier runs.
 The workflow-only repair passes the full local gate (753 workspace/22 harness
@@ -61,6 +63,14 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #50 browser consent UI | `f9d5efd` | `34122292052` / `34122292041` | `88f96fc` |
 | #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
 | #52 Home Screen metadata | `54ee652` | `34123054048` / `34123054108` | `6790e3a` |
+
+Verified exact-checkout closeout: PR #53 head `14a8c8f` passed Application
+`34129078601` and Documentation `34129078631`, then merged as `6622f0b`.
+PR #54 head `18e759c` passed Application `34129213403`, Documentation
+`34129213391`, and both Firefox/WebKit jobs in `34129213526`, then merged as
+`628a85a`. Each had fresh clean independent review and no unresolved review
+threads before a separate merge call. The local performance increment below
+is based on these merged fixes; it does not change the deployed VPS revision.
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1984,6 +1994,12 @@ Desktop/tablet Fit captures from this exact-image run were visually inspected;
 the board and controls are intact in both views. The new release-acceptance
 worksheet passes Markdown/diff checks and independent review without changing
 owner decisions or closing manual gates.
+Final integration onto merged PR #54 passes frozen install, format, lint,
+typecheck, 755 workspace/30 harness tests, build, smoke, and Markdown/full-diff
+checks. A separate PostgreSQL run passes all 329 server tests, including the
+26 omitted by the default database-free suite. Fresh independent review of the
+seven-file increment found no actionable defects and reran four performance
+regressions. Published exact-head CI remains required before merge.
 
 ### Browser-engine acceptance increment
 
