@@ -479,6 +479,85 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Expose authorized replay snapshots, then finish replay delivery.
+  - Scope: Add a read-only replay endpoint with a strict optional event-sequence
+    cursor and current host/seat authorization checked in the same database
+    snapshot as history. Resolve the exact registered replay handler. Return
+    only replayed board state and cursor metadata with no-store caching;
+    keep private bindings, recovery records, and raw actions internal.
+  - Boundary: Mandatory games only in this increment. Retained games still
+    resume but interpreted replay fails closed until their own handlers exist.
+    Corrupt histories and prefixes beyond 10,000 actions fail generically.
+    UI, spectator access, checkpointing/capacity and complete acceptance remain.
+  - Acceptance: Test both seats, host-only access, unrelated/expired/revoked and
+    deleted sessions, recovery metadata privacy, strict cursors, malformed logs,
+    response isolation, readiness, retained-version rejection, and the work cap.
+    Replay two independent automatic combats and a paid historical prefix after
+    a real PostgreSQL restart. Run the full local/browser gates, independent
+    review, and exact-head CI before merging.
+  - Validation: Fourteen access/HTTP/bounds cases and a PostgreSQL combat-replay
+    restart case pass. Frozen install, format, lint, typecheck, 517 default tests
+    plus six harness tests, build, smoke, Markdown lint, and all 153 server tests
+    with PostgreSQL pass. Two-session desktop/tablet and no-contact 24-turn
+    browser acceptance pass (`test-results/authorized-replay`); mandatory input
+    fixtures pass (`test-results/authorized-replay-fixtures`). Fresh independent
+    built-in review found no actionable defects. Exact-head CI remains a
+    pre-merge gate; CodeRabbit is limited and skipped per owner direction.
+    No phase or deployment completion is claimed.
+    The restart test now also crosses a real seat recovery so replay must use
+    the persisted old/new binding chronology added by the verifier's follow-up.
+    The combined stack passes frozen install, format, lint, typecheck, 519
+    default tests plus six harness tests, build, smoke, Markdown lint, and all
+    155 PostgreSQL server tests. Both browser suites pass again in
+    `test-results/authorized-replay-chronology` and
+    `test-results/authorized-replay-chronology-fixtures`. Fresh independent
+    follow-up review found no actionable defects. Exact-head CI remains
+    pre-merge; old totals above record the initial API.
+    Hosted review then required throttling before synchronous replay and
+    game-scoped binding indexing. The route now applies minute-long session,
+    source, and global limits before reads/reconstruction; responses use 429,
+    no-store, and Retry-After. The service supplies only this game's actors and
+    invitation metadata to the indexed verifier, including the parent's new
+    host chronology checks. Four regressions cover all limiter dimensions,
+    expiry without reconstruction on denial, and invitation management across
+    recovered-host snapshot restore. The full install/format/lint/typecheck,
+    527 workspace tests plus six harness tests, build, smoke, Markdown, and
+    whitespace gate passes; all 163 server tests pass with PostgreSQL.
+    Desktop/tablet two-session and no-contact full-turn checks pass in
+    `test-results/authorized-replay-limits`; isolated input fixtures pass in
+    `test-results/authorized-replay-limits-fixtures`. Fresh independent local
+    review found no actionable defects and reran 150 server tests; its 13
+    database skips are covered by the separate PostgreSQL gate above.
+    Exact-head CI remains before merge.
+    The API now also supplies the verifier's invitation activation/revocation,
+    claim, and expiry evidence; secrets remain excluded. The complete local
+    gate passes again (527 workspace plus six harness tests; all 163 PostgreSQL
+    tests). Both browser suites pass in `test-results/authorized-replay-invitation`
+    and `test-results/authorized-replay-invitation-fixtures`. Fresh independent
+    local review found no actionable defects and reran 150 server tests;
+    its 13 database skips are covered above. Exact-head CI remains before merge.
+    Recovery audit evidence is now passed to the strengthened verifier using a
+    game-scoped, credential-free projection of retained grants. Existing host
+    and seat recovery replay tests, including PostgreSQL restart, exercise this
+    integration. The full local gate passes (529 workspace plus six harness
+    tests and all 165 PostgreSQL tests). Both browser suites pass in
+    `test-results/authorized-replay-audit` and
+    `test-results/authorized-replay-audit-fixtures`. Fresh independent local
+    review found no actionable defects and reran 152 server tests; its 13
+    database skips are covered above. Exact-head CI remains before merge.
+    A further hosted pass found that the API readiness middleware hydrated the
+    PostgreSQL snapshot before the replay limits ran. The replay gate now runs
+    before body parsing and readiness. All three limiter tests assert denied
+    requests never call readiness or replay; an anonymous unavailable-service
+    regression proves repeated 503 requests are bounded too. The complete local
+    gate passes with 531 workspace plus six harness tests and all 167 PostgreSQL
+    tests. Two-session desktop/tablet and no-contact full-turn acceptance pass
+    in `test-results/authorized-replay-early-limits`; mandatory input fixtures
+    pass in `test-results/authorized-replay-early-limits-fixtures`. Fresh
+    independent review found no actionable regressions and reran 154 server
+    tests; its 13 database skips are covered above. General API capacity and
+    readiness cost remain in the Phase 4 hardening scope. Reverify exact-head CI
+    before merge.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,
@@ -508,6 +587,12 @@ validation remain separate gates.
     defects. Exact-head CI remains a pre-merge gate. CodeRabbit is limited and
     skipped per owner direction. This no-contact game does not replace owner
     gameplay acceptance.
+    PR #26 head `2f5a173` failed CI run `34079237275` at held-drag page
+    screenshot capture after tests and two-player acceptance passed. Startup
+    and container smoke were skipped. Attempt 2 was superseded/cancelled by
+    the parent-repair merge; owner ChrisTitusTech must retain this as incomplete
+    evidence until the latest head's full Application gate passes. Local browser
+    fixtures passed without weakening their movement assertions.
 - [ ] Verify mandatory replay, then expose authorized replay controls.
   - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
     accepted commands, resolving the historical seat binding and recorded dice.

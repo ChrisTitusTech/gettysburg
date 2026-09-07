@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
+import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -200,6 +200,105 @@ postgres("PostgreSQL durability", () => {
       expect(await restarted.isReady()).toBe(true);
     } finally {
       await restarted.close();
+    }
+  });
+
+  it("replays paid movement and recorded automatic combat after a database restart", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let restarted: PostgresGameService | undefined;
+    let firstClosed = false;
+    try {
+      await first.migrate();
+      const created = await first.createGame("union");
+      const guest = await first.claimInvitation({
+        lookupId: created.invitation.lookup_id,
+        secret: created.invitation.secret,
+      });
+      const credentials = {
+        union: created.credential,
+        confederate: guest.credential,
+      };
+      const act = async (side: Side, command_name: string, payload = {}) => {
+        const current = await first.getGameState(created.gameId);
+        expect(
+          (
+            await first.executeCommand(
+              await first.authenticate(credentials[side], created.gameId),
+              {
+                command_id: randomUUID(),
+                command_name,
+                payload,
+                expected_version: current.version,
+                game_id: created.gameId,
+                schema: COMMAND_SCHEMA_VERSION,
+              },
+            )
+          ).ok,
+        ).toBe(true);
+      };
+      await act("union", "moveStack", {
+        unit_ids: ["u-buford", "u-gamble"],
+        destination: "P3",
+      });
+      const paid = await first.getGameState(created.gameId);
+      const recovery = await first.issueSeatRecovery(
+        created.gameId,
+        "union",
+        "test operator",
+      );
+      credentials.union = (
+        await first.claimSeatRecovery({
+          lookupId: recovery.lookup_id,
+          secret: recovery.secret,
+        })
+      ).credential;
+      await act("union", "moveUnit", { unit_id: "u-devin", destination: "S3" });
+      await act("union", "endPhase");
+      await act("confederate", "enterReinforcement", {
+        unit_id: "c-heth",
+        destination: "S1",
+      });
+      await act("confederate", "moveUnit", {
+        unit_id: "c-heth",
+        destination: "S2",
+      });
+      await act("confederate", "enterReinforcement", {
+        unit_id: "c-pegram",
+        destination: "S1",
+      });
+      await act("confederate", "moveUnit", {
+        unit_id: "c-pegram",
+        destination: "Q3",
+      });
+      await act("confederate", "endPhase");
+      const before = await first.getGameState(created.gameId);
+      expect(Object.keys(before.combats)).toHaveLength(2);
+      await first.close();
+      firstClosed = true;
+      restarted = new PostgresGameService({
+        connectionString: connectionString!,
+        pepper,
+      });
+      await restarted.migrate();
+      const replay = await restarted.getReplay(
+        guest.credential,
+        created.gameId,
+      );
+      expect(replay.state).toEqual(before);
+      expect(replay.state).toEqual(
+        await restarted.getGameState(created.gameId),
+      );
+      expect(
+        (await restarted.getReplay(created.credential, created.gameId, 1))
+          .state,
+      ).toEqual(paid);
+      expect(await restarted.getActions(created.gameId)).toHaveLength(9);
+    } finally {
+      if (restarted) await restarted.close();
+      if (!firstClosed) await first.close();
     }
   });
 

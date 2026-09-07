@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { ActionEvent, AuditEvent } from "@gettysburg/game";
 import { parseCookie, stringifySetCookie } from "cookie";
@@ -74,24 +74,29 @@ interface AttemptBucket {
 }
 
 class AttemptRateLimiter {
-  #global: AttemptBucket = {
-    count: 0,
-    resetAt: Date.now() + CLAIM_LIMIT_WINDOW_MS,
-  };
+  #global: AttemptBucket;
   readonly #sources = new Map<string, AttemptBucket>();
+
+  constructor(
+    private readonly windowMs = CLAIM_LIMIT_WINDOW_MS,
+    private readonly perSource = CLAIM_LIMIT_PER_SOURCE,
+    private readonly globalLimit = CLAIM_LIMIT_GLOBAL,
+  ) {
+    this.#global = { count: 0, resetAt: Date.now() + windowMs };
+  }
 
   allow(source: string, now = Date.now()): boolean {
     if (this.#global.resetAt <= now) {
-      this.#global = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      this.#global = { count: 0, resetAt: now + this.windowMs };
       this.#sources.clear();
     }
-    if (this.#global.count >= CLAIM_LIMIT_GLOBAL) return false;
+    if (this.#global.count >= this.globalLimit) return false;
     let sourceBucket = this.#sources.get(source);
     if (sourceBucket === undefined || sourceBucket.resetAt <= now) {
-      sourceBucket = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      sourceBucket = { count: 0, resetAt: now + this.windowMs };
       this.#sources.set(source, sourceBucket);
     }
-    if (sourceBucket.count >= CLAIM_LIMIT_PER_SOURCE) {
+    if (sourceBucket.count >= this.perSource) {
       return false;
     }
     this.#global.count += 1;
@@ -171,6 +176,7 @@ function errorStatus(code: ServiceErrorCode): number {
   switch (code) {
     case "credential_invalid":
     case "invitation_mismatch":
+    case "replay_cursor_invalid":
       return 400;
     case "game_not_found":
       return 404;
@@ -181,6 +187,7 @@ function errorStatus(code: ServiceErrorCode): number {
     case "creation_unavailable":
     case "invitation_unavailable":
     case "recovery_unavailable":
+    case "replay_unavailable":
     case "seat_unavailable":
     case "version_unavailable":
       return 409;
@@ -196,6 +203,10 @@ export function configureHttpApplication(
   const { gameService, readiness, staticDirectory } = options;
   const creationRateLimiter = new CreationRateLimiter();
   const claimRateLimiter = new AttemptRateLimiter();
+  // Process-local limits precede database reads and synchronous reconstruction.
+  // Both maps are bounded by the global attempt budget and expire each minute.
+  const replaySourceLimiter = new AttemptRateLimiter(60_000, 60, 300);
+  const replaySessionLimiter = new AttemptRateLimiter(60_000, 30, 300);
   const allowBearerClaim = (request: Request, response: Response) => {
     if (claimRateLimiter.allow(request.ip ?? "unknown")) return true;
     response.setHeader(
@@ -218,6 +229,22 @@ export function configureHttpApplication(
   });
   application.use("/api", (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
+    next();
+  });
+  // Register this gate before readiness: PostgreSQL readiness hydrates the
+  // saved snapshot too, so even unavailable/unauthenticated reads need a bound.
+  application.get("/api/games/:gameId/replay", (request, response, next) => {
+    const sessionKey = createHash("sha256")
+      .update(readSessionCredential(request) ?? "anonymous")
+      .digest("hex");
+    if (
+      !replaySourceLimiter.allow(request.ip ?? "unknown") ||
+      !replaySessionLimiter.allow(sessionKey)
+    ) {
+      response.setHeader("Retry-After", "60");
+      response.status(429).json({ error: "replay_rate_limited" });
+      return;
+    }
     next();
   });
   application.use(express.json({ limit: "16kb", strict: true }));
@@ -514,6 +541,37 @@ export function configureHttpApplication(
           },
         );
         response.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.get(
+    "/api/games/:gameId/replay",
+    async (request, response, next) => {
+      try {
+        const credential = readSessionCredential(request);
+        const cursor = request.query.sequence;
+        if (
+          Object.keys(request.query).some((key) => key !== "sequence") ||
+          (cursor !== undefined &&
+            (typeof cursor !== "string" ||
+              !/^(0|[1-9][0-9]{0,15})$/.test(cursor)))
+        )
+          throw new ServiceError(
+            "replay_cursor_invalid",
+            "Invalid replay sequence.",
+          );
+        response
+          .status(200)
+          .json(
+            await gameService.getReplay(
+              credential,
+              request.params.gameId ?? "",
+              cursor === undefined ? undefined : Number(cursor),
+            ),
+          );
       } catch (error) {
         next(error);
       }
