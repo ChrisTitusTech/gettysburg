@@ -642,6 +642,21 @@ active game resolves to a supported pair. Compatibility tests cover failed
 readiness, the read-only response, registry restoration, retained-version replay,
 and migrated-version replay.
 
+The current replay API increment is `GET /api/games/:gameId/replay`, with an
+optional nonnegative integer `sequence` query (zero is the opening; omission
+means latest). Current host or seat access is checked together with the stored
+history in one service read. The no-store response contains only `state`,
+`sequence`, and `latest_sequence`; it never exposes historical bindings, recovery
+identities, invitation secrets, or raw actions. It verifies the requested prefix
+from pinned content and compares the latest prefix with the saved state.
+Malformed/out-of-range cursors return `replay_cursor_invalid`; corrupt histories
+or requested prefixes beyond 10,000 actions return generic `replay_unavailable`.
+Only the mandatory pair currently has a registered interpreted-replay handler.
+Retained tabletop pairs remain resumable but replay returns `version_unavailable`
+until their own handlers are implemented; no mandatory fallback is allowed.
+Replay UI, retained-version coverage, measured capacity/checkpointing, and
+spectator authorization remain separate implementation/release gates.
+
 Production runs as rootless Podman Quadlet services under the `gettysburg` user.
 Caddy is the only public application edge. The deployment target and current
 host baseline are specified in `docs/operations/VPS.md`.

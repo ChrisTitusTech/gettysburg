@@ -479,6 +479,31 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Expose authorized replay snapshots, then finish replay delivery.
+  - Scope: Add a read-only replay endpoint with a strict optional event-sequence
+    cursor and current host/seat authorization checked in the same database
+    snapshot as history. Resolve the exact registered replay handler. Return
+    only replayed board state and cursor metadata with no-store caching;
+    keep private bindings, recovery records, and raw actions internal.
+  - Boundary: Mandatory games only in this increment. Retained games still
+    resume but interpreted replay fails closed until their own handlers exist.
+    Corrupt histories and prefixes beyond 10,000 actions fail generically.
+    UI, spectator access, checkpointing/capacity and complete acceptance remain.
+  - Acceptance: Test both seats, host-only access, unrelated/expired/revoked and
+    deleted sessions, recovery metadata privacy, strict cursors, malformed logs,
+    response isolation, readiness, retained-version rejection, and the work cap.
+    Replay two independent automatic combats and a paid historical prefix after
+    a real PostgreSQL restart. Run the full local/browser gates, independent
+    review, and exact-head CI before merging.
+  - Validation: Fourteen access/HTTP/bounds cases and a PostgreSQL combat-replay
+    restart case pass. Frozen install, format, lint, typecheck, 517 default tests
+    plus six harness tests, build, smoke, Markdown lint, and all 153 server tests
+    with PostgreSQL pass. Two-session desktop/tablet and no-contact 24-turn
+    browser acceptance pass (`test-results/authorized-replay`); mandatory input
+    fixtures pass (`test-results/authorized-replay-fixtures`). Fresh independent
+    built-in review found no actionable defects. Exact-head CI remains a
+    pre-merge gate; CodeRabbit is limited and skipped per owner direction.
+    No phase or deployment completion is claimed.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,

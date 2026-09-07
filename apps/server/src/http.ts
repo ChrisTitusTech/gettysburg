@@ -171,6 +171,7 @@ function errorStatus(code: ServiceErrorCode): number {
   switch (code) {
     case "credential_invalid":
     case "invitation_mismatch":
+    case "replay_cursor_invalid":
       return 400;
     case "game_not_found":
       return 404;
@@ -181,6 +182,7 @@ function errorStatus(code: ServiceErrorCode): number {
     case "creation_unavailable":
     case "invitation_unavailable":
     case "recovery_unavailable":
+    case "replay_unavailable":
     case "seat_unavailable":
     case "version_unavailable":
       return 409;
@@ -514,6 +516,36 @@ export function configureHttpApplication(
           },
         );
         response.status(200).json(result);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.get(
+    "/api/games/:gameId/replay",
+    async (request, response, next) => {
+      try {
+        const cursor = request.query.sequence;
+        if (
+          Object.keys(request.query).some((key) => key !== "sequence") ||
+          (cursor !== undefined &&
+            (typeof cursor !== "string" ||
+              !/^(0|[1-9][0-9]{0,15})$/.test(cursor)))
+        )
+          throw new ServiceError(
+            "replay_cursor_invalid",
+            "Invalid replay sequence.",
+          );
+        response
+          .status(200)
+          .json(
+            await gameService.getReplay(
+              readSessionCredential(request),
+              request.params.gameId ?? "",
+              cursor === undefined ? undefined : Number(cursor),
+            ),
+          );
       } catch (error) {
         next(error);
       }

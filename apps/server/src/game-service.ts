@@ -38,6 +38,7 @@ import {
 } from "@gettysburg/game";
 import canonicalize from "canonicalize";
 import { hasPinnedMandatoryContent } from "./mandatory-content.js";
+import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
 
 import {
   credentialVerifier,
@@ -285,6 +286,12 @@ export interface RecoveryExport {
   };
 }
 
+export interface ReplaySnapshot {
+  readonly state: GameState;
+  readonly sequence: number;
+  readonly latest_sequence: number;
+}
+
 export type ServiceErrorCode =
   | "credential_invalid"
   | "creation_conflict"
@@ -295,6 +302,8 @@ export type ServiceErrorCode =
   | "invitation_mismatch"
   | "invitation_unavailable"
   | "recovery_unavailable"
+  | "replay_cursor_invalid"
+  | "replay_unavailable"
   | "seat_unavailable"
   | "unauthorized"
   | "version_unavailable";
@@ -571,12 +580,17 @@ function normalizeSavedState(
 interface GameVersionHandler {
   accepts?(state: GameState): boolean;
   normalize(state: GameState, actions: readonly StoredAction[]): GameState;
+  replay?: typeof replayMandatoryActions;
 }
 
 const gameVersionRegistry = new Map<string, GameVersionHandler>([
   [
     `${MANDATORY_RULESET_VERSION}\u0000${MANDATORY_CONTENT_REVISION}`,
-    { accepts: hasPinnedMandatoryContent, normalize: (state) => state },
+    {
+      accepts: hasPinnedMandatoryContent,
+      normalize: (state) => state,
+      replay: replayMandatoryActions,
+    },
   ],
   [
     `${LEGACY_RULESET_VERSION}\u0000${SCENARIO_CONTENT_REVISION}`,
@@ -2178,6 +2192,62 @@ export class InMemoryGameService {
 
   getActions(gameId: string): readonly StoredAction[] {
     return structuredClone(this.#requireGame(gameId).actions);
+  }
+
+  getReplay(
+    credential: string | undefined,
+    gameId: string,
+    requestedSequence?: number,
+  ): ReplaySnapshot {
+    // Check current access in the same service snapshot as the history read.
+    // Historical seat bindings are only reducer evidence, never permission.
+    const session = this.#findSession(credential);
+    if (
+      session === undefined ||
+      ![...this.#hostBindings, ...this.#seatBindings].some(
+        (binding) =>
+          binding.gameId === gameId &&
+          binding.sessionId === session.id &&
+          binding.revokedAt === null,
+      )
+    )
+      throw new ServiceError(
+        "unauthorized",
+        "Current game access is required.",
+      );
+    const game = this.#requireActiveGame(gameId);
+    const latest = game.state.event_sequence;
+    const sequence = requestedSequence ?? latest;
+    if (!Number.isSafeInteger(sequence) || sequence < 0 || sequence > latest)
+      throw new ServiceError(
+        "replay_cursor_invalid",
+        "Invalid replay sequence.",
+      );
+    const replay = gameVersionHandler(game.state)?.replay;
+    if (!replay)
+      throw new ServiceError(
+        "version_unavailable",
+        "Interpreted replay is unavailable for this saved version.",
+      );
+    // Bound synchronous verification work. Larger histories remain exportable;
+    // checkpointed replay and measured capacity are separate release gates.
+    if (game.actions.length !== latest || sequence > 10_000)
+      throw new ServiceError("replay_unavailable", "Replay is unavailable.");
+    try {
+      return {
+        state: replay(
+          gameId,
+          game.actions.slice(0, sequence),
+          this.#seatBindings,
+          sequence === latest ? game.state : undefined,
+        ),
+        sequence,
+        latest_sequence: latest,
+      };
+    } catch (error) {
+      if (!(error instanceof ReplayError)) throw error;
+      throw new ServiceError("replay_unavailable", "Replay is unavailable.");
+    }
   }
 
   getRecoveryExport(
