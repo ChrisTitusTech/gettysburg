@@ -656,6 +656,11 @@ Host attribution uses those bounds, and revoke summaries use retained invitation
 metadata. Revocation additionally requires a previously activated, unclaimed
 target, its exact revocation sequence, and a timestamp before expiry. Missing
 historical evidence fails closed without rewriting retained saves.
+Issued invitations match retained side/activation evidence. Recovery audit rows
+match consumed grants, their request/sequence and operator identity, and the
+old/new binding rotation. Gameplay success requires the exact accepted envelope
+and literal boolean `ok: true`. None of this private evidence is returned by
+the replay endpoint.
 The verifier receives only the requested game's evidence and indexes
 historical actors once. Before database reads/reconstruction, process-local
 one-minute limits allow 30 replay attempts per session, 60 per source, and 300

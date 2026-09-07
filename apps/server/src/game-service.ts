@@ -96,6 +96,9 @@ export interface Invitation {
 }
 
 export interface RecoveryGrant {
+  auditSequence?: number;
+  operatorRequestId?: string;
+  newBindingId?: string;
   claimId?: string;
   consumedAt: number | null;
   readonly expiresAt: number;
@@ -2058,6 +2061,9 @@ export class InMemoryGameService {
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#seatBindings.at(-1)!.id;
     options.afterCommit?.(event);
 
     return {
@@ -2201,6 +2207,9 @@ export class InMemoryGameService {
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#hostBindings.at(-1)!.id;
     options.afterCommit?.(event);
     return { ...session, gameId: grant.gameId };
   }
@@ -2265,6 +2274,28 @@ export class InMemoryGameService {
           this.#seatBindings.filter((binding) => binding.gameId === gameId),
           sequence === latest ? game.state : undefined,
           {
+            recoveries: [...this.#recoveryGrants.values()]
+              .filter((grant) => grant.gameId === gameId)
+              .map((grant) => ({
+                gameId: grant.gameId,
+                oldBindingId: grant.oldBindingId,
+                oldBindingVersion: grant.oldBindingVersion,
+                targetBindingType: grant.targetBindingType,
+                side: grant.side,
+                operatorIdentity: grant.operatorIdentity,
+                consumedAt: grant.consumedAt,
+                revokedAt: grant.revokedAt,
+                expiresAt: grant.expiresAt,
+                ...(grant.operatorRequestId === undefined
+                  ? {}
+                  : { operatorRequestId: grant.operatorRequestId }),
+                ...(grant.auditSequence === undefined
+                  ? {}
+                  : { auditSequence: grant.auditSequence }),
+                ...(grant.newBindingId === undefined
+                  ? {}
+                  : { newBindingId: grant.newBindingId }),
+              })),
             hosts: this.#hostBindings.filter(
               (binding) => binding.gameId === gameId,
             ),
