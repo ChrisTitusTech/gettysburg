@@ -479,6 +479,52 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Repair late hosted replay-verifier findings after PR #25 merged.
+  - Scope: Verify invitation retirement at surrender, reject issuance to an
+    occupied seat, and reject overlapping host/same-seat binding intervals.
+    Add focused corruption/valid-history regressions and preserve ordinary
+    resume, deletion privacy, and fail-closed missing-evidence behavior.
+  - Gate: ChrisTitusTech owns the follow-up. These comments arrived after the
+    reviewed merge; do not treat the merged verifier as final release acceptance.
+    Complete local/database/browser gates, fresh independent review, and
+    exact-head CI in a separate repair PR before resolving the late threads.
+- [ ] Repair late hosted replay-viewer findings after PR #28 merged.
+  - Scope: Respect 429/Retry-After, preserve presentation across adjacent events,
+    reflect live management/audit cursors, and remove the desktop grid layout
+    that stretches the return button beside the board.
+  - Gate: ChrisTitusTech owns focused component/API regressions and real
+    desktop/tablet rendered checks, including the entire replay container.
+    Independent review and exact-head CI remain required before repair merge.
+- [ ] Strengthen the full-game browser acceptance beyond no-contact turns.
+  - Scope: Use two actual browser sessions and visible keyboard/touch controls
+    to play the pinned opening into two independent live combats, reload both
+    clients with server results pending, resolve recorded choices, and continue
+    through turn 24 at desktop and tablet widths. Compare saved states after
+    every accepted command and verify exact final/historical replay; await
+    durable deletion of each acceptance game. No fixture commands or dice are
+    injected into the server.
+  - Boundary: This is automated workflow coverage, not owner tabletop
+    adjudication or proof that every randomized run exercises every choice.
+    Existing deterministic fixtures retain edge-case retreat/advance coverage.
+    Full Phase 3 and public-release gates remain open.
+  - Validation: The first run reached the new desktop scenario but
+    its separate HTTP client's state read returned 401 for the browser's Secure
+    loopback cookie. Reads now execute inside the authenticated browser instead.
+    Keyboard checkbox activation uses Space. Both full games now pass; the first
+    successful pair covered loss, retreat, and advance choices at each width.
+    Their completed desktop/tablet renders were inspected in
+    `test-results/enforced-combat-game`. The final bounded rerun passes in
+    `test-results/enforced-combat-game-final`; its desktop game covered all
+    three choice kinds and its tablet game covered loss/advance. Isolated
+    movement fixtures also pass in `test-results/enforced-combat-game-final-fixtures`.
+    Frozen install, format, lint, typecheck, 540 workspace plus six harness tests,
+    build, smoke, Markdown/whitespace, and all 167 PostgreSQL server tests pass.
+    CI now enables both extended games; each game is bounded to five minutes and
+    browser verification fetches to 15 seconds. Fresh independent review found
+    no actionable regressions and checked JavaScript syntax/whitespace; it did
+    not rerun the browser suites covered above. Exact-head CI follows before
+    merge. Responsible owner: ChrisTitusTech. CodeRabbit remains skipped under
+    the owner's limited-plan instruction.
 - [ ] Deliver read-only replay controls and finish replay acceptance.
   - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
     and latest events. Inspect either side, pan/zoom, and read recorded combat
@@ -527,6 +573,9 @@ validation remain separate gates.
     replay inspection, panning, no inactive move tab stops, and the no-contact
     24-turn regression. Fresh independent review found no actionable regressions
     and reran all 96 client tests. Exact-head CI remains a merge gate.
+    PR #28 head `3b8d046` passed Application (`34082151006`) and Documentation
+    (`34082150966`) CI and merged into main as `b3fadc2`, with no unresolved
+    review threads. Broader accessibility and owner gameplay gates remain open.
 - [ ] Expose authorized replay snapshots, then finish replay delivery.
   - Scope: Add a read-only replay endpoint with a strict optional event-sequence
     cursor and current host/seat authorization checked in the same database
@@ -606,6 +655,9 @@ validation remain separate gates.
     tests; its 13 database skips are covered above. General API capacity and
     readiness cost remain in the Phase 4 hardening scope. Reverify exact-head CI
     before merge.
+    PR #27 head `13f81ec` passed Application (`34081955973`) and Documentation
+    (`34081955914`) CI and merged into main as `f9c439f`, with no unresolved
+    review threads. This completes the API increment, not all replay/release gates.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,
