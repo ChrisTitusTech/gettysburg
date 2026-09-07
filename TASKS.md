@@ -1341,6 +1341,29 @@ validation remain separate gates.
 
 ### Phase 4
 
+- [x] Add the host-only spectator grant-list API.
+  - Scope: One authorized snapshot read returns outstanding invitation IDs,
+    invited/claimed status, and invitation expiry, without secrets or identities.
+    Expired unclaimed and revoked grants disappear; claimed grants remain
+    revocable beyond invitation expiry. Read-only; no session renewal.
+  - Validation plan: Host/seat/observer/cross-game authorization, projection,
+    expiry/revocation/deletion, unchanged snapshots, HTTP response shape, and
+    PostgreSQL restart coverage. Run full local/database/browser gates, fresh
+    independent review, exact-head CI, and hosted thread checks before merge.
+    Host browser controls and spectator UI remain separate work. Owner:
+    ChrisTitusTech. No migration or VPS change is part of this increment.
+  - Validation: Frozen install, format, lint, typecheck, 578 workspace/nine
+    harness tests, build, smoke, Markdown, and whitespace pass. All 199 isolated
+    PostgreSQL tests pass. Desktop/tablet enforced games, pending-result reload,
+    exact replay, and input fixtures pass in `test-results/spectator-grant-list`
+    and its `-fixtures` directory; desktop exercised all three pending choices.
+    Fresh independent review found no actionable defects and reran 183 server
+    tests; its 16 PostgreSQL skips are covered above. Exact-head CI and hosted
+    thread checks remain before merge. CodeRabbit is limit-skipped as authorized.
+  - Closeout: PR #36 head `fedf0f0aa607a305396a66569d843b6db436c5da` passed
+    Application `34096055329` and Documentation `34096055298`. A separate final
+    query confirmed no review threads before merge into `faa8586` on 2026-09-07.
+
 - [x] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
   - Scope: Three late PR #34 findings arrived after its separate merge check
     reported zero threads. Ordinary observer reads now require unique claimed
@@ -1448,6 +1471,14 @@ validation remain separate gates.
     this ledger changed; the already verified desktop/tablet and container
     evidence above applies to unchanged application code. Exact-head CI must
     rerun the complete application workflow before merge.
+  - Integration with merged PR #36 preserves both grant-list metadata and live
+    authorization/delivery regressions. The combined full local gate passes
+    584 workspace/nine harness tests and all 205 PostgreSQL tests. Desktop/tablet
+    full games, all pending choices, reload/exact replay, and input fixtures
+    pass in `test-results/spectator-integrated-grants` and its `-fixtures`
+    directory. Fresh independent review found no actionable defects and reran
+    189 server tests; database skips are covered separately. Exact-head CI and
+    final hosted thread checks remain required after publishing this integration.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

@@ -61,6 +61,17 @@ postgres("PostgreSQL durability", () => {
       );
       if (!issued.ok || !issued.invitation)
         throw new Error("Missing invitation");
+      const grants = await first.getSpectatorGrants(
+        host.credential,
+        host.gameId,
+      );
+      expect(grants).toEqual([
+        {
+          lookup_id: issued.invitation.lookup_id,
+          status: "invited",
+          invitation_expires_at: expect.any(Number),
+        },
+      ]);
       const input = {
         claimId: randomUUID(),
         lookupId: issued.invitation.lookup_id,
@@ -70,6 +81,12 @@ postgres("PostgreSQL durability", () => {
       await first.close();
       firstClosed = true;
       await restarted.migrate();
+      expect(
+        await restarted.getSpectatorGrants(host.credential, host.gameId),
+      ).toEqual([{ ...grants[0], status: "claimed" }]);
+      await expect(
+        restarted.getSpectatorGrants(observer.credential, host.gameId),
+      ).rejects.toThrow();
       expect(await restarted.claimSpectatorInvitation(input)).toEqual(observer);
       const mirroredObserver = () =>
         administration.query(
@@ -154,6 +171,9 @@ postgres("PostgreSQL durability", () => {
       await expect(
         restarted.getAuthorizedSpectatorState(spectatorAuthorization),
       ).rejects.toThrow(/Current spectator access/);
+      expect(
+        await restarted.getSpectatorGrants(host.credential, host.gameId),
+      ).toEqual([]);
       await expect(
         restarted.getSpectatorView(observer.credential, host.gameId),
       ).rejects.toThrow(/Current spectator access/);

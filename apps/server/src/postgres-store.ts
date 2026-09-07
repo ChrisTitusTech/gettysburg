@@ -15,6 +15,7 @@ import {
   type SpectatorView,
   type SpectatorAuthorization,
   type HostManagementCommitOptions,
+  type SpectatorGrantSummary,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -47,6 +48,10 @@ export interface GameService {
   getAuthorizedSpectatorState(
     authorization: SpectatorAuthorization,
   ): Promise<GameState>;
+  getSpectatorGrants(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<readonly SpectatorGrantSummary[]>;
   claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ): Promise<SpectatorClaimResult>;
@@ -157,6 +162,9 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
     return this.service.getAuthorizedSpectatorState(authorization);
+  }
+  async getSpectatorGrants(credential: string | undefined, gameId: string) {
+    return this.service.getSpectatorGrants(credential, gameId);
   }
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
@@ -292,6 +300,11 @@ export class PostgresGameService implements GameService {
   async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
     return this.#read((service) =>
       service.getAuthorizedSpectatorState(authorization),
+    );
+  }
+  async getSpectatorGrants(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.getSpectatorGrants(credential, gameId),
     );
   }
   async claimSpectatorInvitation(

@@ -447,6 +447,22 @@ export function configureHttpApplication(
   );
 
   application.get(
+    "/api/games/:gameId/spectator-grants",
+    async (request, response, next) => {
+      try {
+        response.status(200).json({
+          grants: await gameService.getSpectatorGrants(
+            readSessionCredential(request),
+            request.params.gameId ?? "",
+          ),
+        });
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.get(
     "/api/games/:gameId/spectator",
     async (request, response, next) => {
       try {

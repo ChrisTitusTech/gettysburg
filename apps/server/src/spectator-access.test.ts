@@ -58,6 +58,71 @@ describe("revocable read-only spectator access", () => {
     );
     expect(f.service.authorizeSpectatorDelivery([authorization])).toEqual([]);
   });
+  it("lists only current-game outstanding grants for the current host without secrets", () => {
+    const f = fixture();
+    const guest = f.service.claimInvitation({
+      lookupId: f.host.invitation.lookup_id,
+      secret: f.host.invitation.secret,
+    });
+    const invited = f.issue();
+    const claimed = f.issue();
+    const observer = f.service.claimSpectatorInvitation(claimed);
+    const revoked = f.issue();
+    expect(
+      f.execute("revokeSpectatorInvitation", { lookup_id: revoked.lookupId })
+        .ok,
+    ).toBe(true);
+    const other = f.service.createGame("union");
+    const before = f.service.exportSnapshot();
+    const expires = f.clock.now + 24 * 60 * 60 * 1000;
+    expect(
+      f.service.getSpectatorGrants(f.host.credential, f.host.gameId),
+    ).toEqual([
+      {
+        lookup_id: invited.lookupId,
+        status: "invited",
+        invitation_expires_at: expires,
+      },
+      {
+        lookup_id: claimed.lookupId,
+        status: "claimed",
+        invitation_expires_at: expires,
+      },
+    ]);
+    expect(f.service.exportSnapshot()).toEqual(before);
+    for (const credential of [
+      undefined,
+      guest.credential,
+      observer.credential,
+      other.credential,
+    ])
+      expect(() =>
+        f.service.getSpectatorGrants(credential, f.host.gameId),
+      ).toThrow();
+    expect(
+      f.service.getSpectatorGrants(other.credential, other.gameId),
+    ).toEqual([]);
+    f.clock.now = expires;
+    expect(
+      f.service.getSpectatorGrants(f.host.credential, f.host.gameId),
+    ).toEqual([
+      {
+        lookup_id: claimed.lookupId,
+        status: "claimed",
+        invitation_expires_at: expires,
+      },
+    ]);
+    expect(
+      f.execute("revokeSpectatorAccess", { lookup_id: claimed.lookupId }).ok,
+    ).toBe(true);
+    expect(
+      f.service.getSpectatorGrants(f.host.credential, f.host.gameId),
+    ).toEqual([]);
+    expect(f.execute("deleteGame", { confirm: true }).ok).toBe(true);
+    expect(() =>
+      f.service.getSpectatorGrants(f.host.credential, f.host.gameId),
+    ).toThrow();
+  });
   it("denies orphan or inconsistent grants on ordinary reads, not only replay", () => {
     const f = fixture();
     const observer = f.service.claimSpectatorInvitation(f.issue());

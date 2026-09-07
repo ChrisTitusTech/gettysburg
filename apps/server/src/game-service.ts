@@ -139,6 +139,11 @@ export interface HostManagementCommitOptions {
     revokedSpectatorBindingId?: string,
   ) => void;
 }
+export interface SpectatorGrantSummary {
+  readonly lookup_id: string;
+  readonly status: "invited" | "claimed";
+  readonly invitation_expires_at: number;
+}
 
 export interface StoredAction {
   readonly authorizingId: string;
@@ -1303,6 +1308,31 @@ export class InMemoryGameService {
       state: cloneState(game.state),
       action_log: publicActionLog(game.actions),
     };
+  }
+
+  getSpectatorGrants(
+    credential: string | undefined,
+    gameId: string,
+  ): readonly SpectatorGrantSummary[] {
+    // Authorize and project from the same snapshot. This is host metadata,
+    // not an observer permission check or a way to retrieve bearer secrets.
+    this.authenticateHost(credential, gameId);
+    const now = this.#now();
+    return [...this.#spectatorInvitations.values()]
+      .filter(
+        (invitation) =>
+          invitation.gameId === gameId &&
+          invitation.revokedAt === null &&
+          (invitation.claimedAt !== null || invitation.expiresAt > now),
+      )
+      .map((invitation) => ({
+        lookup_id: invitation.lookupId,
+        status:
+          invitation.claimedAt === null
+            ? ("invited" as const)
+            : ("claimed" as const),
+        invitation_expires_at: invitation.expiresAt,
+      }));
   }
 
   #findActiveSpectatorBinding(
