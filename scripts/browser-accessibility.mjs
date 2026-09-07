@@ -3,9 +3,18 @@ import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { AxeBuilder } from "@axe-core/playwright";
 
+export const ACCESSIBILITY_TAGS = Object.freeze([
+  "wcag2a",
+  "wcag2aa",
+  "wcag21a",
+  "wcag21aa",
+  "wcag22a",
+  "wcag22aa",
+]);
+
 export async function auditAccessibility(page, evidenceDirectory, label) {
   const results = await new AxeBuilder({ page })
-    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .withTags([...ACCESSIBILITY_TAGS])
     .analyze();
   // Do not retain page HTML, private invitation values, or session URLs.
   const summarize = (rules) =>

@@ -1888,6 +1888,11 @@ validation remain separate gates.
 
 ### Accessibility audit increment
 
+Hosted review identified the missing WCAG 2.2 tags required by SPEC.md. Add
+2.2 A/AA to the retained 2.0/2.1 baseline and a regression assertion preventing
+that omission. The two-layout WCAG 2.2 rerun finds no automated violations;
+contrast remains incomplete. This supersedes the earlier narrower tag coverage.
+
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
 widths. Retain only rule IDs, severity, counts, and help URLs, never raw HTML or
