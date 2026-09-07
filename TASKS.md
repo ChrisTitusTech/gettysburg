@@ -2178,6 +2178,11 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+After integrating merged container and key-recovery PRs #45/#51, all local
+gates pass 752 workspace/21 harness tests. Fresh independent review is clean
+and reran 159 web/three consent-harness tests. Browser code is unchanged from
+the recorded final desktop/tablet run; new exact-head CI follows.
+
 PR #50 review follow-up isolates failed lazy notification imports behind a
 small error boundary so optional controls cannot unmount gameplay. The
 synthetic consent fixture now skips before browser mutation when provider
