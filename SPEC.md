@@ -672,7 +672,12 @@ or requested prefixes beyond 10,000 actions return generic `replay_unavailable`.
 Only the mandatory pair currently has a registered interpreted-replay handler.
 Retained tabletop pairs remain resumable but replay returns `version_unavailable`
 until their own handlers are implemented; no mandatory fallback is allowed.
-Replay UI, retained-version coverage, measured capacity/checkpointing, and
+The client exposes read-only opening/previous/next/jump/latest navigation,
+counter inspection for both sides, and recorded combat dice. Replay replaces
+gameplay controls until the player returns to live state; it never routes a
+game command. Closing aborts pending reads, stale responses are ignored, and
+failed authorized reads clear the historical board. Retained-version coverage,
+measured capacity/checkpointing, and
 spectator authorization remain separate implementation/release gates.
 
 Production runs as rootless Podman Quadlet services under the `gettysburg` user.

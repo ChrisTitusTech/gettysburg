@@ -479,6 +479,54 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Deliver read-only replay controls and finish replay acceptance.
+  - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
+    and latest events. Inspect either side, pan/zoom, and read recorded combat
+    dice without routing game commands. Abort pending reads on close and discard
+    stale or failed responses; keep the live room synchronized separately.
+  - Boundary: Mandatory games only until retained-version handlers exist.
+    Deleted games remain inaccessible. Full representative game adjudication,
+    spectator authorization, measured replay capacity, and release gates remain.
+  - Acceptance: Component/API regressions cover navigation, request credentials,
+    abort/failure/mismatched-game responses, and read-only counter inspection.
+    Two real desktop/tablet sessions must traverse historical states and prove
+    that the live server version does not change. Inspect both rendered views,
+    run the full local/database/browser gates, then independent review and CI.
+  - Validation: Full frozen install, formatting, lint, typecheck, 528 workspace
+    tests plus six harness tests, build, smoke, Markdown, and whitespace checks
+    pass. All 158 server tests pass with isolated PostgreSQL. Two-session
+    desktop/tablet replay and the no-contact 24-turn transition check pass in
+    `test-results/replay-viewer-final`; mandatory input fixtures pass in
+    `test-results/replay-viewer-final-fixtures`. Rendered replay views inspected.
+    Fresh independent local Codex review found no actionable regressions and
+    reran all 93 client tests. Exact-head CI and parent PR repairs remain before
+    merge. CodeRabbit is skipped under the owner's limited-plan instruction.
+    Hosted review found that counter selection blocked subsequent map panning,
+    surrender remained visible during replay, and Confederate pending choices
+    lacked markers. Replay now preserves the pan surface after inspection,
+    hides surrender until returning to live play, and marks both sides' recorded
+    retreat/advance choices without enabling commands. Three component tests
+    pass (96 client tests); desktop/tablet browser coverage now checks panning
+    after inspection and surrender visibility. The full local gate passes with
+    536 workspace tests plus six harness tests and all 163 PostgreSQL tests.
+    Desktop/tablet two-session replay, panning, surrender visibility, and
+    no-contact 24-turn checks pass in `test-results/replay-viewer-interactions`;
+    isolated input fixtures pass in `test-results/replay-viewer-interactions-fixtures`.
+    Both rendered replay views were inspected. Fresh independent local review
+    found no actionable regressions and reran all 96 client tests. Exact-head CI
+    and review-thread resolution remain before merge.
+    A further hosted pass found that read-only counter selection still exposed
+    all 253 hexes as focusable move buttons. Replay now suppresses destination
+    roles, move labels, and tab stops while retaining counter inspection and
+    panning. Component checks cover every hex; real desktop/tablet acceptance
+    also checks the destination accessibility tree after selection. The complete
+    local gate passes with 540 workspace plus six harness tests. All 167 server
+    tests passed with PostgreSQL on the unchanged server code in parent PR #27.
+    Both browser suites pass in `test-results/replay-viewer-keyboard` and
+    `test-results/replay-viewer-keyboard-fixtures`, including desktop/tablet
+    replay inspection, panning, no inactive move tab stops, and the no-contact
+    24-turn regression. Fresh independent review found no actionable regressions
+    and reran all 96 client tests. Exact-head CI remains a merge gate.
 - [ ] Expose authorized replay snapshots, then finish replay delivery.
   - Scope: Add a read-only replay endpoint with a strict optional event-sequence
     cursor and current host/seat authorization checked in the same database
@@ -593,6 +641,10 @@ validation remain separate gates.
     the parent-repair merge; owner ChrisTitusTech must retain this as incomplete
     evidence until the latest head's full Application gate passes. Local browser
     fixtures passed without weakening their movement assertions.
+    Superseding activation head `6098981` passed the complete Application gate
+    (`34081759781`) and Documentation gate (`34081759784`). PR #26 merged into
+    main as `eedf574` after independent review and no unresolved threads. This
+    closes the increment's failed-CI follow-up, not representative acceptance.
 - [ ] Verify mandatory replay, then expose authorized replay controls.
   - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
     accepted commands, resolving the historical seat binding and recorded dice.
@@ -706,6 +758,10 @@ validation remain separate gates.
     `test-results/mandatory-replay-retirement-fixtures`. Fresh independent
     review found no actionable regressions and reran 133 server tests; its 12
     database skips are covered above. Exact-head CI remains a merge gate.
+    PR #25 head `c7a2371` passed Application (`34081757381`) and Documentation
+    (`34081757389`) CI, with fresh independent review and no unresolved threads.
+    It merged into main as `c164721`. The authorized API and viewer remain
+    separately reviewed increments; no phase or deployment closeout is implied.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,

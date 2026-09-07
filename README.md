@@ -22,7 +22,7 @@ Phase 2 operational closeout is complete. The newer source candidate uses
 weighted movement, continuous stack activation, reinforcement costs, connected
 terrain defense, retreat/advance, and mandatory night withdrawal. Existing saves
 retain their original rules. Dependency advisories were patched separately.
-The newer candidate has not been deployed by this change; replay delivery,
+The newer candidate has not been deployed by this change; retained-version replay,
 owner gameplay acceptance, and Phase 4 release gates remain open.
 See `TASKS.md` for dated evidence; this is a development deployment, not a claim
 of production readiness.
@@ -100,6 +100,15 @@ edge exits. Advance controls offer legal victorious groups and destinations or
 decline; normal movement spending does not restrict a free advance. Board
 shortcuts remain available. Night guidance names counters that must withdraw.
 All movement and combat choices are coordinate-entry-free.
+
+Choose **View replay** to inspect verified mandatory-game history. Opening,
+previous/next, event-number, and latest controls reconstruct a historical board;
+you can inspect either side and pan/zoom, but cannot move counters or resolve
+combat there. Recorded dice are shown with each combat snapshot. **Return to
+live game** restores the current authoritative view. Closing replay cancels its
+pending request; a failed authorized read clears the displayed snapshot.
+Older tabletop rulesets currently fail closed for replay rather than use newer
+rules, and deleted games remain inaccessible.
 
 ## Local container path
 

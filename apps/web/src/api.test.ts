@@ -1,8 +1,21 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createGame, resumeGame, sendHostCommand } from "./api";
+import { createGame, getReplay, resumeGame, sendHostCommand } from "./api";
 
 describe("API requests", () => {
+  it("requests an authorized replay cursor with same-origin credentials", async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(JSON.stringify({ sequence: 0 }), { status: 200 }),
+      );
+    vi.stubGlobal("fetch", fetcher);
+    await getReplay("game/id", 0);
+    expect(fetcher).toHaveBeenCalledWith(
+      "/api/games/game%2Fid/replay?sequence=0",
+      expect.objectContaining({ credentials: "same-origin" }),
+    );
+  });
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
