@@ -13,6 +13,19 @@ const EVENT: ManagementEvent = {
 };
 
 describe("GameEventBus", () => {
+  it("delivers private revocation metadata separately and only to the matching game", () => {
+    const bus = new GameEventBus();
+    const listener = vi.fn();
+    const unrelated = vi.fn();
+    bus.subscribeManagement("game", listener);
+    bus.subscribeManagement("other", unrelated);
+    bus.publishManagement("game", EVENT, "private-binding");
+    expect(listener).toHaveBeenCalledWith(EVENT, "private-binding");
+    expect(listener.mock.calls[0]![0]).not.toHaveProperty(
+      "revokedSpectatorBindingId",
+    );
+    expect(unrelated).not.toHaveBeenCalled();
+  });
   it("keeps a replacement subscription when an old disposer runs twice", () => {
     const bus = new GameEventBus();
     const first = vi.fn();

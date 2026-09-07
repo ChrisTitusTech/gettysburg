@@ -594,8 +594,12 @@ export function configureHttpApplication(
           authorization,
           request.body,
           {
-            afterCommit: (event) =>
-              options.eventBus?.publishManagement(gameId, event),
+            afterCommit: (event, revokedSpectatorBindingId) =>
+              options.eventBus?.publishManagement(
+                gameId,
+                event,
+                revokedSpectatorBindingId,
+              ),
           },
         );
         response.status(200).json(result);

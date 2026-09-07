@@ -36,6 +36,28 @@ function fixture() {
 }
 
 describe("revocable read-only spectator access", () => {
+  it("uses current session expiry for saved room authorization after a legitimate renewal", () => {
+    const f = fixture();
+    const observer = f.service.claimSpectatorInvitation(f.issue());
+    const authorization = f.service.authenticateSpectator(
+      observer.credential,
+      f.host.gameId,
+    );
+    f.clock.now = observer.sessionExpiresAt - 1000;
+    const renewed = f.service.createGame("union", observer.credential);
+    f.clock.now = observer.sessionExpiresAt + 1000;
+    expect(f.service.getAuthorizedSpectatorState(authorization).game_id).toBe(
+      f.host.gameId,
+    );
+    expect(f.service.authorizeSpectatorDelivery([authorization])).toEqual([
+      authorization.bindingId,
+    ]);
+    f.clock.now = renewed.sessionExpiresAt;
+    expect(() => f.service.getAuthorizedSpectatorState(authorization)).toThrow(
+      /Current spectator access/,
+    );
+    expect(f.service.authorizeSpectatorDelivery([authorization])).toEqual([]);
+  });
   it("lists only current-game outstanding grants for the current host without secrets", () => {
     const f = fixture();
     const guest = f.service.claimInvitation({
@@ -275,6 +297,15 @@ describe("revocable read-only spectator access", () => {
       observer.credential,
       f.host.gameId,
     );
+    expect(f.service.getAuthorizedSpectatorState(authorization)).toEqual(
+      before,
+    );
+    expect(() =>
+      f.service.getAuthorizedSpectatorState({
+        ...authorization,
+        bindingVersion: authorization.bindingVersion + 1,
+      }),
+    ).toThrow(/Current spectator access/);
     const command = {
       command_id: randomUUID(),
       game_id: f.host.gameId,
@@ -352,9 +383,16 @@ describe("revocable read-only spectator access", () => {
     const input = f.issue();
     const observer = f.service.claimSpectatorInvitation(input);
     f.clock.now += 2 * 24 * 60 * 60 * 1000;
+    const authorization = f.service.authenticateSpectator(
+      observer.credential,
+      f.host.gameId,
+    );
     expect(
       f.execute("revokeSpectatorAccess", { lookup_id: input.lookupId }).ok,
     ).toBe(true);
+    expect(() => f.service.getAuthorizedSpectatorState(authorization)).toThrow(
+      /Current spectator access/,
+    );
     expect(() =>
       f.service.getSpectatorView(observer.credential, f.host.gameId),
     ).toThrow(/Current spectator access/);

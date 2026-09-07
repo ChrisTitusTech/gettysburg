@@ -1341,7 +1341,7 @@ validation remain separate gates.
 
 ### Phase 4
 
-- [ ] Add browser host controls for spectator refresh and revocation.
+- [x] Add browser host controls for spectator refresh and revocation.
   - Scope: Host-only metadata panel, current-status refresh before revocation,
     existing audited/idempotent host command flow, reload, safe stale-response
     handling, and visible retry errors. No bearer secret display. Link creation
@@ -1401,6 +1401,10 @@ validation remain separate gates.
     tests. Publish the repair, resolve the hosted thread, and verify exact-head
     CI before merge; no release or deployment gate is waived.
 
+  - Closeout: PR #38 head `d777b118989497d5a19667d3b59136af6768d5ff`
+    passed Application `34099758984` and Documentation `34099759057`.
+    A separate final query confirmed its hosted finding resolved before merge
+    as `8befe40367df647ebf66071a84b1ed5f6ad0f626` on 2026-09-07.
 - [x] Add the host-only spectator grant-list API.
   - Scope: One authorized snapshot read returns outstanding invitation IDs,
     invited/claimed status, and invitation expiry, without secrets or identities.
@@ -1424,7 +1428,7 @@ validation remain separate gates.
     Application `34096055329` and Documentation `34096055298`. A separate final
     query confirmed no review threads before merge into `faa8586` on 2026-09-07.
 
-- [ ] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
+- [x] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
   - Scope: Three late PR #34 findings arrived after its separate merge check
     reported zero threads. Ordinary observer reads now require unique claimed
     invitation/binding/session links and an actual issuance event, not only a
@@ -1448,8 +1452,175 @@ validation remain separate gates.
     and input fixtures pass in `test-results/spectator-integrity` and its
     `-fixtures` directory. Fresh independent review found no actionable
     regressions and reran 181 server tests; its 16 database skips are covered
-    above. Exact-head CI and hosted thread resolution remain before merge.
-- [ ] Add private read-only spectator claims and revocable HTTP/replay access.
+    above. PR #35 head `8aec76dbb1d834174c527b3d6dafc52b9085193e` passed
+    Application run `34094183774` and Documentation run `34094183846`.
+    All three late PR #34 threads were resolved; a separate final PR #35 check
+    found no review threads before merge `823e41d6cfdc4c1758b6d708ba86c699f68cf3a9`.
+    CodeRabbit was limit-skipped as authorized. No VPS rollout occurred.
+- [ ] Add live read-only spectator room authorization and immediate revocation.
+  - Scope: Explicit observer role, repeated authorization at join and before
+    broadcast batches, one shared room for two players/eight observers plus
+    reload overlap, command rejection, expiry, and fail-closed reads. Private
+    revocation metadata publishes only after commit and never enters public
+    event/results. Delayed notifications cannot bypass a fresh binding check.
+  - Boundary: Host grant-list controls, spectator UI, three-browser desktop and
+    tablet acceptance, and measured VPS capacity still follow. Owner:
+    ChrisTitusTech. No new production deployment or schema migration.
+  - Validation plan: Room tests cover eight simultaneous observers, shared
+    state, reload replacement, every command denial, revocation/deletion,
+    expiry, and delayed notifications. PostgreSQL failure injection must keep
+    access active and publish nothing; successful revoke/retry must publish
+    exactly once. Run full local/database/browser gates, independent review,
+    and exact-head CI before merging.
+    Initial test failures were fixture errors: the second command used the
+    prior side after the turn changed; the expiry restore used a different
+    credential pepper and then counted its already-sent initial snapshot.
+    Fixtures now use the active side, preserve the pepper, and distinguish
+    initial from later state. One initial PostgreSQL run failed on that same
+    expiry fixture despite its persistence tests passing; rerun is required.
+    Independent review then reproduced out-of-order broadcasts when concurrent
+    authorization reads completed in reverse order. A per-room delivery queue
+    now preserves invocation order; regression coverage delays the first read
+    and proves a failed read skips observer delivery without stalling players
+    or later authorized batches. Fresh validation and review are required.
+    A second review reproduced a reconnect receiving its latest initial state
+    before older queued batches. Per-client sequence cutoffs now suppress all
+    pre-join batches and duplicate/older deliveries; the delayed-read test also
+    joins a new client and proves its state never rewinds. Fresh full gates and
+    independent review remain required for the transport increment.
+    The next full gate passed 581 workspace/nine harness and 202 PostgreSQL
+    tests; desktop/tablet games and fixtures passed in
+    `test-results/spectator-reconnect-cutoffs` and its `-fixtures` directory.
+    A third independent review nevertheless reproduced an update lost during
+    a delayed initial snapshot read. Initial reads now share the delivery
+    queue, retaining later batches until initialization finishes; a regression
+    holds an older snapshot while update/deletion events arrive and verifies
+    ordered delivery after release. Fresh full validation and review are required.
+    That rerun passed 582 workspace/nine harness and 203 PostgreSQL tests;
+    desktop/tablet full games, all three choices, reload/replay, and input
+    fixtures passed in `test-results/spectator-join-queue` and its `-fixtures`
+    directory. Review then found that read failures could strand an observer
+    on stale state without another event to trigger gap recovery. Failed reads
+    now close affected sockets with retryable code 4002 without retiring their
+    binding; tests prove player delivery continues and a fresh observer join
+    recovers current state. Full gates and fresh review must pass again.
+  - Final local validation: Frozen install, format, lint, typecheck, 582
+    workspace/nine harness tests, build, smoke, Markdown and whitespace pass.
+    All 203 PostgreSQL tests pass. Desktop/tablet full games, all pending
+    choices, reload/exact replay, and input fixtures pass in
+    `test-results/spectator-read-recovery` and its `-fixtures` directory.
+    Fresh independent review found no actionable regressions and reran 187
+    server tests plus typecheck; its 16 database skips are covered above.
+    Exact-head CI and hosted thread checks remain before merge. CodeRabbit is
+    limit-skipped as authorized. Runtime dependency audit reports no known
+    vulnerabilities; container scanning remains open (Trivy is not installed
+    locally; owner ChrisTitusTech, follow-up: provision a verified scanner and
+    scan the final immutable release image). No VPS change occurred.
+  - PR #37 initial head `c92be8d4e21a52b41613a760d23f27c012c5f55d` failed
+    Application run `34096300104`: a legacy retry test required the entire
+    Set-Cookie header to stay byte-identical even when remaining Max-Age correctly
+    decreased by one second. Creation and observer retry assertions now compare
+    unchanged cookie identity/security attributes and a positive non-increasing
+    lifetime; the frozen-clock one-hour expiry regression remains exact.
+    Other warnings were action-runtime deprecations, isolated test-database trust
+    and locale setup, or deliberate authorization/failure injection. Later build,
+    browser and container CI steps were skipped, not passed. Local container
+    smoke on that head passed non-root 1000:1000, PostgreSQL restart/resume,
+    fail-closed readiness, and clean shutdown. OCI ignores the image HEALTHCHECK;
+    the tested runtime/Quadlet supplies its explicit health command. Fresh local
+    validation, independent review, and exact-head CI are required for the repair.
+    Repair validation passes the complete local gate (582 workspace/nine harness
+    tests), all 203 PostgreSQL tests, and fresh independent review (187 server
+    tests; its database skips are covered separately). Only test assertions and
+    this ledger changed; the already verified desktop/tablet and container
+    evidence above applies to unchanged application code. Exact-head CI must
+    rerun the complete application workflow before merge.
+  - Integration with merged PR #36 preserves both grant-list metadata and live
+    authorization/delivery regressions. The combined full local gate passes
+    584 workspace/nine harness tests and all 205 PostgreSQL tests. Desktop/tablet
+    full games, all pending choices, reload/exact replay, and input fixtures
+    pass in `test-results/spectator-integrated-grants` and its `-fixtures`
+    directory. Fresh independent review found no actionable defects and reran
+    189 server tests; database skips are covered separately. Exact-head CI and
+    final hosted thread checks remain required after publishing this integration.
+  - Hosted review found four additional transport issues: abandoned reads could
+    stall the delivery queue, a read begun before revocation could authorize
+    a later send, observer denials bypassed command accounting, and full-room
+    matchmaking could create a second room. Delivery now holds a PostgreSQL
+    shared canonical-row lock through its synchronous send callback, bounds
+    reads to two seconds, cancels abandoned joins/late callbacks, discards
+    cancelled read connections, counts denied observer commands, and rejects
+    second-room creation for the same game. Regressions hold a real read lock
+    against a concurrent revocation, cancel it to prove lock release, exercise
+    queue recovery, and force locked-room matchmaking. An initial new test
+    typecheck required wrapping Colyseus's void-or-Promise callback return in
+    Promise.resolve. Full local/database/browser gates and fresh independent
+    review remain before publishing and resolving all four hosted threads.
+  - Follow-up validation: The complete local gate passed 588 workspace/nine
+    harness tests and all 211 PostgreSQL tests. Desktop/tablet full games,
+    all three combat choices, reload/exact replay, and input fixtures passed
+    in `test-results/spectator-locked-delivery` and its `-fixtures` directory.
+    Independent review then found Colyseus defers onLeave until onJoin settles;
+    cancellation now observes the transport close event and removes its listener
+    afterward. A real-socket integration regression closes a pending join and
+    proves cancellation before the two-second deadline, with existing gameplay
+    still progressing. The prior direct-onLeave test now emits socket close.
+    Focused room tests (17) and typecheck pass; fresh full gates/review follow.
+    The socket repair passed the complete local gate (589 workspace/nine
+    harness tests), all 212 PostgreSQL tests, and fresh independent review
+    (194 server tests/typecheck; database skips covered separately).
+    Prior exact-head Application `34097525230` failed the same existing
+    nine-command PostgreSQL replay/restart test's five-second timeout as PR #38;
+    other 204 server tests passed and later workflow gates were skipped. Apply
+    PR #38's reviewed bounded 15-second integration-test budget here too, without
+    relaxing any runtime limit or assertion. Reverify before publication.
+    Reverification passes the full local gate (589 workspace/nine harness),
+    all 212 PostgreSQL tests, and fresh independent review (194 server tests;
+    its 18 database skips are covered separately). Desktop/tablet full games
+    with all three choices, pending-result reload, exact replay, and input
+    fixtures pass in `test-results/spectator-socket-cancellation` and its
+    `-fixtures` directory. Exact-head CI and hosted-thread resolution remain
+    before merge; CodeRabbit limits remain explicitly skipped as authorized.
+  - After PR #38 merged, integration preserved its host controls and the
+    reviewed replay-test budget. Prior transport head `b2005da` passed
+    Application `34100112543` and Documentation `34100112470`. A further hosted
+    review identified the pool-wide connection timeout and an uncancelled
+    room-creation read. The two-second deadline now remains room-specific;
+    ordinary service pool checkouts retain their prior behavior. Room creation
+    uses the same cancellable read helper and discards a timed-out connection.
+    Tests verify a cancelled creation releases its PostgreSQL lock and allows
+    a new room attempt. A void-or-Promise hook test needed Promise.resolve
+    before typecheck. Repeat full gates/review and resolve both new threads
+    after publication; these findings prevent merge until then.
+    Repair validation passes the full local gate (596 workspace/nine harness
+    tests), all 214 PostgreSQL tests, and fresh independent review (six focused
+    room tests and server typecheck; database checks covered separately).
+    Desktop/tablet full games, all three choices on tablet, pending-result
+    reload/exact replay, and input fixtures pass in
+    `test-results/spectator-room-create-cancellation` and its `-fixtures`
+    directory. Publish the repair, resolve both hosted threads, and verify
+    exact-head CI before merge.
+  - Transport head `920fcf6` passed Application `34101969268` and Documentation
+    `34101969314`, but the final premerge thread check found queued delivery
+    checkouts could outlive cancellation and command success preceded the
+    delayed snapshot. Merge remains blocked. The repair isolates delivery
+    reads in a two-connection pool with a two-second checkout timeout and sends
+    successful committed results after the broadcast. Regression coverage
+    holds every delivery connection while cancelled queued reads expire and
+    ordinary operations succeed, and holds spectator authorization while
+    checking snapshot-before-success ordering over a real socket. Full local,
+    database, browser, fresh review, and exact-head CI evidence is pending.
+    Repair validation now passes the full local gate (596 workspace/nine
+    harness tests), all 215 PostgreSQL tests, and fresh independent review
+    (195 server tests; its database skips are covered separately). Both desktop
+    and tablet completed 24 turns, all three combat choices, pending-result
+    reload, and exact replay in `test-results/spectator-delivery-isolation`.
+    An initial test typing error used an overloaded connect return type;
+    explicit PoolClient typing fixed it before the passing gates. Input
+    fixtures also pass in `test-results/spectator-delivery-isolation-fixtures`.
+    Publish the repair, resolve the two findings, and verify exact-head CI and
+    final threads before merge.
+- [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host
     revocation. Preserve legitimate host/seat bindings in a shared browser;
@@ -1490,7 +1661,13 @@ validation remain separate gates.
     reload, and exact replay. Fresh independent review found no actionable
     regressions and reran typecheck, 178 server tests, and whitespace; its 16
     database skips are covered above. New-head CI remains pending publication.
-- [ ] Add audited host-managed spectator invitations.
+  - Closeout: PR #34 merged as `e96d0b4c4e5fc846adb366994b5a79f59966423a`.
+    Exact head `fe303d2f209c1f11c1f2c0524741907662d08579` passed Application
+    run `34091466954` and Documentation run `34091466950`; the separate final
+    thread check showed no unresolved feedback. The old-head Application run
+    `34090715262` was superseded/cancelled, not passed. PR #33's two late
+    findings are addressed by this merge and their threads are resolved.
+- [x] Add audited host-managed spectator invitations.
   - Scope: Separate 24-hour spectator invitations from player invitations;
     cap outstanding grants at eight, preserve command-id retries with sealed
     secrets, and support host-only issue/revoke events without gameplay-version
@@ -1529,6 +1706,11 @@ validation remain separate gates.
     found no actionable regressions and reran 170 server tests/whitespace;
     its 15 database skips are covered above. Exact-head CI and thread resolution
     remain required before merge; Phase 4 remains open.
+  - Closeout: PR #33 merged as `0ec4c9acd4558c1fb0a38f7c4843ac8bcb635664`
+    after exact-head Application `34090157566` and Documentation `34090157565`
+    passed. Its two late findings and merge-gate failure are explicitly tracked
+    and corrected in the PR #34 closeout above; this is not a clean initial
+    review claim. The bounded invitation/API tasks are complete, not Phase 4.
 - [x] Consolidate ordinary resume into one authorized snapshot read.
   - Scope: Replace the response's four/five independent snapshot hydrations with
     one read for current host/seat access, public action events, host-only
@@ -1590,6 +1772,15 @@ validation remain separate gates.
     `test-results/spectator-link-create` and its `-fixtures` directory. Desktop
     covered retreat/loss; tablet loss/advance. Exact-head CI and final thread
     checks remain before merge. CodeRabbit is limit-skipped as authorized.
+  - Integrating transport head `8078ad4` passes the full local gate (599
+    workspace/nine harness tests), with its 215 PostgreSQL tests covering
+    unchanged backend code. Desktop/tablet full games, pending-result reload,
+    exact replay, and input fixtures pass in
+    `test-results/spectator-link-transport-integration` and its `-fixtures`
+    directory; tablet covers all three choices. Fresh review found a transport
+    handshake authorization gap, also reproduced by the combined observer
+    review. Keep this local integration unpublished until the base repair,
+    fresh review, and exact-head CI clear; no merge readiness is claimed.
 
 ## Phase 0 completion gate
 
