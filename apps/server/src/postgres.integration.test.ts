@@ -1340,7 +1340,9 @@ postgres("PostgreSQL durability", () => {
       { kind: "gameplay", sequence: 2 },
     ]);
     await resumedAgain.close();
-  });
+    // Three migrations plus durable invitation/seat writes exceed the default
+    // five-second unit-test budget on shared CI runners.
+  }, 15_000);
 
   it("persists soft deletion and terminal host retry across restart", async () => {
     const first = new PostgresGameService({
