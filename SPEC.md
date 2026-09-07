@@ -1046,6 +1046,19 @@ counter, and explanatory assets.
 
 ## Performance and compatibility
 
+The notification-only service worker never intercepts requests or caches game
+or session responses. It accepts bounded, schema-validated opaque game/event IDs,
+displays generic text, and opens only a constructed same-origin game route;
+normal session authorization still controls access. Stable delivery-ID tags and
+`renotify: false` coalesce retries into one existing notification card. Every
+valid push calls the display API as required by browsers; a retry after dismissal
+can reappear, so exactly-once delivery is not promised. No delivery metadata is
+cached. Registration and provider subscription require the
+separate explicit opt-in workflow. Browser behavior follows the
+[push event API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/push_event)
+and [notification click API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/notificationclick_event),
+including [WebKit's visible-notification requirement](https://webkit.org/blog/12945/meet-web-push/).
+
 - Support current stable Chrome/Chromium, Firefox, and Safari releases.
 - A board interaction should provide visual feedback within 100 ms on supported
   desktop hardware; accepted network commands should normally appear to both

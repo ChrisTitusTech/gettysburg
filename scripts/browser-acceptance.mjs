@@ -11,6 +11,7 @@ import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { runEnforcedGame } from "./browser-enforced-game.mjs";
 import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
+import { checkPushWorker } from "./browser-push-worker.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -512,6 +513,7 @@ try {
 
   await waitForReadiness(origin, () => output);
   browser = await chromium.launch({ headless: true });
+  await checkPushWorker(origin);
   await runScenario(browser, origin, {
     hostName: "Confederate",
     inputMode: "keyboard",

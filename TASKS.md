@@ -2010,6 +2010,32 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+The next browser increment supplies a notification-only service worker without
+registering it in the product yet. Generic messages, strict payload validation,
+same-origin click destinations, serial processing, and stable notification tags
+coalesce duplicate retries. Initial independent review found that suppressing
+display from a receipt cache violates browsers' user-visible-push requirement.
+Remove that cache and display every valid event with the same tag and no
+renotification; a retry after dismissal can reappear. The browser harness
+explicitly installs the worker in
+a task-owned context and synthesizes events without contacting a push provider.
+Full gates, real-browser validation, and independent review follow. Explicit
+consent UI, real provider/device checks, encrypted key backup/restore, and release
+approval remain open; no deployed key or subscription is created.
+The first native-worker browser check failed because Playwright's minimal
+headless shell reports notification permission denied despite a granted
+Permissions API state. A focused probe proves full Chromium grants both;
+the notification fixture now launches that channel separately. The initial
+harness lint also required qualifying the worker-only `self.PushEvent` global.
+The corrected installed-worker fixture passes actual notification display,
+stable-tag coalescing, and unsafe-payload rejection in full Chromium. Both
+desktop/tablet 24-turn games, pending-result reload, exact replay, observer flows,
+and input fixtures pass in `test-results/push-service-worker` and its `-fixtures`
+directory. Desktop covers loss/advance and tablet retreat/advance. Full local
+gates pass 739 workspace/nine harness tests; fresh independent review is clean
+and reran all 14 focused worker tests. Backend code is unchanged from startup's
+329-test PostgreSQL gate. Exact-head CI and real provider/device checks remain.
+
 Optional push startup configuration is the next small increment. An explicit
 `GETTYSBURG_PUSH_VAPID_FILE` enables the worker only after migrations/readiness;
 without it, push stays disabled. The loader requires an owned regular 0600 file,
