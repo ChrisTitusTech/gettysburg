@@ -1600,6 +1600,26 @@ validation remain separate gates.
     `test-results/spectator-room-create-cancellation` and its `-fixtures`
     directory. Publish the repair, resolve both hosted threads, and verify
     exact-head CI before merge.
+  - Transport head `920fcf6` passed Application `34101969268` and Documentation
+    `34101969314`, but the final premerge thread check found queued delivery
+    checkouts could outlive cancellation and command success preceded the
+    delayed snapshot. Merge remains blocked. The repair isolates delivery
+    reads in a two-connection pool with a two-second checkout timeout and sends
+    successful committed results after the broadcast. Regression coverage
+    holds every delivery connection while cancelled queued reads expire and
+    ordinary operations succeed, and holds spectator authorization while
+    checking snapshot-before-success ordering over a real socket. Full local,
+    database, browser, fresh review, and exact-head CI evidence is pending.
+    Repair validation now passes the full local gate (596 workspace/nine
+    harness tests), all 215 PostgreSQL tests, and fresh independent review
+    (195 server tests; its database skips are covered separately). Both desktop
+    and tablet completed 24 turns, all three combat choices, pending-result
+    reload, and exact replay in `test-results/spectator-delivery-isolation`.
+    An initial test typing error used an overloaded connect return type;
+    explicit PoolClient typing fixed it before the passing gates. Input
+    fixtures also pass in `test-results/spectator-delivery-isolation-fixtures`.
+    Publish the repair, resolve the two findings, and verify exact-head CI and
+    final threads before merge.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

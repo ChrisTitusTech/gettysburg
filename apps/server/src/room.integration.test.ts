@@ -267,8 +267,9 @@ describe("Colyseus authoritative room", () => {
     });
     const port = await reservePort();
     const origin = `http://127.0.0.1:${port}`;
+    const asyncService = new InMemoryAsyncGameService(service);
     server = createGettysburgServer({
-      gameService: new InMemoryAsyncGameService(service),
+      gameService: asyncService,
       readiness: { isReady: () => true },
       trustedWebSocketOrigin: origin,
     });
@@ -346,8 +347,41 @@ describe("Colyseus authoritative room", () => {
       nextMessage<GameState>(room, "snapshot", (state) => state.version === 1),
     );
     const firstCommand = nextMessage<CommandResult>(hostRoom, "commandResult");
-    hostRoom.send("endPhase", hostCommand("endPhase"));
-    expect(await firstCommand).toMatchObject({ ok: true });
+    const order: string[] = [];
+    const stopSnapshot = hostRoom.onMessage<GameState>("snapshot", (state) => {
+      if (state.version === 1) order.push("snapshot");
+    });
+    const stopResult = hostRoom.onMessage<CommandResult>(
+      "commandResult",
+      (result) => {
+        if (result.ok) order.push("result");
+      },
+    );
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const authorize =
+      asyncService.deliverAuthorizedSpectators.bind(asyncService);
+    const held = vi
+      .spyOn(asyncService, "deliverAuthorizedSpectators")
+      .mockImplementationOnce(async (...args) => {
+        await barrier;
+        return authorize(...args);
+      });
+    try {
+      hostRoom.send("endPhase", hostCommand("endPhase"));
+      await vi.waitFor(() => expect(held).toHaveBeenCalledOnce());
+      expect(order).toEqual([]);
+      release();
+      expect(await firstCommand).toMatchObject({ ok: true });
+      expect(order).toEqual(["snapshot", "result"]);
+    } finally {
+      release();
+      held.mockRestore();
+      stopSnapshot();
+      stopResult();
+    }
     const synchronized = await Promise.all(snapshots);
     for (const state of synchronized)
       expect(state).toEqual(service.getGameState(host.gameId));

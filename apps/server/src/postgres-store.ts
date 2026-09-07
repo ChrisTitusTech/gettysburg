@@ -310,6 +310,7 @@ export class InMemoryAsyncGameService implements GameService {
 
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
+  readonly #deliveryPool: Pool;
   readonly #pepper: Uint8Array;
   async verifyRoomGame(gameId: string, signal: AbortSignal) {
     await this.#readForDelivery((service) => {
@@ -371,6 +372,12 @@ export class PostgresGameService implements GameService {
     this.#pool = new Pool({
       connectionString: options.connectionString,
       max: 10,
+    });
+    // Bound queued room reads without timing out ordinary gameplay checkouts.
+    this.#deliveryPool = new Pool({
+      connectionString: options.connectionString,
+      max: 2,
+      connectionTimeoutMillis: 2_000,
     });
     this.#pepper = options.pepper;
   }
@@ -485,7 +492,7 @@ export class PostgresGameService implements GameService {
   }
 
   async close(): Promise<void> {
-    await this.#pool.end();
+    await Promise.all([this.#pool.end(), this.#deliveryPool.end()]);
   }
 
   async canRetryTerminalDelete(
@@ -704,7 +711,8 @@ export class PostgresGameService implements GameService {
     operation: (service: InMemoryGameService) => void,
     signal: AbortSignal,
   ): Promise<void> {
-    const client = await this.#pool.connect();
+    if (signal.aborted) throw new Error("Room delivery was cancelled.");
+    const client = await this.#deliveryPool.connect();
     let released = false;
     const discard = () => {
       if (!released) {
