@@ -1929,6 +1929,55 @@ validation remain separate gates.
     `test-results/alpine-host-input-fixtures`. Exact-head CI and final release
     image scanning remain open; this does not complete the release gate.
 
+### Browser push foundation
+
+Integration evidence: PR #41 head `19ba6e8` passed Application `34102616922`
+and Documentation `34102617045`. With the reviewed transport handshake repair,
+the full local gate passes 608 workspace/nine harness tests and all 227
+PostgreSQL tests. Fresh independent review found no actionable defects and
+reran 207 server tests. The helper still has no runtime caller or sender;
+unchanged browser behavior is covered by the transport's desktop/tablet full
+games and input fixtures in `test-results/spectator-handshake-authorization`
+and its `-fixtures` directory. Publish the integration and verify exact-head
+CI, final review threads, and merge the transport base before this PR.
+
+The pending-ack isolation repair is integrated. Full local gates pass 611
+workspace/nine harness tests and all 231 PostgreSQL tests. Fresh independent
+review against the repaired transport found no actionable defects and reran
+210 server tests. The policy still has no runtime caller; unchanged browser
+paths are covered by full desktop/tablet games and input fixtures in
+`test-results/spectator-pending-ack-isolation` and its `-fixtures` directory.
+The prior policy head `a14fa93` passed Application `34105754831` and
+Documentation `34105754816`; this integration requires new exact-head checks.
+
+- [ ] Add deterministic turn-notification targeting.
+  - Scope: Pure server policy for consecutive compatible mandatory-game
+    snapshots. Notify the other seat only when a newly required decision
+    appears, including combat choices and ending combat after the opponent's
+    last choice. Coalesce multiple new decisions to one intent per recipient.
+    Ignore routine moves, duplicates, non-gameplay events, completed games,
+    and incompatible snapshots. No state mutation or outbound delivery.
+  - Validation plan: Table-driven targeting, all three pending choices,
+    duplicate/order independence, end-combat handoff, completed/version guards,
+    and input preservation. Full local/database/browser gates, independent
+    review, exact-head CI, and final thread checks before merge. Owner:
+    ChrisTitusTech. This foundation alone does not enable browser notifications.
+  - Validation: Eight focused cases pass. Full local gates pass 604 workspace
+    tests/nine harness tests; all 222 PostgreSQL tests pass. Fresh independent
+    review found no actionable defects and reran 203 server tests; its 19
+    database skips are covered separately. This helper has no runtime caller
+    yet, and the unchanged browser/runtime paths retain the full desktop/tablet
+    evidence in `test-results/spectator-room-create-cancellation` and its
+    `-fixtures` directory. Exact-head CI must run the complete application
+    workflow before merge. Actual push delivery remains explicitly unverified.
+- [ ] Add protected opt-in subscriptions and browser permission controls.
+- [ ] Persist and dispatch authorized notification intents through a durable
+  outbox, with bounded delivery, safe provider endpoints, retries, opt-out,
+  expiration, and deletion retention.
+- [ ] Verify actual push delivery, opt-out, permission denial, click navigation,
+  and iOS/iPadOS Home Screen setup on supported devices. The platform guidance
+  linked in SPEC.md is preparation, not evidence of completed acceptance.
+
 ### Host spectator link creation
 
 Final transport integration: the full local gate passes 606 workspace/nine
