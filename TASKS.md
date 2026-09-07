@@ -2030,6 +2030,16 @@ also now waits for the application's real return-to-lobby URL. Full local gates
 pass 750 workspace/nine harness tests; independent review is clean (157 web
 tests). The build reports a 502.81 kB initial chunk (149.02 kB gzip); record this
 performance follow-up rather than raising the warning threshold.
+The final UI loads notification controls on demand, lowering the entry chunk
+to 500.43 kB (148.40 kB gzip) plus a 3.93 kB control chunk; the remaining warning
+stays visible. After integration, the full gate still passes 750 workspace/nine
+harness tests, and fresh independent review reran all 157 web tests cleanly.
+Both desktop/tablet final consent flows, 24-turn games, reload, exact replay,
+observer flows, and input fixtures pass in `test-results/push-consent-final`
+and its `-fixtures` directory; tablet covers all three combat choices and
+desktop loss/advance. Both rendered consent panels were inspected for wrapping
+and readable controls. Backend code is covered by startup's 329 PostgreSQL
+tests. Exact-head CI and actual provider/device acceptance remain open.
 
 The next browser increment supplies a notification-only service worker without
 registering it in the product yet. Generic messages, strict payload validation,

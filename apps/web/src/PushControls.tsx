@@ -108,7 +108,7 @@ export function PushControls({ gameId }: { readonly gameId: string }) {
         {problem === null ? null : <p>{problem}</p>}
         <p role="status">{message}</p>
       </div>
-      <div className="button-row">
+      <div className="push-actions">
         <button
           disabled={
             busy || !config?.enabled || status === null || problem !== null
