@@ -32,7 +32,7 @@ diff --git a/src/transport/WebSocketTransport.ts b/src/transport/WebSocketTransp
 index 83a4782d78e86667142be24eb59a139f7b95a33b..a778f9f9a3871fd434f517a008f0d4ea6bacfea8 100644
 --- a/src/transport/WebSocketTransport.ts
 +++ b/src/transport/WebSocketTransport.ts
-@@ -27,7 +27,9 @@ export class WebSocketTransport implements ITransport {
+@@ -27,6 +27,8 @@ export class WebSocketTransport implements ITransport {
       * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
       */
      public connect(url: string, headers?: any): void {
@@ -42,4 +42,3 @@ index 83a4782d78e86667142be24eb59a139f7b95a33b..a778f9f9a3871fd434f517a008f0d4ea
 +        } else try {
              // Node or Bun environments (supports custom headers)
              this.ws = new WebSocket(url, { headers, protocols: this.protocols });
- 

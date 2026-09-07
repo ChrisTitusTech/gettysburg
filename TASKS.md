@@ -1964,6 +1964,16 @@ Full local gates pass 755 workspace/24 harness tests, and Chromium input fixture
 pass in `test-results/transport-fixed-fixtures`. Fresh independent review found
 no actionable regressions and reran five focused regression tests. Exact-head
 CI still must replace the failed WebKit run before this increment can merge.
+After integrating the WCAG 2.2 increment, all three engines pass the two-layout
+consent/reconnect/replay/spectator and accessibility checks in
+`test-results/chromium-accessibility`, `test-results/firefox-accessibility`, and
+`test-results/webkit-accessibility`. Contrast remains the sole incomplete axe
+rule. Earlier full-game and input evidence above is retained; exact-head CI
+reruns complete games on the integrated source. Full local gates pass 755
+workspace/25 harness tests. Independent review caught a whitespace-only final
+patch context line; remove it and refresh the pnpm patch hash without changing
+patched runtime code. Frozen install, all local gates, event-range whitespace,
+and a fresh five-test independent review pass. No actionable findings remain.
 
 ### Accessibility audit increment
 
