@@ -1924,8 +1924,10 @@ all 322 PostgreSQL tests pass, including cancellation under a held write lock,
 unchanged idle polls, and current-lease dispatch authorization. Fresh independent
 review found no actionable defects and reran four worker tests/typecheck. Initial
 lint rejected two unused test parameters; removing them and rerunning the full
-gate passed. Fresh desktop/tablet browser acceptance and exact-head CI remain
-before publication/merge. No runtime worker has been enabled on the VPS.
+gate passed. Fresh desktop/tablet 24-turn games, loss/advance, pending-result
+reload, exact replay, and input fixtures pass in `test-results/push-worker` and
+its `-fixtures` directory; prior provider runs cover retreat at both widths.
+Exact-head CI remains before merge. No runtime worker has been enabled on the VPS.
 
 Provider transport follow-up is in progress as a separate small PR. It uses
 `web-push` 3.6.7 for standard encrypted/VAPID request details and Node HTTPS for
