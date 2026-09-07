@@ -860,6 +860,25 @@ deletion, or failed current-access verification clears the board and replay.
 An explicit reconnect repeats authorization and loads the latest state. Private
 link creation remains a separate host UI gate until implemented and verified.
 
+### Opt-in turn notification targeting
+
+Browser push remains an incomplete delivery gate. Its deterministic targeting
+policy compares consecutive, compatible mandatory-game snapshots from a newly
+committed gameplay command. It identifies newly required movement, combat
+confirmation, loss, retreat, advance, or end-combat decisions, coalescing them
+to at most one intent per recipient per event. The acting player is excluded;
+routine moves, exact retries, management-only events, and completed games do
+not create turn intents. This policy neither sends notifications nor bypasses
+subscription/session/seat authorization.
+
+Subscription controls, protected persistence, durable outbox dispatch, and
+actual browser/provider acceptance remain separate implementation slices.
+Permission must follow explicit user action, and incoming pushes must display
+notifications. See [browser subscription guidance](https://web.dev/articles/push-notifications-subscribing-a-user).
+On iOS/iPadOS, supported push is for web apps added to the Home Screen; include
+that setup and actual device acceptance in the release checklist. See
+[WebKit's platform guidance](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
