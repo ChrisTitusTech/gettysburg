@@ -1863,6 +1863,15 @@ validation remain separate gates.
 
 ### Protected browser push subscriptions
 
+Integrated validation: full local gates pass 637 workspace/nine harness tests,
+all 259 PostgreSQL tests pass, and fresh independent review passes 236 server
+tests without actionable findings. Desktop/tablet full games cover all three
+choices, reload/replay, and input fixtures in
+`test-results/push-subscription-pending-ack` and its `-fixtures` directory.
+The later connection-reuse integration preserves those UI/protocol paths and
+adds a separately verified database regression. Exact-head CI and final review
+threads are required before merge; this foundation still sends no notifications.
+
 - [ ] Store per-seat browser push consent and encrypted subscription credentials.
   - Scope: Canonical HTTPS endpoints for the Chrome/Firefox/Safari production
     push providers, valid P-256/auth keys, one subscription per current seat
