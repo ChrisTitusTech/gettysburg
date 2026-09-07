@@ -988,6 +988,24 @@ export class InMemoryGameService {
     };
   }
 
+  authorizePushDelivery(
+    id: string,
+    leaseToken: string,
+    begin: () => void,
+  ): void {
+    this.#prunePushSubscriptions();
+    this.#prunePushOutbox();
+    const intent = this.#pushOutbox
+      .snapshot()
+      .find(
+        (item) =>
+          item.id === id &&
+          item.leaseToken === leaseToken &&
+          (item.leaseExpiresAt ?? 0) > this.#now(),
+      );
+    if (intent) begin();
+  }
+
   finishPushDelivery(
     id: string,
     leaseToken: string,

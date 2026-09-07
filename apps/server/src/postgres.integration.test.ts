@@ -138,6 +138,14 @@ postgres("PostgreSQL durability", () => {
       const claimed = claims.filter((item) => item !== undefined);
       expect(claimed).toHaveLength(1);
       const intent = claimed[0]!.intent;
+      const begin = vi.fn();
+      await first.authorizePushDelivery(
+        intent.id,
+        intent.leaseToken!,
+        begin,
+        new AbortController().signal,
+      );
+      expect(begin).toHaveBeenCalledOnce();
       expect(intent).toMatchObject({
         gameId: host.gameId,
         eventSequence: 1,
@@ -159,6 +167,13 @@ postgres("PostgreSQL durability", () => {
       // The old decision is gone from the canonical outbox, but its matching
       // in-flight provider outcome still retires this unchanged subscription.
       await restarted.finishPushDelivery(intent.id, intent.leaseToken!, "gone");
+      await first.authorizePushDelivery(
+        intent.id,
+        intent.leaseToken!,
+        begin,
+        new AbortController().signal,
+      );
+      expect(begin).toHaveBeenCalledOnce();
       expect(
         await first.getPushSubscriptionStatus(guest.credential, host.gameId),
       ).toMatchObject({ enabled: false });
@@ -167,6 +182,61 @@ postgres("PostgreSQL durability", () => {
       expect((await restarted.getGameState(host.gameId)).version).toBe(2);
     } finally {
       await Promise.all([first.close(), restarted.close()]);
+    }
+  });
+
+  it("cancels blocked worker claims and avoids canonical writes during idle polls", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const controller = new AbortController();
+    let lock: PoolClient | undefined;
+    let pending: Promise<unknown> | undefined;
+    try {
+      await service.migrate();
+      lock = await administration.connect();
+      await lock.query("BEGIN");
+      await lock.query(
+        "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
+      );
+      pending = service
+        .claimPushDelivery(controller.signal)
+        .catch((error: unknown) => error);
+      await vi.waitFor(async () => {
+        const waiting = await administration.query<{ count: string }>(
+          "SELECT count(*) FROM pg_stat_activity WHERE query = 'SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE' AND wait_event_type = 'Lock'",
+        );
+        expect(Number(waiting.rows[0]!.count)).toBeGreaterThan(0);
+      });
+      controller.abort();
+      expect(await pending).toBeInstanceOf(Error);
+      await lock.query("ROLLBACK");
+      lock.release();
+      lock = undefined;
+      expect(await service.claimPushDelivery()).toBeUndefined();
+      const queries = vi.spyOn(PgClient.prototype, "query");
+      try {
+        expect(await service.claimPushDelivery()).toBeUndefined();
+        expect(await service.claimPushDelivery()).toBeUndefined();
+        expect(
+          queries.mock.calls.filter(
+            ([sql]) =>
+              typeof sql === "string" && sql.startsWith("UPDATE service_state"),
+          ),
+        ).toEqual([]);
+      } finally {
+        queries.mockRestore();
+      }
+      expect(await service.isReady()).toBe(true);
+    } finally {
+      controller.abort();
+      await pending;
+      if (lock) {
+        await lock.query("ROLLBACK");
+        lock.release();
+      }
+      await service.close();
     }
   });
 
