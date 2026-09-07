@@ -245,7 +245,9 @@ Phase 2 should implement these steps as a reviewed script or runbook, not as
 unrecorded shell history:
 
 1. Fetch the exact reviewed revision into `/srv/gettysburg/src`.
-2. Build or pull an immutable image and record its digest.
+2. Build an immutable image, scan that exact ID, and record its digest. The
+   deployment script refuses scanner/checksum errors or HIGH/CRITICAL findings
+   before entering maintenance or changing service files.
 3. Back up PostgreSQL and persistent state before a migration.
 4. Put Caddy in maintenance mode and stop the old application so no old-ruleset
    writes can race the candidate or make rollback unsafe.
@@ -269,6 +271,8 @@ The reviewed repository entry points are:
 ```bash
 # Root: refuse a dirty checkout, build the exact HEAD, back up an existing
 # database, install rootless Quadlets, validate Caddy, and verify readiness.
+# First provision an official verified Trivy binary, then export its absolute
+# path and SHA-256 as GETTYSBURG_TRIVY_BIN and GETTYSBURG_TRIVY_SHA256.
 scripts/vps-deploy.sh
 
 # Gettysburg service account: create an age-encrypted PostgreSQL dump and
@@ -296,7 +300,46 @@ read-only root filesystems, private named volumes, and an internal network. The
 application drops all capabilities. PostgreSQL drops the defaults and restores
 only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
 entrypoint needs to initialize the named volume and become the database user.
-The PostgreSQL and Node base images are pinned by digest. Secrets are created
+The PostgreSQL and Node base images are pinned by digest. The application
+candidate uses Node 24.18.0 on Alpine 3.24 with OpenSSL packages at least 3.5.8-r0;
+build and runtime stages share the same base to avoid native ABI mismatches.
+The stable Alpine repository can replace package revisions. Minimum-version
+constraints permit later fixes instead of requiring removed APKs. Only the base
+and resulting image IDs are immutable; source rebuilds are not bit-for-bit
+reproducible. Preserve the reviewed image for rollback and scan every new build.
+Runtime npm, Corepack, and Yarn are removed after the build. Alpine 3.24 has
+[main support through June 1, 2028](https://alpinelinux.org/releases/).
+For each base/package refresh, rerun the full container smoke and browser
+acceptance gates against the candidate, then scan its immutable image for OS
+and Node vulnerabilities. Record scanner version, verified release checksum,
+image ID, scan date, and unresolved findings in `TASKS.md`. Rebuild and rescan
+the final merged release image; a previous candidate scan does not attest to
+later source or dependency changes. This local candidate is not the deployed
+VPS image recorded above.
+
+The deployment scanner must be provisioned from an official release whose
+archive checksum/signature has been verified before extraction or execution.
+Record that provenance in `TASKS.md`; then compute the extracted binary's
+SHA-256 and provide it through `GETTYSBURG_TRIVY_SHA256`, with its absolute path
+in `GETTYSBURG_TRIVY_BIN` (default `/usr/local/bin/trivy`). The service account
+must be able to execute it. The local verified Trivy 0.74.0 binary has SHA-256
+`d89bcc6510a267f11b773398cbf1be5520ce39f9e8b6633178c4487f05b7d791`;
+do not assume another platform/release has the same binary checksum.
+
+`scripts/scan-container.sh IMAGE_ID /absolute/report.json` exports that exact
+local Podman image to a task-owned Docker archive and scans OS/library packages
+with a ten-minute limit plus five seconds before forced termination, current
+database updates, and no ignore file/config or
+inherited Trivy overrides. It checks the binary checksum before executing it.
+The deploy script invokes it before its service-changing rollback trap, retains
+the JSON report, scanner version, checksum, and candidate ID under the rollout's
+protected `image-scan/` directory even when the image is rejected, and
+installs the same image ID into the Quadlet without rebuilding. A failed scan
+does not stop the running application. The root deployment sequence and scanner
+provisioning still require the approved VPS rollout gate; local helper tests
+do not claim an actual remote deployment.
+
+Secrets are created
 outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The
 deployment script records the exact Git revision and application image ID beside
 the pre-change rollback material. Before building or entering maintenance mode,
@@ -391,8 +434,24 @@ new file only and never prints private key material or overwrites existing keys.
 It was validated against a temporary protected file; no VPS key was generated.
 Set `GETTYSBURG_PUSH_VAPID_FILE=/var/lib/gettysburg/push-vapid.json` in the protected
 application environment only after the browser opt-in/service-worker gates and
-encrypted on/off-host key-backup/restore coverage are ready. The current backup
-automation has not yet been extended for this new file. Keep that gate open.
+encrypted on/off-host key-backup/restore coverage are ready. Backup automation
+now encrypts the canonical volume file as `push-vapid.json.age`, even if push
+is currently disabled. It records a checksum-covered `push-vapid-present` marker
+and refuses a missing configured key, symlink, unsafe permissions, or a configured
+path outside `/var/lib/gettysburg/push-vapid.json`. Arbitrary application loader
+paths are not supported by this VPS backup contract.
+
+The isolated restore test and off-host copy decrypt the optional key only into
+protected temporary storage and validate its owner-only permissions, canonical
+contact, and matching P-256 pair without printing private material. Off-host
+verification removes plaintext before atomically accepting the directory and
+acknowledging the deletion watermark. Historical backups without a key/marker
+remain readable; do not use those to recover a push-enabled installation while
+claiming existing subscriptions remain valid. Recover the matching encrypted
+key to the canonical volume path with application ownership and mode 0600,
+then validate configured startup before exposing the service. Actual VPS/off-host
+restore and enablement remain owner-gated; local controlled tests do not close
+that operational acceptance gate.
 
 Restarting with the same file preserves the public key. Missing or invalid
 configured files fail startup; omitting the variable disables the worker. Do not

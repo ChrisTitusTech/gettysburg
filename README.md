@@ -59,8 +59,10 @@ and scenario adaptations remain explicit owner gameplay acceptance checks.
 
 ## Development
 
-Use Node.js 24 and pnpm 11.21.0. Install dependencies and run the terminating
-local gate with:
+Use Node.js 24 and pnpm 11.21.0, with Bash, coreutils/util-linux, and `age`
+(`age` plus `age-keygen`) available for local operations tests. These tests use
+temporary keys and controlled container/SSH boundaries, not the VPS. Install
+dependencies and run the terminating local gate with:
 
 ```bash
 pnpm install --frozen-lockfile
