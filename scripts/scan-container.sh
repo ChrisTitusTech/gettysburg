@@ -34,11 +34,11 @@ trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-timeout 120 podman save --format docker-archive \
+timeout --kill-after=5s 120 podman save --format docker-archive \
 	--output "${scan_directory}/candidate.tar" "${image_id}"
-timeout 30 env -i HOME="${HOME}" PATH="${PATH}" \
+timeout --kill-after=5s 30 env -i HOME="${HOME}" PATH="${PATH}" \
 	"${scanner}" --version >"${report_file}.scanner-version"
-timeout 600 env -i HOME="${HOME}" PATH="${PATH}" \
+timeout --kill-after=5s 600 env -i HOME="${HOME}" PATH="${PATH}" \
 	"${scanner}" --config /dev/null image \
 	--cache-dir "${GETTYSBURG_TRIVY_CACHE_DIR:-${HOME}/.cache/trivy}" \
 	--scanners vuln --pkg-types os,library --severity HIGH,CRITICAL \

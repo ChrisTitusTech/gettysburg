@@ -328,10 +328,12 @@ do not assume another platform/release has the same binary checksum.
 
 `scripts/scan-container.sh IMAGE_ID /absolute/report.json` exports that exact
 local Podman image to a task-owned Docker archive and scans OS/library packages
-with a ten-minute limit, current database updates, and no ignore file/config or
+with a ten-minute limit plus five seconds before forced termination, current
+database updates, and no ignore file/config or
 inherited Trivy overrides. It checks the binary checksum before executing it.
 The deploy script invokes it before its service-changing rollback trap, retains
-the JSON report, scanner version, and checksum beside rollback metadata, and
+the JSON report, scanner version, checksum, and candidate ID under the rollout's
+protected `image-scan/` directory even when the image is rejected, and
 installs the same image ID into the Quadlet without rebuilding. A failed scan
 does not stop the running application. The root deployment sequence and scanner
 provisioning still require the approved VPS rollout gate; local helper tests

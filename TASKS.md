@@ -1899,6 +1899,12 @@ review found no actionable defects and reran the four helper/shell checks.
 Exact-head CI follows. VPS provisioning/rollout remains unattempted and
 approval-gated; no production service or secret changed.
 PLAN/ROADMAP now distinguish the merged worker from open startup/browser work.
+Further hosted review adds a five-second forced-kill grace to all archive and
+scanner deadlines, and preserves rejected-image findings in the protected
+rollout `image-scan/` directory rather than deleting them with temporary files.
+Only the helper's exported archive is temporary. All four helper tests, Bash
+syntax, ShellCheck, shfmt, documentation checks, and fresh independent review
+pass. The root deployment remains unexecuted; exact-head CI follows.
 
 Merged worker integration passes the full gate (719 workspace/nine harness
 tests). Image `3120b0d4a36277199abd42ed06e061c72084d88c9d836f113b9a619c78965978`

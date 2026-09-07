@@ -113,8 +113,19 @@ test("deployment scans before service-changing setup and reuses the scanned ID",
     'run_user bash "${source_root}/scripts/scan-container.sh"',
   );
   assert(scan > source.indexOf("run_user podman build"));
-  assert(scan < source.indexOf('install -d -o "${service_user}"'));
+  assert(
+    scan <
+      source.indexOf(
+        '"${quadlet_root}" "${systemd_root}" "${secret_root}" "${rollback_root}"',
+      ),
+  );
   assert(scan < source.indexOf("trap fail ERR"));
   assert.equal(source.match(/run_user podman build/g)?.length, 1);
   assert(source.includes('sed "s|@IMAGE_ID@|${candidate_image_id}|g"'));
+  assert(
+    source.includes('candidate_scan_directory="${rollback_root}/image-scan"'),
+  );
+  assert(!source.includes('rm -rf -- "${candidate_scan_directory}"'));
+  const helper = readFileSync(script, "utf8");
+  assert.equal(helper.match(/timeout --kill-after=5s /g)?.length, 3);
 });

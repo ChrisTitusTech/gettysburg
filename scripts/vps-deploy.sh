@@ -181,8 +181,11 @@ fi
 candidate_revision="$(git -C "${source_root}" rev-parse --verify HEAD)"
 # Build and scan before installing units/secrets, entering maintenance, or
 # enabling the rollback trap (which can stop the previously running services).
-candidate_scan_directory="$(run_user mktemp -d)"
-trap 'run_user rm -rf -- "${candidate_scan_directory}"' EXIT
+candidate_scan_directory="${rollback_root}/image-scan"
+# Keep rejected-image evidence too; only the helper's temporary archive is
+# removed. This audit directory does not alter application/service state.
+install -d -o "${service_user}" -g "${service_user}" -m 0700 \
+	"${rollback_root}" "${candidate_scan_directory}"
 run_user podman build \
 	--label "org.opencontainers.image.revision=${candidate_revision}" \
 	--tag "localhost/gettysburg:${candidate_revision}" \
@@ -190,6 +193,12 @@ run_user podman build \
 	"${source_root}"
 candidate_image_id="$(run_user podman image inspect \
 	--format '{{.Id}}' "localhost/gettysburg:${candidate_revision}")"
+printf 'revision=%s image=%s\n' "${candidate_revision}" "${candidate_image_id}" \
+	>"${candidate_scan_directory}/candidate-image.txt"
+printf '%s\n' "${GETTYSBURG_TRIVY_SHA256:-missing}" \
+	>"${candidate_scan_directory}/scanner-sha256"
+chmod 0600 "${candidate_scan_directory}/candidate-image.txt" \
+	"${candidate_scan_directory}/scanner-sha256"
 run_user bash "${source_root}/scripts/scan-container.sh" \
 	"${candidate_image_id}" "${candidate_scan_directory}/image-scan.json"
 
@@ -198,11 +207,6 @@ install -d -o "${service_user}" -g "${service_user}" -m 0700 \
 install -d -o "${service_user}" -g "${service_user}" -m 0755 \
 	"${readiness_root}"
 install -d -m 0700 "${rollback_root}/quadlet" "${rollback_root}/systemd"
-install -o "${service_user}" -g "${service_user}" -m 0600 \
-	"${candidate_scan_directory}/image-scan.json" \
-	"${candidate_scan_directory}/image-scan.json.scanner-version" "${rollback_root}/"
-printf '%s\n' "${GETTYSBURG_TRIVY_SHA256}" >"${rollback_root}/scanner-sha256"
-chmod 0600 "${rollback_root}/scanner-sha256"
 
 for filename in "${quadlet_files[@]}"; do
 	if [[ -f "${quadlet_root}/${filename}" ]]; then
