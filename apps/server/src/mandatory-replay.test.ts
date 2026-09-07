@@ -57,6 +57,13 @@ function fixture() {
       created.gameId,
       actions,
       service.exportSnapshot().seatBindings,
+      undefined,
+      {
+        hosts: service.exportSnapshot().hostBindings,
+        invitations: service
+          .exportSnapshot()
+          .invitations.map(([, invitation]) => invitation),
+      },
     );
   return { service, created, credentials, act, state, replay };
 }
@@ -90,6 +97,12 @@ describe("deterministic mandatory action replay", () => {
     ).toBe(true);
     const actions = f.service.getActions(f.created.gameId);
     expect(f.replay(actions)).toEqual(f.state());
+    const wrongSide = structuredClone(actions);
+    if (!wrongSide[2]!.result?.ok) throw new Error("Missing revoke result");
+    Object.assign(wrongSide[2]!.result.event, {
+      summary: "union invitation revoked",
+    });
+    expect(() => f.replay(wrongSide)).toThrow(/invalid management event/);
     for (const patch of [
       { commandName: "deleteGame" },
       { payload: null },
@@ -129,6 +142,84 @@ describe("deterministic mandatory action replay", () => {
       expect(() => f.replay([{ ...action, ...patch } as StoredAction])).toThrow(
         /invalid audit metadata/,
       );
+  });
+
+  it("resolves host actions against persisted recovery boundaries", () => {
+    const f = fixture();
+    f.act("confederate", "surrenderSeat");
+    const issue = (credential: string) => {
+      const result = f.service.executeHostCommand(
+        f.service.authenticateHost(credential, f.created.gameId),
+        {
+          command_id: randomUUID(),
+          command_name: "issueInvitation",
+          payload: { seat: "confederate" },
+          schema: COMMAND_SCHEMA_VERSION,
+          game_id: f.created.gameId,
+          expected_version: f.state().version,
+        },
+      );
+      expect(result.ok).toBe(true);
+    };
+    issue(f.created.credential);
+    const grant = f.service.issueHostRecovery(
+      f.created.gameId,
+      "test operator",
+    );
+    const replacement = f.service.claimHostRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    });
+    issue(replacement.credential);
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    const hosts = f.service.exportSnapshot().hostBindings;
+    expect(
+      hosts.find((host) => host.id === actions[1]!.authorizingId),
+    ).toMatchObject({ activeAfterSequence: 0, inactiveFromSequence: 3 });
+    expect(
+      hosts.find((host) => host.id === actions[3]!.authorizingId),
+    ).toMatchObject({ activeAfterSequence: 3 });
+    for (const [target, source] of [
+      [1, 3],
+      [3, 1],
+    ] as const) {
+      const corrupt = structuredClone(actions);
+      Object.assign(corrupt[target]!, {
+        authorizingId: actions[source]!.authorizingId,
+        authorizingVersion: actions[source]!.authorizingVersion,
+      });
+      expect(() => f.replay(corrupt)).toThrow(/binding was not active/);
+    }
+    const corrupt = structuredClone(actions);
+    Object.assign(corrupt[1]!, { authorizingId: randomUUID() });
+    expect(() => f.replay(corrupt)).toThrow(/historical host binding/);
+    const snapshot = f.service.exportSnapshot();
+    expect(() =>
+      replayMandatoryActions(
+        f.created.gameId,
+        actions,
+        snapshot.seatBindings,
+        undefined,
+        { hosts: [...hosts, hosts[0]!], invitations: [] },
+      ),
+    ).toThrow(/historical host binding/);
+    expect(() =>
+      replayMandatoryActions(
+        f.created.gameId,
+        actions,
+        snapshot.seatBindings,
+        undefined,
+        {
+          hosts: hosts.map((host) => {
+            const unavailable = { ...host };
+            Reflect.deleteProperty(unavailable, "activeAfterSequence");
+            return unavailable;
+          }),
+          invitations: [],
+        },
+      ),
+    ).toThrow(/binding chronology unavailable/);
   });
 
   it("fails closed when deletion has deliberately removed historical bindings", () => {
@@ -284,7 +375,8 @@ describe("deterministic mandatory action replay", () => {
 
   it("validates management IDs and rejects events after terminal deletion", () => {
     const f = fixture();
-    const bindings = f.service.exportSnapshot().seatBindings;
+    const snapshot = f.service.exportSnapshot();
+    const bindings = snapshot.seatBindings;
     const result = f.service.executeHostCommand(
       f.service.authenticateHost(f.created.credential, f.created.gameId),
       {
@@ -299,7 +391,10 @@ describe("deterministic mandatory action replay", () => {
     expect(result.ok).toBe(true);
     const actions = f.service.getActions(f.created.gameId);
     const replay = (input: readonly StoredAction[]) =>
-      replayMandatoryActions(f.created.gameId, input, bindings);
+      replayMandatoryActions(f.created.gameId, input, bindings, undefined, {
+        hosts: snapshot.hostBindings,
+        invitations: [],
+      });
     expect(replay(actions).event_sequence).toBe(1);
     expect(() =>
       replay([{ ...actions[0]!, commandName: "issueInvitation" }]),
