@@ -2029,6 +2029,13 @@ and `test-results/push-startup-fixtures`; desktop covers all three combat choice
 tablet loss/advance. Encrypted VAPID backup/restore wiring,
 browser opt-in/service-worker implementation, exact-head CI, and real-device
 acceptance remain before release. No VPS key was created or enabled.
+Exact-head Application run `34116623160` failed one existing multi-restart
+PostgreSQL fixture at its default five-second unit-test timeout; the other
+328 server tests passed. The fixture performs three migrations plus durable
+invitation and surrender writes. Give only that fixture a bounded 15-second
+integration budget, preserving assertions and production timeouts. All 329 real
+PostgreSQL tests pass again and independent review found no actionable defects.
+Exact-head CI is still required; owner: ChrisTitusTech. No new runtime change.
 
 The next bounded increment connects a serial background-worker implementation
 to durable claims/outcomes and the provider's post-DNS authorization callback.
