@@ -2078,6 +2078,13 @@ gates and the corrected two-layout Firefox run pass in
 `test-results/firefox-notification-loaded`; application code is unchanged.
 Fresh independent review of the reload wait is clean; syntax and whitespace
 checks pass. Publish this fixture-only repair and rerun exact-head CI.
+WebKit run `34127922076` then exposed a post-surrender assertion running after
+the URL changed but before React removed the notification region. Await actual
+detachment before retaining the zero-count and protected 401 assertions; do not
+weaken either check. Integrate the live-audit readiness regression as well.
+All local gates pass 755 workspace/26 harness tests, and WebKit passes both
+layouts in `test-results/webkit-consent-ready`. Fresh independent review is
+clean and reran five focused tests. Publish and require new exact-head CI.
 
 ### Accessibility audit increment
 
@@ -2099,6 +2106,13 @@ consent/replay/observer checks, and input fixtures in
 `test-results/accessibility-home-screen` and its `-fixtures` directory. Fresh
 independent review is clean and reran the baseline assertion and 38 focused web
 tests. PR #52 is merged; real Home Screen installation remains manual.
+Hosted review found live audits could run before lazy notification controls
+appeared. Wait for both named player notification regions before auditing them;
+a regression proves both readiness waits finish first. The full local gate
+passes 753 workspace/23 harness tests, and both layouts pass in
+`test-results/accessibility-lazy-ready`. Fresh independent review is clean and
+reran both focused regressions. Publish the repair before resolving its thread
+and require a new exact-head CI run before merge.
 
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
