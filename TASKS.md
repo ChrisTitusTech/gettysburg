@@ -2010,6 +2010,29 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+The next bounded increment connects a serial background-worker implementation
+to durable claims/outcomes and the provider's post-DNS authorization callback.
+Dispatch rechecks the current pending decision and lease under the existing
+shared canonical-row lock; retained completion receipts cannot authorize a new
+send. Worker mutations use cancellable capacity and a five-second total budget;
+idle polls compare snapshots structurally and avoid unnecessary writes. Shutdown
+cancels pending work before pool closure, while abandoned committed leases remain
+recoverable. This increment has no startup caller yet. Focused worker tests pass;
+full/database/browser validation, independent review, and exact-head CI remain
+before publication. Owner: ChrisTitusTech. VAPID setup, public-key configuration,
+browser permission controls, service worker, and real-device acceptance remain
+separate open tasks.
+
+Worker validation: full local gates pass 701 workspace/nine harness tests;
+all 322 PostgreSQL tests pass, including cancellation under a held write lock,
+unchanged idle polls, and current-lease dispatch authorization. Fresh independent
+review found no actionable defects and reran four worker tests/typecheck. Initial
+lint rejected two unused test parameters; removing them and rerunning the full
+gate passed. Fresh desktop/tablet 24-turn games, loss/advance, pending-result
+reload, exact replay, and input fixtures pass in `test-results/push-worker` and
+its `-fixtures` directory; prior provider runs cover retreat at both widths.
+Exact-head CI remains before merge. No runtime worker has been enabled on the VPS.
+
 Provider transport follow-up is in progress as a separate small PR. It uses
 `web-push` 3.6.7 for standard encrypted/VAPID request details and Node HTTPS for
 an address-pinned connection with normal hostname/certificate verification.

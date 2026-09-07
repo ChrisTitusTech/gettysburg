@@ -1,6 +1,7 @@
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 
 import { Pool, type PoolClient } from "pg";
 import { DeliverySlots } from "./delivery-slots.js";
@@ -43,11 +44,18 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
-  claimPushDelivery(): Promise<PushDelivery | undefined>;
+  claimPushDelivery(signal?: AbortSignal): Promise<PushDelivery | undefined>;
+  authorizePushDelivery(
+    id: string,
+    leaseToken: string,
+    begin: () => void,
+    signal: AbortSignal,
+  ): Promise<void>;
   finishPushDelivery(
     id: string,
     leaseToken: string,
     outcome: PushDeliveryOutcome,
+    signal?: AbortSignal,
   ): Promise<void>;
   setPushSubscription(
     credential: string | undefined,
@@ -183,14 +191,28 @@ export interface GameService {
 }
 
 export class InMemoryAsyncGameService implements GameService {
-  async claimPushDelivery(): Promise<PushDelivery | undefined> {
+  async authorizePushDelivery(
+    id: string,
+    leaseToken: string,
+    begin: () => void,
+    signal: AbortSignal,
+  ) {
+    signal.throwIfAborted();
+    this.service.authorizePushDelivery(id, leaseToken, begin);
+  }
+  async claimPushDelivery(
+    signal?: AbortSignal,
+  ): Promise<PushDelivery | undefined> {
+    signal?.throwIfAborted();
     return this.service.claimPushDelivery();
   }
   async finishPushDelivery(
     id: string,
     leaseToken: string,
     outcome: PushDeliveryOutcome,
+    signal?: AbortSignal,
   ): Promise<void> {
+    signal?.throwIfAborted();
     this.service.finishPushDelivery(id, leaseToken, outcome);
   }
   constructor(readonly service = new InMemoryGameService()) {}
@@ -359,16 +381,31 @@ export class InMemoryAsyncGameService implements GameService {
 }
 
 export class PostgresGameService implements GameService {
-  async claimPushDelivery(): Promise<PushDelivery | undefined> {
-    return this.#mutate((service) => service.claimPushDelivery());
+  async authorizePushDelivery(
+    id: string,
+    leaseToken: string,
+    begin: () => void,
+    signal: AbortSignal,
+  ) {
+    await this.#readForDelivery(
+      (service) => service.authorizePushDelivery(id, leaseToken, begin),
+      signal,
+    );
+  }
+  async claimPushDelivery(
+    signal?: AbortSignal,
+  ): Promise<PushDelivery | undefined> {
+    return this.#mutatePush((service) => service.claimPushDelivery(), signal);
   }
   async finishPushDelivery(
     id: string,
     leaseToken: string,
     outcome: PushDeliveryOutcome,
+    signal?: AbortSignal,
   ): Promise<void> {
-    return this.#mutate((service) =>
-      service.finishPushDelivery(id, leaseToken, outcome),
+    return this.#mutatePush(
+      (service) => service.finishPushDelivery(id, leaseToken, outcome),
+      signal,
     );
   }
   async setPushSubscription(
@@ -910,6 +947,68 @@ export class PostgresGameService implements GameService {
       throw error;
     } finally {
       if (!released) client.release();
+    }
+  }
+
+  // Worker-only transactions use bounded, cancellable capacity. An idle poll
+  // does not rewrite the canonical snapshot or mirrors when nothing changed.
+  async #mutatePush<T>(
+    operation: (service: InMemoryGameService) => T,
+    shutdown?: AbortSignal,
+  ): Promise<T> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5_000);
+    const signal = shutdown
+      ? AbortSignal.any([controller.signal, shutdown])
+      : controller.signal;
+    let releaseSlot: (() => void) | undefined;
+    let client: PoolClient | undefined;
+    let discarded = false;
+    let began = false;
+    const discard = () => {
+      if (client && !discarded) {
+        discarded = true;
+        client.release(began);
+      }
+    };
+    try {
+      releaseSlot = await this.#deliverySlots.acquire(signal);
+      client = await this.#deliveryPool.connect();
+      signal.throwIfAborted();
+      signal.addEventListener("abort", discard, { once: true });
+      began = true;
+      await client.query("BEGIN");
+      await client.query("SET LOCAL statement_timeout = '2000ms'");
+      const result = await client.query<{ snapshot: GameServiceSnapshot }>(
+        "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
+      );
+      signal.throwIfAborted();
+      const snapshot = result.rows[0]?.snapshot;
+      if (!snapshot) throw new Error("Push state is unavailable.");
+      const service = new InMemoryGameService({
+        pepper: this.#pepper,
+        snapshot,
+      });
+      const value = operation(service);
+      const next = service.exportSnapshot();
+      if (!isDeepStrictEqual(next, snapshot)) {
+        await client.query(
+          "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
+          [JSON.stringify(next)],
+        );
+        await this.#mirrorSnapshot(client, next, snapshot);
+      }
+      signal.throwIfAborted();
+      await client.query("COMMIT");
+      return value;
+    } catch (error) {
+      discard(); // Closing rolls back failed or cancelled worker transactions.
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", discard);
+      if (client && !discarded) client.release();
+      releaseSlot?.();
+      clearTimeout(timeout);
     }
   }
 
