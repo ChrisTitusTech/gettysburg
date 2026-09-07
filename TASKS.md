@@ -1,5 +1,33 @@
 # Gettysburg project tasks
 
+## Current source rollup: 2026-09-07
+
+This rollup distinguishes merged source from the last verified VPS deployment.
+Older incremental entries below preserve their contemporaneous stopping points
+and evidence; they do not supersede this current status or close owner gates.
+
+| Area | Current state | Remaining gate |
+| --- | --- | --- |
+| Phases 0-2 | Complete; last verified VPS revision is `40cff572aab183660dfeee188c4b6acddb2b1de5` | New source is not yet a new VPS rollout |
+| Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
+| Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
+| Private spectators | Claims, revocable HTTP/replay access, and host grant management are merged through PR #38 | Live transport, host link creation, and observer browser PRs remain unmerged; integration review gates apply |
+| Opt-in browser push | Owner approved; targeting-policy PR #41 remains unmerged and does not send notifications | Protected subscriptions, durable delivery/retries, opt-out, and real provider/device acceptance |
+| Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
+
+Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
+continue through reviewed increments, recording failed or unavailable gates
+below. No phase is completed merely by passing the automated game script.
+
+Status-reconciliation validation: documentation and one stale code comment only;
+no rule, runtime, schema, terrain, or deployment changes. Frozen installation,
+format, lint, typecheck, 584 workspace/nine harness tests, build, smoke, and
+Markdown/diff checks pass. The unchanged runtime retains PR #38's 199-test
+PostgreSQL and desktop/tablet evidence; no fresh database or browser run is
+claimed for this documentation update. Fresh independent review found no
+actionable defects; exact-head CI and final threads remain before merging the
+status reconciliation.
+
 ## Remaining-phase execution: 2026-09-06
 
 The owner authorized completing remaining tasks/phases in small PRs and merging
@@ -70,7 +98,7 @@ terrain makes retreat impossible, including trapped artillery on this board.
 | Remaining gate | Responsible owner | Attempted result | Reason and follow-up |
 | --- | --- | --- | --- |
 | Owner terrain gameplay | ChrisTitusTech | Automated desktop/tablet flows and visual inspection passed | Manually play representative forest/hill/town combats and inspect R10/W7/W10 adaptations before release |
-| Complete Phase 3 | ChrisTitusTech | Terrain defense implemented; phase not complete | Finish movement costs, remaining rules, and full rules-enforced acceptance game |
+| Complete Phase 3 | ChrisTitusTech | Mandatory enforcement, replay, and automated full games are now merged; phase not complete | Owner physical-rule adjudication and retained-version replay decision/coverage remain |
 
 This follow-up supersedes earlier terrain-unverified, fixed-M9, and 231-hex
 calibration statements below. The August operational entries are historical
@@ -1310,13 +1338,14 @@ validation remain separate gates.
     and skipped per owner direction; no unresolved threads remained. General
     accompaniment and server validation now have separate preparatory increments;
     browser integration and ruleset activation remain.
-- [ ] Implement and test terrain costs, roads, streams, ZOC, and advanced
+- [x] Implement and test mandatory terrain costs, roads, streams, ZOC, and advanced
   stacking. Basic one-point-per-hex allowance enforcement, cumulative movement
   spending, atomic stack drag, Ctrl single-counter drag, and a capped route
   preview are complete in Phase 2. The 253-coordinate terrain worksheet is
   approved and transcribed. Road/rail/stream edge estimates are mapped and
-  structurally tested, but their variable movement costs are not yet enforced.
-- [ ] Implement and test complete terrain modifiers and remaining ZOC effects,
+  structurally tested. Their variable movement costs are enforced by the active
+  mandatory version, with route previews and desktop/tablet input fixtures.
+- [x] Implement and test mandatory terrain modifiers and remaining ZOC effects,
   loss, retreat, and advance. Adjacent-contact discovery, same-hex grouping,
   mandatory legal skirmish separation, independent automatic two-die unit-factor
   result interpretation, and printed-factor modifier totals are complete in
@@ -1332,12 +1361,18 @@ validation remain separate gates.
   remain available. Forest-link tests must distinguish woods artwork that crosses
   a shared hex side from visually disconnected woods in adjacent hexes; reviewed
   per-hex-side forest links are required before enforcement.
-- [ ] Implement and test remaining reinforcement, night, objective, and victory
+- [x] Implement and test mandatory reinforcement, night, objective, and victory
   rules. Core mandatory night withdrawal, no entry into enemy ZOC, and
   trapped-only combat are complete. Optional nighttime reorganization is excluded;
-  remaining mandatory edge cases are in `docs/references/MANDATORY_RULES.md`.
-- [ ] Add rule versions, explanations, previews, and deterministic replay.
-- [ ] Complete a full rules-enforced acceptance game.
+  the implemented mandatory contract is in `docs/references/MANDATORY_RULES.md`.
+- [x] Add mandatory rule versions, explanations, previews, and deterministic
+  replay with authorized browser controls. PRs #29-31 record merged evidence.
+- [x] Complete automated 24-turn rules-enforced games at desktop/tablet widths,
+  with pending-choice reload and exact replay. PR #29 records acceptance and
+  pacing repairs; subsequent increments repeat the same browser gate.
+- [ ] Complete owner-adjudicated physical-rule acceptance and retained-version
+  replay coverage or an explicit scope decision. The prior asynchronous scope
+  question is unanswered; legacy replay is not silently waived.
 
 ### Phase 4
 

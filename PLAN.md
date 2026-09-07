@@ -31,8 +31,8 @@ browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
 
 The 2026-09-06 approved terrain follow-up expands the development board to A-W,
 records best-guess connections, and implements terrain defense. The owner
-confirmed no live/production games require compatibility. This bounded Phase 3
-increment does not complete movement-rule enforcement. The owner subsequently
+confirmed no live/production games require compatibility. That initial Phase 3
+increment covered terrain defense only. The owner subsequently
 authorized merge, deployment, and backed-up retirement of five old development
 games; those delivery actions completed on 2026-09-06.
 Current evidence and remaining gates are in `TASKS.md`.
@@ -40,8 +40,15 @@ Current evidence and remaining gates are in `TASKS.md`.
 The newer source candidate enables mandatory Scenario Five for new games with
 the complete pinned terrain/edge bundle and shared rule previews. It does not
 change the last verified VPS revision above or reinterpret existing saves.
-Replay delivery, representative owner adjudication/full-game acceptance, and
-Phase 4 features and operational/release gates remain open.
+Mandatory-rule replay, authorized browser replay controls, and automated
+24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,
+reinforcement, combat choices, night, and victory enforcement are implemented
+for the pinned mandatory version. Representative owner adjudication remains
+open; automated play does not establish agreement with the physical rules.
+Legacy tabletop saves remain resumable but lack interpreted replay. Private
+spectator claims, HTTP/replay access, and host grant management are merged;
+live transport, host link creation, the observer screen, and browser push remain
+separate unmerged delivery work. Phase 4 operational/release gates remain open.
 
 Phases 0 and 1 are complete: the owner selected mandatory Scenario Five scope
 and approved the original presentation for public release on 2026-09-06.
