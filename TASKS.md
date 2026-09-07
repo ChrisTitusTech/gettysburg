@@ -1981,6 +1981,13 @@ push events use their own SHA. Rerun exact-head CI before resolving that thread
 and merging. Earlier CI associations are not proof of an exact-head checkout.
 The workflow-only repair passes all local gates (755 workspace/25 harness
 tests) and fresh independent review; the validated browser runtime is unchanged.
+A subsequent integrated performance run exposed a Firefox warning when the
+deliberate reload aborted the lazy notification module. Wait for the rendered
+notification region before reloading, preserving all console checks. Full local
+gates and the corrected two-layout Firefox run pass in
+`test-results/firefox-notification-loaded`; application code is unchanged.
+Fresh independent review of the reload wait is clean; syntax and whitespace
+checks pass. Publish this fixture-only repair and rerun exact-head CI.
 
 ### Accessibility audit increment
 
