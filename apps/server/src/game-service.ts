@@ -2270,10 +2270,23 @@ export class InMemoryGameService {
             ),
             invitations: [...this.#invitations.values()]
               .filter((invitation) => invitation.gameId === gameId)
-              .map(({ gameId, lookupId, allowedSeat }) => ({
-                gameId,
-                lookupId,
-                allowedSeat,
+              .map((invitation) => ({
+                gameId: invitation.gameId,
+                lookupId: invitation.lookupId,
+                allowedSeat: invitation.allowedSeat,
+                claimedAt: invitation.claimedAt,
+                expiresAt: invitation.expiresAt,
+                revokedAt: invitation.revokedAt,
+                ...(invitation.activeAfterSequence === undefined
+                  ? {}
+                  : {
+                      activeAfterSequence: invitation.activeAfterSequence,
+                    }),
+                ...(invitation.revokedAtSequence === undefined
+                  ? {}
+                  : {
+                      revokedAtSequence: invitation.revokedAtSequence,
+                    }),
               })),
           },
         ),

@@ -529,6 +529,13 @@ validation remain separate gates.
     review found no actionable defects and reran 150 server tests; its 13
     database skips are covered by the separate PostgreSQL gate above.
     Exact-head CI remains before merge.
+    The API now also supplies the verifier's invitation activation/revocation,
+    claim, and expiry evidence; secrets remain excluded. The complete local
+    gate passes again (527 workspace plus six harness tests; all 163 PostgreSQL
+    tests). Both browser suites pass in `test-results/authorized-replay-invitation`
+    and `test-results/authorized-replay-invitation-fixtures`. Fresh independent
+    local review found no actionable defects and reran 150 server tests;
+    its 13 database skips are covered above. Exact-head CI remains before merge.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,
@@ -558,6 +565,12 @@ validation remain separate gates.
     defects. Exact-head CI remains a pre-merge gate. CodeRabbit is limited and
     skipped per owner direction. This no-contact game does not replace owner
     gameplay acceptance.
+    PR #26 head `2f5a173` failed CI run `34079237275` at held-drag page
+    screenshot capture after tests and two-player acceptance passed. Startup
+    and container smoke were skipped. Attempt 2 was superseded/cancelled by
+    the parent-repair merge; owner ChrisTitusTech must retain this as incomplete
+    evidence until the latest head's full Application gate passes. Local browser
+    fixtures passed without weakening their movement assertions.
 - [ ] Verify mandatory replay, then expose authorized replay controls.
   - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
     accepted commands, resolving the historical seat binding and recorded dice.
