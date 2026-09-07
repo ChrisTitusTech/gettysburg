@@ -333,6 +333,53 @@ async function runScenario(browser, origin, options) {
         .getByRole("button", { name: /Buford, O5/ })
         .waitFor();
     }
+    const liveVersion = options.inputMode === "keyboard" ? 4 : 3;
+    await unionPage
+      .getByRole("button", { name: "View replay", exact: true })
+      .click();
+    const viewer = unionPage.getByRole("region", {
+      name: "Read-only game replay",
+    });
+    await viewer.getByText(/Viewing event 0 of/).waitFor();
+    await viewer
+      .getByRole("button", { name: /Wadsworth, D3, selectable/ })
+      .click();
+    await viewer.locator('[data-coordinate="E4"]').click();
+    await viewer
+      .getByText("Read-only history; no commands are sent.")
+      .waitFor();
+    await viewer
+      .getByRole("button", { name: "Next event", exact: true })
+      .click();
+    await viewer.getByText(/Viewing event 1 of/).waitFor();
+    await viewer
+      .getByRole("button", { name: /Wadsworth, E4, selectable/ })
+      .waitFor();
+    await viewer.screenshot({
+      path: resolve(evidenceDirectory, `${options.label}-replay.png`),
+    });
+    await viewer
+      .getByRole("button", { name: "Latest event", exact: true })
+      .click();
+    await viewer
+      .getByText(new RegExp(`Viewing event ${liveVersion} of`))
+      .waitFor();
+    await viewer
+      .getByRole("button", { name: /Wadsworth, P7, selectable/ })
+      .waitFor();
+    const authoritativeVersion = await unionPage.evaluate(async () => {
+      const id = window.location.pathname.split("/").at(-1);
+      const response = await fetch(`/api/games/${id}`);
+      if (!response.ok)
+        throw new Error("Could not verify live replay isolation");
+      return (await response.json()).state.version;
+    });
+    assert.equal(authoritativeVersion, liveVersion);
+    await unionPage
+      .getByRole("button", { name: "Return to live game", exact: true })
+      .click();
+    await waitForVersion(unionPage, liveVersion);
+    await waitForVersion(confederatePage, liveVersion);
     const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;
     cleanupHostPage.once("dialog", (dialog) => dialog.accept());
     await cleanupHostPage

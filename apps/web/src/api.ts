@@ -49,6 +49,23 @@ export interface SessionResponse {
   readonly state: GameState;
 }
 
+export interface ReplayResponse {
+  readonly state: GameState;
+  readonly sequence: number;
+  readonly latest_sequence: number;
+}
+
+export function getReplay(
+  gameId: string,
+  sequence?: number,
+  signal?: AbortSignal,
+): Promise<ReplayResponse> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/replay${sequence === undefined ? "" : `?sequence=${sequence}`}`,
+    signal === undefined ? undefined : { signal },
+  );
+}
+
 export interface CreateGameResponse extends SessionResponse {
   readonly invitation: {
     readonly lookup_id: string;

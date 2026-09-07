@@ -30,6 +30,7 @@ import {
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
+import { ReplayViewer } from "./ReplayViewer";
 import { invitationUrl, type SecretGrantFragment } from "./invitation";
 import { leaveOpenRoom } from "./room-lifecycle";
 import { TabletopControls } from "./TabletopControls";
@@ -92,6 +93,7 @@ export function App({
       ? null
       : { ...initialInvitation, kind: "invitation" as const });
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
+  const [replayOpen, setReplayOpen] = useState(false);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
@@ -117,6 +119,7 @@ export function App({
 
   const enterGame = useCallback(
     (session: SessionResponse, shareUrl?: string) => {
+      setReplayOpen(false);
       setActiveGame({
         ...session,
         ...(shareUrl ? { invitationUrl: shareUrl } : {}),
@@ -904,7 +907,24 @@ export function App({
         )}
       </section>
 
-      {activeGame.seat === null ? (
+      <section className="action-log" aria-label="Replay controls">
+        <button
+          type="button"
+          aria-expanded={replayOpen}
+          onClick={() => setReplayOpen((open) => !open)}
+        >
+          {replayOpen ? "Return to live game" : "View replay"}
+        </button>
+        {replayOpen ? (
+          <ReplayViewer
+            key={activeGame.game_id}
+            gameId={activeGame.game_id}
+            latestSequence={activeGame.state.event_sequence}
+          />
+        ) : null}
+      </section>
+
+      {replayOpen ? null : activeGame.seat === null ? (
         <section className="join-panel">
           <h2>Host controls recovered</h2>
           <p>

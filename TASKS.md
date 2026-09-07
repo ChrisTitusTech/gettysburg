@@ -479,6 +479,28 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Deliver read-only replay controls and finish replay acceptance.
+  - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
+    and latest events. Inspect either side, pan/zoom, and read recorded combat
+    dice without routing game commands. Abort pending reads on close and discard
+    stale or failed responses; keep the live room synchronized separately.
+  - Boundary: Mandatory games only until retained-version handlers exist.
+    Deleted games remain inaccessible. Full representative game adjudication,
+    spectator authorization, measured replay capacity, and release gates remain.
+  - Acceptance: Component/API regressions cover navigation, request credentials,
+    abort/failure/mismatched-game responses, and read-only counter inspection.
+    Two real desktop/tablet sessions must traverse historical states and prove
+    that the live server version does not change. Inspect both rendered views,
+    run the full local/database/browser gates, then independent review and CI.
+  - Validation: Full frozen install, formatting, lint, typecheck, 528 workspace
+    tests plus six harness tests, build, smoke, Markdown, and whitespace checks
+    pass. All 158 server tests pass with isolated PostgreSQL. Two-session
+    desktop/tablet replay and the no-contact 24-turn transition check pass in
+    `test-results/replay-viewer-final`; mandatory input fixtures pass in
+    `test-results/replay-viewer-final-fixtures`. Rendered replay views inspected.
+    Fresh independent local Codex review found no actionable regressions and
+    reran all 93 client tests. Exact-head CI and parent PR repairs remain before
+    merge. CodeRabbit is skipped under the owner's limited-plan instruction.
 - [ ] Expose authorized replay snapshots, then finish replay delivery.
   - Scope: Add a read-only replay endpoint with a strict optional event-sequence
     cursor and current host/seat authorization checked in the same database

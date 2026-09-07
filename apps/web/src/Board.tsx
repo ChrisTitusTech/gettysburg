@@ -38,6 +38,7 @@ import { MovementControls } from "./MovementControls";
 import { previewAdvance } from "./advance-preview";
 
 interface BoardProps {
+  readonly readOnly?: boolean;
   readonly onExit?: (unitIds: readonly string[]) => void;
   readonly onAdvance?: (
     combatId: string,
@@ -112,7 +113,8 @@ function unitFactor(combat: number | null, movement: number): string {
 }
 
 export function Board({
-  disabled = false,
+  disabled: inputDisabled = false,
+  readOnly = false,
   error,
   onAdvance = () => undefined,
   onMove,
@@ -121,6 +123,7 @@ export function Board({
   seat,
   state,
 }: BoardProps) {
+  const disabled = inputDisabled || readOnly;
   const mandatory = state.ruleset_version === MANDATORY_RULESET_VERSION;
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
@@ -189,6 +192,7 @@ export function Board({
   ];
   const pendingAdvance = Object.values(state.combats).find(
     (combat) =>
+      !readOnly &&
       combat.pending_choice?.kind === "advance" &&
       combat.pending_choice.side === seat,
   );
@@ -228,9 +232,9 @@ export function Board({
   });
 
   function selectUnit(unitId: string, single = false) {
-    if (state.units[unitId]?.side === seat) {
+    if (readOnly || state.units[unitId]?.side === seat) {
       setSelectedUnitId(unitId);
-      setSelectedSingle(single || singleCounterMode);
+      setSelectedSingle(readOnly || single || singleCounterMode);
       setMovementNotice(null);
     }
   }
@@ -332,6 +336,7 @@ export function Board({
 
   function selectedIds(): string[] {
     if (selectedUnitId === null) return [];
+    if (readOnly) return [selectedUnitId];
     const retreat = retreatContext(selectedUnitId);
     const advance = advanceContext(selectedUnitId, selectedSingle);
     return (
@@ -387,7 +392,11 @@ export function Board({
   function moveSelected(target: HexCoordinate) {
     if (selectedUnit === undefined || selectedUnit.location === null) return;
     if (disabled) {
-      setMovementNotice("Waiting for the authoritative server.");
+      setMovementNotice(
+        readOnly
+          ? "Read-only history; no commands are sent."
+          : "Waiting for the authoritative server.",
+      );
       return;
     }
     const retreat = retreatContext(selectedUnit.id);
@@ -878,6 +887,7 @@ export function Board({
             aria-pressed={singleCounterMode}
             type="button"
             onClick={toggleSingleCounterMode}
+            hidden={readOnly}
           >
             One counter
           </button>
@@ -888,7 +898,11 @@ export function Board({
       <div className="board-frame">
         <svg
           ref={svgReference}
-          aria-label={`Interactive ${mandatory ? "mandatory-rules" : "rules-light"} hex board. Drag to pan, use the controls to zoom, and select your counter before choosing a destination.`}
+          aria-label={
+            readOnly
+              ? "Read-only replay board. Pan, zoom, and inspect counters from either side."
+              : `Interactive ${mandatory ? "mandatory-rules" : "rules-light"} hex board. Drag to pan, use the controls to zoom, and select your counter before choosing a destination.`
+          }
           className="board-svg"
           onPointerCancel={() => {
             dragStart.current = null;
@@ -1123,7 +1137,7 @@ export function Board({
               return (
                 <g
                   key={unit.id}
-                  aria-label={`${unit.label}, ${unit.location}${unit.side === seat ? ", selectable" : ""}, ${details}, ${unit.organization}`}
+                  aria-label={`${unit.label}, ${unit.location}${readOnly || unit.side === seat ? ", selectable" : ""}, ${details}, ${unit.organization}`}
                   aria-pressed={selected}
                   className={`counter counter-${unit.side}${retreatRequired ? " retreat-required" : ""}${advanceEligible ? " advance-eligible" : ""}${selected ? " selected" : ""}${draggedPath === null ? "" : " dragging"}`}
                   data-combat={currentCombat ?? ""}
@@ -1141,7 +1155,7 @@ export function Board({
                     handleCounterPointerDown(event, unit.id)
                   }
                   role="button"
-                  tabIndex={unit.side === seat ? 0 : -1}
+                  tabIndex={readOnly || unit.side === seat ? 0 : -1}
                   transform={`translate(${displayPoint.x + (draggedPath === null || (unitDrag?.unitIds.length ?? 0) > 1 ? offset.x : 0)} ${displayPoint.y + (draggedPath === null || (unitDrag?.unitIds.length ?? 0) > 1 ? offset.y : 0)})`}
                 >
                   <title>
@@ -1179,14 +1193,24 @@ export function Board({
         aria-label="Selected counter inspector"
       >
         <div>
-          <p className="inspector-label">Your seat</p>
-          <strong>{seat === "union" ? "Union" : "Confederate"}</strong>
+          <p className="inspector-label">
+            {readOnly ? "Viewing history" : "Your seat"}
+          </p>
+          <strong>
+            {readOnly
+              ? "Both sides (read-only)"
+              : seat === "union"
+                ? "Union"
+                : "Confederate"}
+          </strong>
         </div>
         <div>
           <p className="inspector-label">Selected counter</p>
           <strong>
             {selectedUnit === undefined
-              ? "Select your counter"
+              ? readOnly
+                ? "Select any counter"
+                : "Select your counter"
               : selectedIds().length > 1
                 ? `${selectedIds().length}-counter stack (${selectedUnit.label})`
                 : selectedUnit.label}
@@ -1206,13 +1230,15 @@ export function Board({
                   : ` · Arrival turn ${selectedUnit.entry_turn}`}
               </span>
               <span>
-                {retreatContext(selectedUnit.id) !== null
-                  ? "Retreat pending: drag this stack to the first empty hex"
-                  : advanceContext(selectedUnit.id) !== null
-                    ? "Advance pending: drag to a highlighted hex or the decline tray"
-                    : selectedSingle
-                      ? "Single-counter mode: drag this counter alone; turn off One counter to rejoin its stack"
-                      : `Movement remaining: ${movementAllowance(selectedIds())} (stack limit)`}
+                {readOnly
+                  ? `Recorded movement spent: ${selectedUnit.movement_spent ?? 0}`
+                  : retreatContext(selectedUnit.id) !== null
+                    ? "Retreat pending: drag this stack to the first empty hex"
+                    : advanceContext(selectedUnit.id) !== null
+                      ? "Advance pending: drag to a highlighted hex or the decline tray"
+                      : selectedSingle
+                        ? "Single-counter mode: drag this counter alone; turn off One counter to rejoin its stack"
+                        : `Movement remaining: ${movementAllowance(selectedIds())} (stack limit)`}
               </span>
               <span>
                 {selectedUnit.strength} strength ·{" "}
@@ -1223,8 +1249,14 @@ export function Board({
           )}
         </div>
         <div className="drag-guidance">
-          <strong>Board drag controls</strong>
-          <span>No hex number entry is required.</span>
+          <strong>
+            {readOnly ? "Read-only replay" : "Board drag controls"}
+          </strong>
+          <span>
+            {readOnly
+              ? "Inspect either side; pan and zoom without changing the game."
+              : "No hex number entry is required."}
+          </span>
         </div>
         <p
           aria-live="polite"
@@ -1233,12 +1265,15 @@ export function Board({
         >
           {error ??
             movementNotice ??
-            (disabled
-              ? "Waiting for the authoritative server."
-              : "Drag a stack to move it together. Hold Ctrl or turn on One counter before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
+            (readOnly
+              ? "Read-only history; no commands are sent."
+              : disabled
+                ? "Waiting for the authoritative server."
+                : "Drag a stack to move it together. Hold Ctrl or turn on One counter before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
         </p>
       </aside>
-      {mandatory &&
+      {!readOnly &&
+      mandatory &&
       selectedUnit?.location &&
       selectedUnit.side === seat &&
       state.phase === "movement" &&

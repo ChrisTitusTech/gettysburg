@@ -63,6 +63,28 @@ const state: GameState = {
   },
 };
 
+it("lets a read-only viewer inspect either side without sending commands", async () => {
+  const onMove = vi.fn();
+  const user = userEvent.setup();
+  render(<Board readOnly seat="confederate" state={state} onMove={onMove} />);
+  const opponent = screen.getByRole("button", {
+    name: /Union fixture counter, P7, selectable/,
+  });
+  opponent.focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getByText("Both sides (read-only)")).toBeVisible();
+  await user.click(document.querySelector('[data-coordinate="O7"]')!);
+  expect(onMove).not.toHaveBeenCalled();
+  expect(
+    screen.getByText("Read-only history; no commands are sent."),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "One counter" }),
+  ).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Fit" }));
+  expect(screen.getByLabelText("Current zoom")).toHaveTextContent("100%");
+});
+
 function prepareBoardPointer(
   container: HTMLElement,
   coordinate: HexCoordinate,

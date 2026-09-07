@@ -888,6 +888,39 @@ footer {
   }
 }
 
+.replay-viewer {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.replay-viewer > p,
+.replay-viewer > h2 {
+  margin: 0;
+}
+
+.replay-viewer form,
+.replay-viewer label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.replay-viewer input {
+  width: 7rem;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid #a88e5d;
+  border-radius: 0.25rem;
+  color: #fff8e9;
+  background: #192319;
+}
+
+.replay-viewer .zoom-controls {
+  flex-wrap: wrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
