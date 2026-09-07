@@ -1,6 +1,7 @@
 import { adjacentHexes, type HexCoordinate } from "./coordinates.js";
 import { terrainDefenseModifier } from "./terrain.js";
 import {
+  MANDATORY_RULESET_VERSION,
   RULESET_VERSION,
   type CombatConfirmation,
   type CombatState,
@@ -33,6 +34,7 @@ export function currentCombatValue(
 ): number | null {
   if (unit.combat === null) return null;
   return (rulesetVersion === RULESET_VERSION ||
+    rulesetVersion === MANDATORY_RULESET_VERSION ||
     rulesetVersion === "phase-2-tabletop-v2") &&
     unit.strength === "reduced"
     ? (unit.reduced_combat ?? Math.ceil(unit.combat / 2))

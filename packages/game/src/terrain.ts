@@ -1,4 +1,8 @@
-import { RULESET_VERSION, type GameState } from "./protocol.js";
+import {
+  MANDATORY_RULESET_VERSION,
+  RULESET_VERSION,
+  type GameState,
+} from "./protocol.js";
 
 /** One skirmish, strongest effective defending hex, never one bonus per unit. */
 export function terrainDefenseModifier(
@@ -6,7 +10,11 @@ export function terrainDefenseModifier(
   attackers: readonly string[],
   defenders: readonly string[],
 ): number {
-  if (state.ruleset_version !== RULESET_VERSION || state.terrain === undefined)
+  if (
+    (state.ruleset_version !== RULESET_VERSION &&
+      state.ruleset_version !== MANDATORY_RULESET_VERSION) ||
+    state.terrain === undefined
+  )
     return 0;
   const attackerTerrain = attackers.flatMap((id) => {
     const unit = state.units[id];

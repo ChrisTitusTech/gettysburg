@@ -6,6 +6,7 @@ import {
   combatOpportunities,
   defenderCombatModifier,
   RULESET_VERSION,
+  MANDATORY_RULESET_VERSION,
   terrainDefenseModifier,
   type CombatState,
   type GameState,
@@ -43,6 +44,7 @@ function counter(
 function battle(
   attacker: HexCoordinate,
   defenders: HexCoordinate[],
+  rulesetVersion: string = RULESET_VERSION,
 ): GameState {
   return {
     active_side: "confederate",
@@ -53,7 +55,7 @@ function battle(
     night: false,
     objectives: {},
     phase: "combat",
-    ruleset_version: RULESET_VERSION,
+    ruleset_version: rulesetVersion,
     terrain: BOARD_TERRAIN,
     turn: 1,
     version: 0,
@@ -132,94 +134,97 @@ describe("owner-approved terrain content", () => {
   });
 });
 
-describe("terrain defense per skirmish", () => {
-  it.each([
-    ["A2", ["A4"], 2],
-    ["A1", ["C1"], 0],
-    ["B1", ["B2"], 2],
-    ["A2", ["A4", "A5"], 2],
-    ["A4", ["A5", "B2"], 2],
-    ["D5", ["F5"], 2],
-    ["G6", ["F5"], 2],
-    ["F6", ["F5"], 0],
-    ["A2", ["G6"], 4],
-    ["A2", ["A1"], 2],
-    ["B1", ["A1"], 2],
-    ["K6", ["L6"], 0],
-    ["A2", ["O7"], 1],
-    ["A2", ["A4", "G6"], 4],
-  ] as const)(
-    "attack from %s against %j gives terrain %i",
-    (a, ds, expected) => {
-      const state = battle(a, [...ds]);
-      expect(
-        terrainDefenseModifier(
-          state,
-          ["a"],
-          ds.map((_, i) => `d${i}`),
-        ),
-      ).toBe(expected);
-    },
-  );
-
-  it("only participating attackers cancel terrain; only participating defenders contribute", () => {
-    const state = battle("A2", ["A4", "G6"]);
-    const extra = {
-      ...state,
-      units: { ...state.units, extra: counter("extra", "A5", "confederate") },
-    };
-    expect(terrainDefenseModifier(extra, ["a"], ["d0"])).toBe(2);
-    expect(terrainDefenseModifier(extra, ["a", "extra"], ["d0"])).toBe(0);
-    expect(terrainDefenseModifier(extra, ["a"], ["d1"])).toBe(4);
-  });
-
-  it("caps unit and terrain modifiers together and ignores duplicate defending IDs for terrain", () => {
-    const state = battle("A2", ["A4", "A5", "A6"]);
-    expect(defenderCombatModifier(state, ["a"], ["d0", "d1", "d2"])).toBe(10);
-    expect(terrainDefenseModifier(state, ["a"], ["d0", "d0"])).toBe(2);
-  });
-
-  it("uses the same total for discovery, preview, and automatic resolution", () => {
-    const state = battle("B1", ["B2"]);
-    expect(
-      combatOpportunities(state, "confederate")[0]?.defender_modifier,
-    ).toBe(5);
-    const combat: CombatState = {
-      id: "test",
-      attackers: ["a"],
-      defenders: ["d0"],
-      attacker_loss_allocated: false,
-      attacker_retreated: false,
-      defender_loss_allocated: false,
-      defender_retreated: false,
-      confirmation: null,
-      pending_choice: null,
-      rolls: { attacker: 5, defender: 5 },
-      status: "awaiting_result_confirmation",
-    };
-    const resolution = automaticCombatResolution(state, combat)!;
-    expect(resolution).toMatchObject({
-      attacker_total: 8,
-      defender_total: 10,
-      margin: 2,
-      confirmation: { defender_modifier: 5, result: "defender_win" },
-    });
-    const afterRetreat = {
-      ...state,
-      units: {
-        ...state.units,
-        d0: {
-          ...state.units.d0!,
-          location: "A2" as const,
-          strength: "reduced" as const,
-        },
+describe.each([RULESET_VERSION, MANDATORY_RULESET_VERSION])(
+  "terrain defense per skirmish: %s",
+  (rulesetVersion) => {
+    it.each([
+      ["A2", ["A4"], 2],
+      ["A1", ["C1"], 0],
+      ["B1", ["B2"], 2],
+      ["A2", ["A4", "A5"], 2],
+      ["A4", ["A5", "B2"], 2],
+      ["D5", ["F5"], 2],
+      ["G6", ["F5"], 2],
+      ["F6", ["F5"], 0],
+      ["A2", ["G6"], 4],
+      ["A2", ["A1"], 2],
+      ["B1", ["A1"], 2],
+      ["K6", ["L6"], 0],
+      ["A2", ["O7"], 1],
+      ["A2", ["A4", "G6"], 4],
+    ] as const)(
+      "attack from %s against %j gives terrain %i",
+      (a, ds, expected) => {
+        const state = battle(a, [...ds], rulesetVersion);
+        expect(
+          terrainDefenseModifier(
+            state,
+            ["a"],
+            ds.map((_, i) => `d${i}`),
+          ),
+        ).toBe(expected);
       },
-    };
-    expect(
-      automaticCombatResolution(afterRetreat, {
-        ...combat,
-        confirmation: resolution.confirmation,
-      }),
-    ).toEqual(resolution);
-  });
-});
+    );
+
+    it("only participating attackers cancel terrain; only participating defenders contribute", () => {
+      const state = battle("A2", ["A4", "G6"], rulesetVersion);
+      const extra = {
+        ...state,
+        units: { ...state.units, extra: counter("extra", "A5", "confederate") },
+      };
+      expect(terrainDefenseModifier(extra, ["a"], ["d0"])).toBe(2);
+      expect(terrainDefenseModifier(extra, ["a", "extra"], ["d0"])).toBe(0);
+      expect(terrainDefenseModifier(extra, ["a"], ["d1"])).toBe(4);
+    });
+
+    it("caps unit and terrain modifiers together and ignores duplicate defending IDs for terrain", () => {
+      const state = battle("A2", ["A4", "A5", "A6"], rulesetVersion);
+      expect(defenderCombatModifier(state, ["a"], ["d0", "d1", "d2"])).toBe(10);
+      expect(terrainDefenseModifier(state, ["a"], ["d0", "d0"])).toBe(2);
+    });
+
+    it("uses the same total for discovery, preview, and automatic resolution", () => {
+      const state = battle("B1", ["B2"], rulesetVersion);
+      expect(
+        combatOpportunities(state, "confederate")[0]?.defender_modifier,
+      ).toBe(5);
+      const combat: CombatState = {
+        id: "test",
+        attackers: ["a"],
+        defenders: ["d0"],
+        attacker_loss_allocated: false,
+        attacker_retreated: false,
+        defender_loss_allocated: false,
+        defender_retreated: false,
+        confirmation: null,
+        pending_choice: null,
+        rolls: { attacker: 5, defender: 5 },
+        status: "awaiting_result_confirmation",
+      };
+      const resolution = automaticCombatResolution(state, combat)!;
+      expect(resolution).toMatchObject({
+        attacker_total: 8,
+        defender_total: 10,
+        margin: 2,
+        confirmation: { defender_modifier: 5, result: "defender_win" },
+      });
+      const afterRetreat = {
+        ...state,
+        units: {
+          ...state.units,
+          d0: {
+            ...state.units.d0!,
+            location: "A2" as const,
+            strength: "reduced" as const,
+          },
+        },
+      };
+      expect(
+        automaticCombatResolution(afterRetreat, {
+          ...combat,
+          confirmation: resolution.confirmation,
+        }),
+      ).toEqual(resolution);
+    });
+  },
+);
