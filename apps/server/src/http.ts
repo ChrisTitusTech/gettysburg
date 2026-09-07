@@ -21,7 +21,6 @@ import {
 } from "./postgres-store.js";
 
 export const SESSION_COOKIE_NAME = "__Host-gettysburg-session";
-const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const CREATION_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
 const CREATION_LIMIT_PER_SOURCE = 10;
 const CREATION_LIMIT_GLOBAL = 100;
@@ -128,12 +127,16 @@ function readSessionCredential(request: Request): string | undefined {
   return readSessionCredentialFromCookieHeader(request.headers.cookie);
 }
 
-function setSessionCookie(response: Response, credential: string): void {
+function setSessionCookie(
+  response: Response,
+  credential: string,
+  sessionExpiresAt: number,
+): void {
   response.setHeader(
     "Set-Cookie",
     stringifySetCookie({
       httpOnly: true,
-      maxAge: SESSION_MAX_AGE_SECONDS,
+      maxAge: Math.max(0, Math.floor((sessionExpiresAt - Date.now()) / 1000)),
       name: SESSION_COOKIE_NAME,
       path: "/",
       sameSite: "strict",
@@ -337,7 +340,7 @@ export function configureHttpApplication(
           ? suppliedCreationCredential
           : undefined,
       );
-      setSessionCookie(response, result.credential);
+      setSessionCookie(response, result.credential, result.sessionExpiresAt);
       response.status(201).json({
         action_log: await actionLog(gameService, result.gameId),
         active_invitations: await gameService.getActiveInvitations(
@@ -388,7 +391,7 @@ export function configureHttpApplication(
           ...(requestedSeat === undefined ? {} : { requestedSeat }),
           secret,
         });
-        setSessionCookie(response, result.credential);
+        setSessionCookie(response, result.credential, result.sessionExpiresAt);
         response.status(200).json({
           action_log: await actionLog(gameService, result.gameId),
           active_invitations: [],
@@ -435,7 +438,7 @@ export function configureHttpApplication(
           ...(credential === undefined ? {} : { credential }),
           ...(requestedGameId === undefined ? {} : { requestedGameId }),
         });
-        setSessionCookie(response, result.credential);
+        setSessionCookie(response, result.credential, result.sessionExpiresAt);
         response.status(200).json(result.view);
       } catch (error) {
         next(error);
@@ -496,7 +499,7 @@ export function configureHttpApplication(
             revokedSeat: result.seat,
           });
         }
-        setSessionCookie(response, result.credential);
+        setSessionCookie(response, result.credential, result.sessionExpiresAt);
         response.status(200).json({
           action_log: await actionLog(gameService, result.gameId),
           active_invitations: [],
@@ -542,7 +545,7 @@ export function configureHttpApplication(
         if (auditEvent !== undefined) {
           options.eventBus?.publishAudit(result.gameId, { event: auditEvent });
         }
-        setSessionCookie(response, result.credential);
+        setSessionCookie(response, result.credential, result.sessionExpiresAt);
         response.status(200).json({
           action_log: await actionLog(gameService, result.gameId),
           active_invitations: await gameService.getActiveInvitations(

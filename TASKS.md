@@ -1341,6 +1341,31 @@ validation remain separate gates.
 
 ### Phase 4
 
+- [ ] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
+  - Scope: Three late PR #34 findings arrived after its separate merge check
+    reported zero threads. Ordinary observer reads now require unique claimed
+    invitation/binding/session links and an actual issuance event, not only a
+    matching active session. Missing development claim metadata fails closed.
+    Preserve observer-only PostgreSQL session rows and repair missing mirrors;
+    bound all cookie-setting responses to authoritative remaining lifetime.
+    Failed duplicate claims must not silently renew their browser session.
+    Soft deletion removes the claim-to-session link while retaining hashes.
+  - Validation plan: Corrupted/unbound/reassigned grant regressions, shared-role
+    preservation, exact retry cookie lifetime, and PostgreSQL mirror retention,
+    repair, and deletion. Run the full local/database/browser gate, fresh
+    independent review, exact-head CI, and resolve all three hosted threads.
+    Owner: ChrisTitusTech. Live transport remains isolated until this repair
+    clears; no new VPS deployment or destructive migration is authorized here.
+    Initial typecheck caught an optional issuance record dereference; an
+    explicit missing-record guard fixes it. Targeted service/HTTP tests pass.
+  - Validation: Frozen install, format, lint, typecheck, 576 workspace/nine
+    harness tests, build, smoke, Markdown and whitespace pass. All 197 isolated
+    PostgreSQL tests pass, including observer mirror retention/repair/deletion.
+    Desktop/tablet enforced games, all pending choices, reload/exact replay,
+    and input fixtures pass in `test-results/spectator-integrity` and its
+    `-fixtures` directory. Fresh independent review found no actionable
+    regressions and reran 181 server tests; its 16 database skips are covered
+    above. Exact-head CI and hosted thread resolution remain before merge.
 - [ ] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host
