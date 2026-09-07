@@ -1581,6 +1581,25 @@ validation remain separate gates.
     fixtures pass in `test-results/spectator-socket-cancellation` and its
     `-fixtures` directory. Exact-head CI and hosted-thread resolution remain
     before merge; CodeRabbit limits remain explicitly skipped as authorized.
+  - After PR #38 merged, integration preserved its host controls and the
+    reviewed replay-test budget. Prior transport head `b2005da` passed
+    Application `34100112543` and Documentation `34100112470`. A further hosted
+    review identified the pool-wide connection timeout and an uncancelled
+    room-creation read. The two-second deadline now remains room-specific;
+    ordinary service pool checkouts retain their prior behavior. Room creation
+    uses the same cancellable read helper and discards a timed-out connection.
+    Tests verify a cancelled creation releases its PostgreSQL lock and allows
+    a new room attempt. A void-or-Promise hook test needed Promise.resolve
+    before typecheck. Repeat full gates/review and resolve both new threads
+    after publication; these findings prevent merge until then.
+    Repair validation passes the full local gate (596 workspace/nine harness
+    tests), all 214 PostgreSQL tests, and fresh independent review (six focused
+    room tests and server typecheck; database checks covered separately).
+    Desktop/tablet full games, all three choices on tablet, pending-result
+    reload/exact replay, and input fixtures pass in
+    `test-results/spectator-room-create-cancellation` and its `-fixtures`
+    directory. Publish the repair, resolve both hosted threads, and verify
+    exact-head CI before merge.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

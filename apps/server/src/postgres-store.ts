@@ -38,6 +38,7 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  verifyRoomGame(gameId: string, signal: AbortSignal): Promise<void>;
   deliverAuthorizedState(
     authorization: GameAuthorization | SpectatorAuthorization,
     deliver: (state: GameState) => void,
@@ -159,6 +160,9 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async verifyRoomGame(gameId: string, signal: AbortSignal) {
+    if (!signal.aborted) this.service.getGameState(gameId);
+  }
   async deliverAuthorizedState(
     authorization: GameAuthorization | SpectatorAuthorization,
     deliver: (state: GameState) => void,
@@ -307,6 +311,11 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #pepper: Uint8Array;
+  async verifyRoomGame(gameId: string, signal: AbortSignal) {
+    await this.#readForDelivery((service) => {
+      service.getGameState(gameId);
+    }, signal);
+  }
   async deliverAuthorizedState(
     authorization: GameAuthorization | SpectatorAuthorization,
     deliver: (state: GameState) => void,
@@ -362,7 +371,6 @@ export class PostgresGameService implements GameService {
     this.#pool = new Pool({
       connectionString: options.connectionString,
       max: 10,
-      connectionTimeoutMillis: 2_000,
     });
     this.#pepper = options.pepper;
   }

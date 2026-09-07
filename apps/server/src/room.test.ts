@@ -25,6 +25,45 @@ describe("command-window pruning", () => {
 });
 
 describe("authorized broadcast ordering", () => {
+  it("cancels a stalled room-creation read before allowing a retry", async () => {
+    vi.useFakeTimers();
+    const service = new InMemoryAsyncGameService();
+    const host = await service.createGame("union");
+    const Room = createGettysburgRoom(service, { isReady: () => true });
+    const first = new Room();
+    const retry = new Room();
+    vi.spyOn(first, "setMetadata").mockResolvedValue(undefined);
+    vi.spyOn(retry, "setMetadata").mockResolvedValue(undefined);
+    let signal: AbortSignal | undefined;
+    vi.spyOn(service, "verifyRoomGame").mockImplementationOnce(
+      async (_id, cancellation) => {
+        signal = cancellation;
+        await new Promise<void>((resolve) =>
+          cancellation.addEventListener("abort", () => resolve(), {
+            once: true,
+          }),
+        );
+      },
+    );
+    try {
+      const result = Promise.resolve(
+        first.onCreate!({ gameId: host.gameId }),
+      ).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      await vi.advanceTimersByTimeAsync(ROOM_DELIVERY_TIMEOUT_MS);
+      expect(await result).toBeInstanceOf(Error);
+      expect(signal?.aborted).toBe(true);
+      await retry.onCreate!({ gameId: host.gameId });
+      expect(retry.setMetadata).toHaveBeenCalledWith({ gameId: host.gameId });
+    } finally {
+      await first.onDispose!();
+      await retry.onDispose!();
+      vi.restoreAllMocks();
+      vi.useRealTimers();
+    }
+  });
   it.each(["disconnect", "timeout"])(
     "releases established delivery after a pending join %s",
     async (cause) => {
