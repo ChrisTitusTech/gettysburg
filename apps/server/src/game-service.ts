@@ -87,6 +87,7 @@ export interface Invitation {
   readonly allowedSeat: Side;
   claimId?: string;
   claimedAt: number | null;
+  claimedAfterSequence?: number;
   readonly expiresAt: number;
   readonly gameId: string;
   readonly lookupId: string;
@@ -1197,6 +1198,9 @@ export class InMemoryGameService {
     const session = this.#resolveOrCreateSession(input.credential);
     invitation.claimId = input.claimId ?? randomUUID();
     invitation.claimedAt = now;
+    invitation.claimedAfterSequence = this.#requireActiveGame(
+      invitation.gameId,
+    ).state.event_sequence;
     invitation.sealedClaimCredential = sealInvitationSecret(
       this.#pepper,
       session.credential,
@@ -1784,6 +1788,7 @@ export class InMemoryGameService {
           delete invitation.sealedClaimCredential;
           if (invitation.claimedAt === null && invitation.revokedAt === null) {
             invitation.revokedAt = now;
+            invitation.revokedAtSequence = game.state.event_sequence + 1;
           }
           this.#destroyInvitationSecret(invitation.lookupId);
         }
@@ -2306,6 +2311,9 @@ export class InMemoryGameService {
                 lookupId: invitation.lookupId,
                 allowedSeat: invitation.allowedSeat,
                 claimedAt: invitation.claimedAt,
+                ...(invitation.claimedAfterSequence === undefined
+                  ? {}
+                  : { claimedAfterSequence: invitation.claimedAfterSequence }),
                 expiresAt: invitation.expiresAt,
                 revokedAt: invitation.revokedAt,
                 ...(invitation.activeAfterSequence === undefined

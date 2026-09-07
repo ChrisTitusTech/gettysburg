@@ -488,6 +488,30 @@ validation remain separate gates.
     reviewed merge; do not treat the merged verifier as final release acceptance.
     Complete local/database/browser gates, fresh independent review, and
     exact-head CI in a separate repair PR before resolving the late threads.
+  - Implementation: Persist invitation claim and surrender-revocation event
+    boundaries; keep the replay API's evidence projection credential-free.
+    Validate nonoverlapping per-role binding intervals once, use indexed
+    historical seat occupancy for issuance, and check surrender's outstanding
+    invitations without retiring future issues or earlier claims/revocations.
+    Immediate-recovery zero-action intervals remain valid. No save rewrite or
+    ordinary-resume change; missing replay evidence fails closed.
+  - Validation: The first focused run rejected a corrupt recovery fixture at
+    the new earlier chronology check; its expected error was updated. Initial
+    new test typing errors involved readonly arrays and omitted optional fields;
+    corrected fixtures pass typecheck and all 35 focused replay tests, including
+    overlapping host/Union/Confederate intervals, consistently forged occupied
+    invitations, surrender retirement, future claims/issues, expired invitations,
+    and replay after snapshot restore through the API projection. Complete
+    local/database/browser gates and fresh review follow before publication.
+    The complete local gate now passes with 554 workspace/nine harness tests
+    and all 172 PostgreSQL tests. Both enforced games pass through turn 24 with
+    two combats, pending-result reload, and exact replay in
+    `test-results/replay-management-chronology`; mandatory input fixtures pass
+    in `test-results/replay-management-chronology-fixtures`. Fresh independent
+    review found
+    no actionable regressions and reran 159 server tests/typecheck; its 13
+    database skips are covered by the isolated PostgreSQL run above. Parent
+    PR #29's failed CI timeout remains a merge blocker for this stack.
 - [ ] Repair late hosted replay-viewer findings after PR #28 merged.
   - Scope: Respect 429/Retry-After, preserve presentation across adjacent events,
     reflect live management/audit cursors, and remove the desktop grid layout
