@@ -253,6 +253,79 @@ try {
         .screenshot({ path: resolve(evidence, `${name}-retreat-edge.png`) });
       await choose("Confirm permanent retreat off board");
       await state().filter({ hasText: "v1: a=exited, steps=2" }).waitFor();
+
+      async function advance(kind) {
+        await page.goto(origin);
+        await page.evaluate(async (selected) => {
+          const { mountAdvanceFixture } =
+            await import("/src/test/AdvanceFixture.tsx");
+          mountAdvanceFixture(selected);
+        }, kind);
+        await page
+          .getByRole("heading", {
+            name: "Advance test fixture - not a live game",
+          })
+          .waitFor();
+        await page.getByRole("button", { name: "Fit", exact: true }).click();
+      }
+      await advance("mixed");
+      const advancingPair = page.getByRole("radio", {
+        name: "Fixture infantry + Fixture general from F5",
+      });
+      if (hasTouch) await advancingPair.tap();
+      else await advancingPair.press("Space");
+      assert.equal(await state().innerText(), "v0: pending_choice");
+      await page
+        .getByRole("region", { name: "Advance choice" })
+        .screenshot({ path: resolve(evidence, `${name}-advance-choice.png`) });
+      await choose("Confirm advance to F4");
+      await state().filter({ hasText: "v1: resolved" }).waitFor();
+      assert.equal(
+        await page
+          .getByRole("status", { name: "Fixture counters" })
+          .innerText(),
+        "a=F5, spent=5; b=F4, spent=5; g=F4, spent=5",
+      );
+
+      await advance("blocked");
+      assert.equal(
+        await page.getByRole("button", { name: /Confirm advance/ }).count(),
+        0,
+      );
+      await choose("Decline this advance");
+      await state().filter({ hasText: "v1: resolved" }).waitFor();
+
+      await advance("clear");
+      const advancing = page.getByRole("button", {
+        name: /Fixture artillery, F5, selectable/,
+      });
+      if (hasTouch) {
+        await advancing.tap();
+        await hex("F4").tap();
+      } else {
+        const start = await advancing.boundingBox();
+        const end = await hex("F4").boundingBox();
+        assert(start && end);
+        await page.mouse.move(
+          start.x + start.width / 2,
+          start.y + start.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(end.x + end.width / 2, end.y + end.height / 2, {
+          steps: 5,
+        });
+        await page
+          .getByText("Release to advance to F4 for no movement cost.")
+          .waitFor();
+        await page.mouse.up();
+      }
+      await state().filter({ hasText: "v1: resolved" }).waitFor();
+      assert.equal(
+        await page
+          .getByRole("status", { name: "Fixture counters" })
+          .innerText(),
+        "a=F4, spent=5",
+      );
       assert.deepEqual(issues, []);
     } finally {
       await context.close();

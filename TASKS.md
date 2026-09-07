@@ -479,6 +479,28 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory advance controls and full-game acceptance.
+  - Scope: Preview advance with the same pure reducer used by the server. Offer
+    legal victorious groups and destinations, including a smaller infantry/general
+    pair when artillery cannot enter wooded rough hills. Normal movement spending
+    and closed activations do not restrict this free combat action. Declining is
+    available even when no group can advance. Board clicks, drag previews, and
+    drag release validate terrain, ownership, pending choices, and source capacity.
+  - Boundary: Mandatory-v4 is still unavailable to new games. Reinforcement/night
+    guidance, complete pinned content/version activation, and full two-player
+    rules-enforced acceptance remain open; existing rules keep their controls.
+  - Validation: Seven cases cover safe subsets, free movement/objectives,
+    invalid previews, keyboard focus, confirmation, declining, disabled/opposing
+    seats, and board clicks. Browser fixtures exercise desktop keyboard/mouse
+    and tablet touch through the real schema/reducer, including leaving artillery
+    behind, unchanged movement spending, and a blocked advance that can decline.
+    The rendered tablet controls were inspected in
+    `test-results/mandatory-advance-controls`. Frozen install, format, lint,
+    typecheck, 432 default workspace tests plus six harness tests, build, smoke,
+    Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
+    desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-advance-controls-regression`). Independent review
+    and exact-head CI remain required before merge.
 - [ ] Complete mandatory normal-movement group and exit controls.
   - Scope: Offer all legal subsets of a selected stack, retaining source capacity,
     printed budgets, general accompaniment, and active/closed move boundaries.
@@ -497,8 +519,10 @@ validation remain separate gates.
     typecheck, 425 default workspace tests plus six harness tests, build, smoke,
     Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
     desktop/tablet and 24-turn regression also pass
-    (`test-results/mandatory-movement-controls-review`). Independent review
-    and exact-head CI remain required before merge. Independent review identified
+    (`test-results/mandatory-movement-controls-review`). PR #20 merged as
+    `84d23f6` after fresh independent built-in review, hosted Codex review, and
+    exact-head CI passed. No unresolved threads remained; CodeRabbit was limited
+    and skipped under owner direction. Independent review identified
     radio focus loss after selection: only the exit confirmation now remounts,
     while component and real-browser arrow-key tests verify preserved radio focus.
     Re-selecting a prior group cannot revive its discarded confirmation.
