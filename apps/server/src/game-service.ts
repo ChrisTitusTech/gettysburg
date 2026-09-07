@@ -68,6 +68,10 @@ export interface HostBinding {
 }
 
 export interface SeatBinding {
+  // Optional only for retained pre-chronology saves. Interpreted mandatory replay
+  // requires these boundaries; never infer them from current revocation time.
+  readonly activeAfterSequence?: number;
+  inactiveFromSequence?: number;
   readonly gameId: string;
   readonly id: string;
   readonly sessionId: string;
@@ -1096,6 +1100,7 @@ export class InMemoryGameService {
     });
     this.#seatBindings.push({
       gameId,
+      activeAfterSequence: 0,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -1226,6 +1231,8 @@ export class InMemoryGameService {
     this.#destroyInvitationSecret(invitation.lookupId);
     this.#seatBindings.push({
       gameId: invitation.gameId,
+      activeAfterSequence: this.#requireActiveGame(invitation.gameId).state
+        .event_sequence,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -1572,8 +1579,10 @@ export class InMemoryGameService {
           if (
             binding.gameId === authorization.gameId &&
             binding.revokedAt === null
-          )
+          ) {
             binding.revokedAt = now;
+            binding.inactiveFromSequence = game.state.event_sequence + 1;
+          }
         }
         for (const binding of this.#hostBindings) {
           if (
@@ -1792,6 +1801,7 @@ export class InMemoryGameService {
       )!;
       const now = this.#now();
       binding.revokedAt = now;
+      binding.inactiveFromSequence = game.state.event_sequence + 2;
       for (const invitation of this.#invitations.values()) {
         if (
           invitation.gameId === authorization.gameId &&
@@ -2050,6 +2060,8 @@ export class InMemoryGameService {
       session.credential,
     );
     oldBinding.revokedAt = now;
+    oldBinding.inactiveFromSequence =
+      this.#requireActiveGame(grant.gameId).state.event_sequence + 1;
     grant.consumedAt = now;
     for (const invitation of this.#invitations.values()) {
       if (
@@ -2061,6 +2073,8 @@ export class InMemoryGameService {
     }
     this.#seatBindings.push({
       gameId: grant.gameId,
+      activeAfterSequence:
+        this.#requireActiveGame(grant.gameId).state.event_sequence + 1,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
