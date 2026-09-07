@@ -2000,6 +2000,25 @@ checks. A separate PostgreSQL run passes all 329 server tests, including the
 26 omitted by the default database-free suite. Fresh independent review of the
 seven-file increment found no actionable defects and reran four performance
 regressions. Published exact-head CI remains required before merge.
+PR #55 head `58bfd69` failed its first WebKit CI timing gate in job
+`101769294512` (`34130528806`): desktop p95 113 ms, two of 20 samples above
+100 ms. Browser installation/startup, native notification checks, and lobby
+accessibility passed before the timing failure; Firefox's full run passed.
+The complete relevant job log was inspected. The Node 20 action-deprecation
+notice and retained bundle-size warning are not this failure's cause.
+An isolated two-CPU WebKit profile records 1-2 ms React updates but substantially
+longer frame scheduling/render opportunities. Disabling counter shadows did not
+materially improve the timings, so no speculative artwork/runtime edit was kept.
+Retain per-sample confirmation-frame and total timing diagnostics (numeric only)
+and print them on a budget miss before another reviewed exact-head CI run.
+The 100 ms gate is unchanged; the first failure remains evidence, and neither
+VPS performance nor Phase 4 is accepted by a later passing sample.
+The diagnostics-only repair passes the full local gate (755 workspace/30 harness
+tests), independent review, and a two-CPU isolated WebKit probe (20 samples,
+70 ms p95, none over budget). Local raw numeric profiles remain in
+`test-results/zoom-confirmation-diagnostics.json` and
+`test-results/webkit-profile-diagnostics-performance.json`. This does not
+explain away or replace the hosted failure; CI must rerun on the published head.
 
 ### Browser-engine acceptance increment
 

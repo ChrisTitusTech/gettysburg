@@ -75,6 +75,10 @@ test("failed confirmation and input retain bounded evidence before rejecting", a
       assert.equal(evidence.samples, 1);
       assert.equal(evidence.maximumMs, 2_000);
       assert.equal(evidence.overBudget, 1);
+      assert.deepEqual(
+        evidence.frameDiagnostics,
+        inputFailure ? [] : [{ confirmedAtMs: null, durationMs: 2_000 }],
+      );
       assert.equal(
         evidence.failure,
         inputFailure

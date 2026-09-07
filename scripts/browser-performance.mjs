@@ -73,6 +73,7 @@ export function summarizeResponseTimes(samples) {
 export async function measureBoardResponse(page, evidence, label) {
   await page.getByRole("button", { name: "Fit", exact: true }).click();
   const samples = [];
+  const frameDiagnostics = [];
   let failure;
   for (let index = 0; index < 20; index++) {
     const zoomIn = index % 2 === 0;
@@ -87,11 +88,13 @@ export async function measureBoardResponse(page, evidence, label) {
             "click",
             () => {
               const start = performance.now();
+              let confirmedAtMs = null;
               const finish = (confirmed) => {
                 clearTimeout(timeout);
                 resolveSample({
                   durationMs: performance.now() - start,
                   confirmed,
+                  confirmedAtMs,
                 });
               };
               const timeout = setTimeout(() => finish(false), 2_000);
@@ -103,9 +106,10 @@ export async function measureBoardResponse(page, evidence, label) {
                 if (
                   document.querySelector('[aria-label="Current zoom"]')
                     ?.textContent === expectedZoom
-                )
+                ) {
+                  confirmedAtMs = performance.now() - start;
                   requestAnimationFrame(() => finish(true));
-                else requestAnimationFrame(observeUpdate);
+                } else requestAnimationFrame(observeUpdate);
               };
               requestAnimationFrame(observeUpdate);
             },
@@ -119,6 +123,10 @@ export async function measureBoardResponse(page, evidence, label) {
       await button.click({ timeout: 2_000 });
       const sample = await page.evaluate(() => window.__gettysburgTiming);
       samples.push(sample.durationMs);
+      frameDiagnostics.push({
+        confirmedAtMs: sample.confirmedAtMs ?? null,
+        durationMs: sample.durationMs,
+      });
       if (!sample.confirmed) failure = "zoom-not-confirmed-before-deadline";
     } catch {
       samples.push(2_000);
@@ -142,6 +150,7 @@ export async function measureBoardResponse(page, evidence, label) {
         browser: page.context().browser().version(),
         viewport: page.viewportSize(),
         ...summary,
+        frameDiagnostics,
         failure: failure ?? null,
         limitations: [
           "No CPU or network throttling; this is the current test machine.",
@@ -156,6 +165,10 @@ export async function measureBoardResponse(page, evidence, label) {
   console.log(
     `${label}: board response p95 ${summary.p95Ms.toFixed(1)} ms; ${summary.overBudget}/${summary.samples} samples exceed 100 ms`,
   );
+  if (summary.overBudget > 0)
+    console.log(
+      `${label}: frame diagnostics ${JSON.stringify(frameDiagnostics)}`,
+    );
   // Persist evidence before rejecting a missed response budget.
   assert.equal(
     failure,
