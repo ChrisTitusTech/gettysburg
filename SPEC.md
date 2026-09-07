@@ -777,6 +777,12 @@ ordinary ten-connection pool. Both pools close during service shutdown; the
 additional connections are not a measured capacity claim. Successful committed
 commands acknowledge completion only after their snapshot broadcast, keeping
 the sender's pending controls aligned with the authoritative state.
+Observers receive no private state in Colyseus's pre-acknowledgement queue.
+Their initial read waits for transport JOINED state, with a bounded cancellable
+handshake wait, then reauthorizes and sends under the same database read lock.
+Delayed acknowledgement across session expiry or an unnotified revocation
+closes the observer without a snapshot. A pending handshake does not hold the
+room delivery queue or a database connection.
 Failed reads never fall back to
 cached spectator access and close affected observer sockets with retryable code
 4002, so a fresh join must reauthorize and load current state. These checks
