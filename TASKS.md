@@ -508,10 +508,16 @@ validation remain separate gates.
     two combats, pending-result reload, and exact replay in
     `test-results/replay-management-chronology`; mandatory input fixtures pass
     in `test-results/replay-management-chronology-fixtures`. Fresh independent
-    review found
-    no actionable regressions and reran 159 server tests/typecheck; its 13
+    review found no actionable regressions and reran 159 server tests/typecheck;
+    its 13
     database skips are covered by the isolated PostgreSQL run above. Parent
-    PR #29's failed CI timeout remains a merge blocker for this stack.
+    PR #29's failed CI timeout remains a merge blocker for this stack. The
+    repaired eight-minute harness bound from parent `7f7a84f` is merged here;
+    it changes no application source or browser assertions. The existing
+    chronology browser/database evidence above passed under the stricter bound.
+    The combined local gate passes again (554 workspace/nine harness tests).
+    Fresh independent review against the viewer parent found no actionable
+    regressions and reran 159 server tests; database/browser evidence is above.
 - [ ] Repair late hosted replay-viewer findings after PR #28 merged.
   - Scope: Respect 429/Retry-After, preserve presentation across adjacent events,
     reflect live management/audit cursors, and remove the desktop grid layout
@@ -551,6 +557,10 @@ validation remain separate gates.
     The complete replay-container renders were inspected again. A fresh
     independent review of the combined branch found no actionable regressions
     and reran all 105 client tests and whitespace checks.
+    PR #30 head `d936c79` passed Application (`34085234470`, 12m12s) and
+    Documentation (`34085234490`) with no review threads. The four late PR #28
+    threads are resolved after publishing the repair. Merge still waits for
+    parent PR #29's repaired exact-head CI.
 - [ ] Strengthen the full-game browser acceptance beyond no-contact turns.
   - Scope: Use two actual browser sessions and visible keyboard/touch controls
     to play the pinned opening into two independent live combats, reload both
