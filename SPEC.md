@@ -869,6 +869,10 @@ commit only once.
 - Secrets live outside Git in rootless service environment files with mode 0600.
 - Dependencies, container images, and migrations are reviewed before production
   deployment.
+- The application uses matching digest-pinned Node 24 Alpine build/runtime
+  stages, pinned OpenSSL security packages, and no runtime package managers.
+  Scan the final immutable application image, including OS and Node packages,
+  before release; a clean workspace dependency audit alone is insufficient.
 
 The supplied scans may contain copyrighted Avalon Hill material. They remain
 local, are ignored by Git, and must never be force-added. Public or commercial

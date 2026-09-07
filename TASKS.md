@@ -1600,6 +1600,57 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Container vulnerability closeout (release gate open)
+
+- [ ] Refresh and scan the immutable Node 24 container base and application.
+  - The 2026-09-07 complete and production-only pnpm audits report no known
+    vulnerabilities. They do not cover OS packages or bundled global tools.
+  - Provisioned Trivy 0.74.0 in a task-local directory from its official
+    GitHub release. Verified the Linux archive against GitHub's published
+    SHA-256 `2ae6fe3ee734b7fdf11335663e18c75ea12dccc76062f09f164a3b0f8be4371a`
+    before extracting/running the named binary. No global host package changed.
+  - The pinned base `85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e`
+    fails the HIGH/CRITICAL scan: 62 OS findings (six critical, six with fixes)
+    and 15 bundled Node-tool findings (one critical, all with fixes).
+    Raw local JSON: `/tmp/gettysburg-scanner.K2VSLN/pinned-base.json`.
+  - Current Node 24.18.0 Bookworm slim was also scanned at immutable digest
+    `6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d`:
+    56 OS findings without listed fixes (four critical) and nine bundled-tool
+    findings with fixes (one critical). This is not a passing release result.
+  - Plan: Compare supported current bases, minimize unused runtime tools,
+    validate the real container entrypoint/readiness/restart/durability, and
+    scan the final immutable application image. Preserve non-root execution,
+    reviewed source boundaries, full local/browser gates, independent review,
+    and exact-head CI. Owner: ChrisTitusTech. No VPS rollout or release approval
+    is implied by local image work; unresolved findings remain visible.
+  - Candidate: Node 24.18.0 Alpine 3.24.1 at digest
+    `a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd`.
+    Its initial scan found two high OpenSSL package findings, both fixed by
+    `libcrypto3`/`libssl3` 3.5.8-r0, plus the same nine global-tool findings.
+    Pin those available security packages and remove unused npm/Corepack/Yarn
+    from the runtime layer only. Builder and runtime share the same Alpine
+    base so native dependency targets match. The glibc-to-musl change requires
+    actual container build/startup/restart/persistence validation, not only
+    host tests.
+  - Candidate image `0c898aa8c42633c9b4e00600b762136e84260f64ed9d828cae686b6fe86c7c67`
+    passes Trivy 0.74.0 HIGH/CRITICAL scanning on 2026-09-07: zero findings
+    across 18 OS packages and 344 Node packages. Raw local evidence is
+    `/tmp/gettysburg-scanner.K2VSLN/candidate.json`. This is a severity-bounded
+    scan, not a claim of zero vulnerabilities of every severity. The scanner's
+    Alpine EOL-metadata warning was checked against the official release table;
+    Alpine 3.24 main support ends 2028-06-01.
+  - Full local gates pass 584 workspace/nine harness tests. Container smoke
+    proves UID 1000, database restart/resume, readiness failure, and shutdown.
+    The actual immutable candidate (not the host Node server) completes two
+    24-turn browser games at desktop/tablet widths, all three combat choices,
+    pending-result reload, and exact replay in
+    `test-results/alpine-image-acceptance`. The first ad-hoc harness attempt
+    failed before startup because this Podman rejected tmpfs ownership options;
+    rerunning with a task-owned named volume passed and cleaned its resources.
+  - Independent review found no actionable defects. Final documentation checks,
+    integration with merged application work, exact-head CI, and a scan of the
+    final merged release image remain required. No VPS changes were made.
+
 ## Phase 0 completion gate
 
 - [x] Merge PR #1 to establish the project foundation and implementation

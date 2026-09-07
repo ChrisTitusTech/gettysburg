@@ -296,7 +296,20 @@ read-only root filesystems, private named volumes, and an internal network. The
 application drops all capabilities. PostgreSQL drops the defaults and restores
 only `CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETGID`, and `SETUID`, which its official
 entrypoint needs to initialize the named volume and become the database user.
-The PostgreSQL and Node base images are pinned by digest. Secrets are created
+The PostgreSQL and Node base images are pinned by digest. The application
+candidate uses Node 24.18.0 on Alpine 3.24 with pinned OpenSSL 3.5.8-r0 packages;
+build and runtime stages share the same base to avoid native ABI mismatches.
+Runtime npm, Corepack, and Yarn are removed after the build. Alpine 3.24 has
+[main support through June 1, 2028](https://alpinelinux.org/releases/).
+For each base/package refresh, rerun the full container smoke and browser
+acceptance gates against the candidate, then scan its immutable image for OS
+and Node vulnerabilities. Record scanner version, verified release checksum,
+image ID, scan date, and unresolved findings in `TASKS.md`. Rebuild and rescan
+the final merged release image; a previous candidate scan does not attest to
+later source or dependency changes. This local candidate is not the deployed
+VPS image recorded above.
+
+Secrets are created
 outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The
 deployment script records the exact Git revision and application image ID beside
 the pre-change rollback material. Before building or entering maintenance mode,
