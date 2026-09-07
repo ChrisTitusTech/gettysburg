@@ -53,6 +53,44 @@ stream costs, rough-hill/artillery restrictions, generals, and remaining ZOC
 rules are the separate Phase 3 movement task; these edge estimates are inputs
 to that task, not a claim that it is already complete.
 
+## Mandatory movement bundle (not yet enabled)
+
+`packages/content/src/mandatory.ts` pins the complete new Scenario Five opening
+under `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1`. It includes
+all 253 approved terrain records, the existing 70 road / 15 rail / 58 stream
+pairs, 82 counters with unchanged schedules, eight objectives worth 16 points,
+and empty continuous-movement activation. The first active phase is Union
+movement, turn 1. Each constructor call returns an isolated snapshot; a content
+fingerprint guards against silently changing this revision's interpretation.
+The server does not yet register or create this version pair.
+
+Off-board road/rail links were separately estimated from the approved PNG on
+2026-09-06. The explicit inventory is A2, A7, H11, O11, Q11, S1, U1, W7,
+and W11. A route merely passing through an edge hex is not an off-board link.
+Only these listed boundary crossings supply the half-point entry discount,
+including when the nearest-safe-entry rule sends a reinforcement there.
+They do not make an otherwise illegal entry legal or let artillery enter wooded
+rough hills. Normal voluntary exit still costs one full movement point.
+
+| Boundary location | Inferred hex | Basis / limitation |
+| --- | --- | --- |
+| Upper western road | A2 | Painted road crosses the western boundary |
+| Middle western road | A7 | Painted road crosses the western boundary |
+| Southwestern road | H11 | Southern exit is in H11; I11 only contains an on-board segment |
+| South-central road | O11 | Vertical road continues to the outer boundary |
+| Southern railroad | Q11 | Rail continuation at the southern boundary is near a hex vertex; lower confidence |
+| Northern railroad | S1 | Rail crosses the top boundary |
+| Northeastern road | U1 | Road reaches the upper-right boundary, not every adjacent top-row hex |
+| Middle eastern road | W7 | Road crosses the eastern boundary |
+| Lower eastern road | W11 | Painted road is below W10 at the boundary |
+
+No scheduled arrival is relocated to fit these estimates. On an enemy-free,
+uncongested board the scheduled infantry entry costs are A1 = 2, A8 = 1,
+I11 = 2, S1 = 0.5, W7 = 0.5, and W10 = 2. A8 remains owner-verified clear
+terrain, despite nearby painted woods. The owner-approved worksheet is unchanged.
+These border estimates, especially the southern rail vertex and I11/W10
+adaptations, remain explicit owner gameplay acceptance checks before release.
+
 ## Scenario adaptation
 
 | Item | Previous key | Painted-board key | Treatment |

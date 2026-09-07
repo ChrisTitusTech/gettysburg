@@ -479,6 +479,29 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Pin and activate the complete mandatory content/version pair.
+  - Scope: Add an isolated initial-state constructor with all approved terrain,
+    existing movement edges, unchanged Scenario Five units/schedules/objectives,
+    empty continuous-movement activation, and explicit off-board road/rail
+    crossings. A fixed content fingerprint protects the revision from silent
+    edits. Record the inferred crossings and scheduled entry costs in
+    `docs/references/TERRAIN_CONNECTIONS.md`; do not modify owner terrain rows.
+  - Boundary: The new pair is `gettysburg-mandatory-v4` /
+    `gettysburg-mandatory-board-v1`. This preparatory constructor does not
+    register the pair or change server-created games. Strict server bundle
+    validation, activation, persistence/replay integration, and live two-player
+    mandatory acceptance remain separate work. Owner gameplay review of inferred
+    road/rail border crossings remains required before release.
+  - Validation: Nineteen cases cover complete content, immutable identity,
+    isolated snapshots, unique boundary entries, every scheduled entry cost, and
+    all nine explicit road/rail entry discounts. Frozen install, format, lint,
+    typecheck, 459 default workspace tests plus six harness tests, build, smoke,
+    Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
+    desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-content-regression`); mandatory keyboard/touch
+    browser fixtures also pass (`test-results/mandatory-content-fixtures`).
+    Fresh independent built-in review found no actionable defects. Exact-head
+    CI and published review checks remain required before merge.
 - [ ] Complete mandatory reinforcement/night guidance and live acceptance.
   - Scope: Select scheduled counters for single or joint entry; preview actual
     costs and nearest legal enemy-free alternatives, and explain friendly
@@ -499,9 +522,10 @@ validation remain separate gates.
     Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
     desktop/tablet and 24-turn regression pass
     (`test-results/mandatory-turn-guidance-regression`). A formatting failure
-    was corrected before rerunning the full gate. Fresh independent built-in
-    review found no actionable regressions. Exact-head CI and published review
-    checks remain required before merge; skip CodeRabbit if limited.
+    was corrected before rerunning the full gate. PR #22 merged as `326878d`
+    after fresh independent built-in review, hosted Codex review, and exact-head
+    CI passed. No unresolved threads remained; CodeRabbit was limited and skipped
+    under owner direction.
 - [ ] Complete mandatory advance controls and full-game acceptance.
   - Scope: Preview advance with the same pure reducer used by the server. Offer
     legal victorious groups and destinations, including a smaller infantry/general
