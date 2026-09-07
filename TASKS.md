@@ -536,6 +536,15 @@ validation remain separate gates.
     and `test-results/authorized-replay-invitation-fixtures`. Fresh independent
     local review found no actionable defects and reran 150 server tests;
     its 13 database skips are covered above. Exact-head CI remains before merge.
+    Recovery audit evidence is now passed to the strengthened verifier using a
+    game-scoped, credential-free projection of retained grants. Existing host
+    and seat recovery replay tests, including PostgreSQL restart, exercise this
+    integration. The full local gate passes (529 workspace plus six harness
+    tests and all 165 PostgreSQL tests). Both browser suites pass in
+    `test-results/authorized-replay-audit` and
+    `test-results/authorized-replay-audit-fixtures`. Fresh independent local
+    review found no actionable defects and reran 152 server tests; its 13
+    database skips are covered above. Exact-head CI remains before merge.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,

@@ -2274,6 +2274,28 @@ export class InMemoryGameService {
           this.#seatBindings.filter((binding) => binding.gameId === gameId),
           sequence === latest ? game.state : undefined,
           {
+            recoveries: [...this.#recoveryGrants.values()]
+              .filter((grant) => grant.gameId === gameId)
+              .map((grant) => ({
+                gameId: grant.gameId,
+                oldBindingId: grant.oldBindingId,
+                oldBindingVersion: grant.oldBindingVersion,
+                targetBindingType: grant.targetBindingType,
+                side: grant.side,
+                operatorIdentity: grant.operatorIdentity,
+                consumedAt: grant.consumedAt,
+                revokedAt: grant.revokedAt,
+                expiresAt: grant.expiresAt,
+                ...(grant.operatorRequestId === undefined
+                  ? {}
+                  : { operatorRequestId: grant.operatorRequestId }),
+                ...(grant.auditSequence === undefined
+                  ? {}
+                  : { auditSequence: grant.auditSequence }),
+                ...(grant.newBindingId === undefined
+                  ? {}
+                  : { newBindingId: grant.newBindingId }),
+              })),
             hosts: this.#hostBindings.filter(
               (binding) => binding.gameId === gameId,
             ),
