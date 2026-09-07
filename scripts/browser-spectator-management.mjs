@@ -10,7 +10,12 @@ export async function checkSpectatorManagement(
   options,
 ) {
   const contexts = await Promise.all(
-    [0, 1, 2].map(() => browser.newContext({ viewport: options.viewport })),
+    [0, 1, 2].map(() =>
+      browser.newContext({
+        ...options.contextOptions,
+        viewport: options.viewport,
+      }),
+    ),
   );
   const [host, guest, observer] = await Promise.all(
     contexts.map((context) => context.newPage()),

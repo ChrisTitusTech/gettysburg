@@ -6,6 +6,15 @@ const serverOrigin =
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: [
+      {
+        find: /^@colyseus\/msgpackr$/,
+        // Use the dependency's published CSP-safe build, not an unsafe-eval policy.
+        replacement: "@colyseus/msgpackr/index-no-eval",
+      },
+    ],
+  },
   server: {
     host: process.env.GETTYSBURG_WEB_HOST ?? "127.0.0.1",
     port: Number(process.env.GETTYSBURG_WEB_PORT ?? "5173"),

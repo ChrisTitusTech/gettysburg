@@ -94,6 +94,16 @@ historical replay, and await durable cleanup. The games have an eight-minute
 per-game bound; commands are paced below the room's abuse limit even on fast
 runners. CI allows 25 minutes for these games plus the other required gates.
 These automated checks do not replace owner tabletop adjudication.
+`GETTYSBURG_BROWSER=firefox GETTYSBURG_FULL_GAME=true pnpm browser:acceptance`
+also passes locally at both widths with keyboard/mouse input. Chromium remains
+the default and supplies continuous tablet-touch and native notification-worker
+fixtures. The alternate-engine CI workflow additionally targets WebKit on Ubuntu;
+actual Safari/iPad and real push-provider behavior remain manual release gates.
+Locally managed WebKit runs use a task-owned HTTPS proxy (requires OpenSSL) so
+production Secure session cookies survive reload. Other engines can exercise
+that fixture with `GETTYSBURG_BROWSER_HTTPS=true`. Its self-signed certificate
+exception applies only to fixture browser contexts; explicitly configured remote
+origins retain certificate verification. No system trust store is changed.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl
