@@ -12,7 +12,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49 | Browser consent UI, key backup/restore, Home Screen installability, and real provider/device acceptance |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49; encrypted key-recovery wiring merged in PR #51 | Browser consent UI, Home Screen metadata/icons, actual VPS key recovery, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -39,10 +39,12 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
 | #43 protected subscriptions | `e1991d1` | `34112288240` / `34112288184` | `fc70599` |
 | #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
+| #45 container hardening | `e1c67d3` | `34120190523` / `34120190448` | `d3c658c` |
 | #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
 | #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
 | #48 optional startup | `d7c0d4c` | `34117338015` / `34117337993` | `2afd7ef` |
 | #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
+| #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1902,6 +1904,8 @@ spectators in `test-results/accessibility-final`; input evidence is in its
 `-fixtures` directory. The rendered desktop board was inspected. Fresh
 independent review found no actionable defects and reran 146 web tests.
 Exact-head CI follows; unchanged backend retains the 329-test PostgreSQL gate.
+Integration with merged container/key-recovery work passes the full local gate
+again (739 workspace/18 harness tests) without changing browser runtime logic.
 
 Owner/manual gate remains open: verify contrast over the painted board and
 gradient surfaces, keyboard focus order and combat choices, actual screen-reader
