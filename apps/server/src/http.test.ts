@@ -43,6 +43,58 @@ async function withServer(
 }
 
 describe("service health", () => {
+  it("bounds an exact spectator retry cookie by its original server session expiry", async () => {
+    let now = Date.now();
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+    try {
+      const service = new InMemoryAsyncGameService();
+      const host = await service.createGame("union");
+      const issued = await service.executeHostCommand(
+        await service.authenticateHost(host.credential, host.gameId),
+        {
+          command_id: randomUUID(),
+          command_name: "issueSpectatorInvitation",
+          payload: {},
+          expected_version: 0,
+          game_id: host.gameId,
+          schema: COMMAND_SCHEMA_VERSION,
+        },
+      );
+      if (!issued.ok || !issued.invitation)
+        throw new Error("Missing invitation");
+      const invitation = issued.invitation;
+      const input = { claim_id: randomUUID(), secret: invitation.secret };
+      await withServer(
+        true,
+        async (origin) => {
+          const claim = () =>
+            fetch(
+              `${origin}/api/spectator-invitations/${invitation.lookup_id}/claim`,
+              {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify(input),
+              },
+            );
+          const first = await claim();
+          expect(first.status).toBe(200);
+          expect(first.headers.get("set-cookie")).toContain("Max-Age=2592000");
+          await first.json();
+          now += 60 * 60 * 1000;
+          const retry = await claim();
+          expect(retry.status).toBe(200);
+          expect(retry.headers.get("set-cookie")).toContain("Max-Age=2588400");
+          expect(retry.headers.get("set-cookie")?.split(";", 1)[0]).toBe(
+            first.headers.get("set-cookie")?.split(";", 1)[0],
+          );
+          await retry.json();
+        },
+        service,
+      );
+    } finally {
+      clock.mockRestore();
+    }
+  });
   it("claims a private spectator cookie, rejects mutations, and revokes reads", async () => {
     const service = new InMemoryAsyncGameService();
     const host = await service.createGame("union");

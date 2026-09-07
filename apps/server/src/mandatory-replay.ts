@@ -28,7 +28,11 @@ export interface ReplayManagementEvidence {
   readonly spectatorInvitations?: readonly (Omit<
     ReplayManagementEvidence["invitations"][number],
     "allowedSeat"
-  > & { readonly issuedAt: number; readonly bindingId?: string })[];
+  > & {
+    readonly issuedAt: number;
+    readonly bindingId?: string;
+    readonly claimedSessionId?: string;
+  })[];
   readonly hosts: readonly HostBinding[];
   readonly invitations: readonly Pick<
     Invitation,
@@ -331,12 +335,14 @@ export function replayMandatoryActions(
         if (
           binding !== undefined ||
           invitation.bindingId !== undefined ||
+          invitation.claimedSessionId !== undefined ||
           invitation.claimedAfterSequence !== undefined
         )
           throw new ReplayError(0, "unclaimed spectator has binding evidence");
       } else if (
         binding === undefined ||
         binding.id !== invitation.bindingId ||
+        binding.sessionId !== invitation.claimedSessionId ||
         !Number.isFinite(invitation.claimedAt) ||
         invitation.claimedAt < invitation.issuedAt ||
         invitation.claimedAt >= invitation.expiresAt ||

@@ -738,11 +738,20 @@ state and public events; interpreted replay is available with current access,
 but raw recovery exports, player commands, and host commands require their own
 bindings. Existing legitimate host/seat access in the same browser is preserved.
 The host can auditably `revokeSpectatorAccess` even after the original invitation
-expires; subsequent observer reads and replay are denied immediately. Claims
-expire after 24 hours, while an already claimed observer uses the normal browser
-session lifetime. Game deletion removes observer bindings and sealed retries,
+expires; subsequent observer reads and replay are denied immediately. Invitation
+secrets and exact claim retries expire after 24 hours, while an already claimed
+observer uses the normal browser session lifetime. Every cookie-setting response
+uses that session's remaining lifetime, including exact retries; it does not
+extend the browser cookie beyond the unchanged authoritative expiry.
+Game deletion removes observer bindings, claim-to-session links, and sealed retries,
 retaining only invitation hashes/metadata through the deletion window. Replay
 verifies unique claim/binding links and chronology as well as host revocation.
+Ordinary spectator reads also require a unique binding tied to its claimed
+invitation, browser session, and actual host issuance event. Missing or
+inconsistent claim metadata fails closed rather than granting observation;
+no compatibility inference is made for unreleased development spectator grants.
+PostgreSQL's session mirror retains canonical observer-only sessions through
+unrelated mutations and repairs missing mirror rows on subsequent mutations.
 
 Live room authorization, immediate socket revocation, host grant-list controls,
 and the spectator browser interface remain separate delivery gates. A spectator

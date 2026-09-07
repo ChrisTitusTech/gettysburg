@@ -124,6 +124,7 @@ export interface RecoveryGrant {
 export interface SpectatorInvitation extends Omit<Invitation, "allowedSeat"> {
   readonly issuedAt: number;
   bindingId?: string;
+  claimedSessionId?: string;
 }
 export interface SpectatorBinding extends HostBinding {
   readonly invitationLookupId: string;
@@ -282,6 +283,7 @@ export type HostManagementResult = CommandFailure | HostManagementSuccess;
 export interface SessionResult {
   readonly credential: string;
   readonly sessionId: string;
+  readonly sessionExpiresAt: number;
 }
 
 export interface CreateGameResult extends SessionResult {
@@ -1088,6 +1090,7 @@ export class InMemoryGameService {
         },
         seat: side,
         sessionId: session.id,
+        sessionExpiresAt: session.expiresAt,
         state: cloneState(replay.state),
       };
     }
@@ -1211,15 +1214,17 @@ export class InMemoryGameService {
       return {
         credential,
         sessionId: session.id,
+        sessionExpiresAt: session.expiresAt,
         gameId: invitation.gameId,
         view: this.getSpectatorView(credential, invitation.gameId),
       };
     }
-    const session = this.#resolveOrCreateSession(input.credential);
+    const existingSession = this.#findSession(input.credential);
     if (
+      existingSession !== undefined &&
       this.#spectatorBindings.some(
         (binding) =>
-          binding.sessionId === session.sessionId &&
+          binding.sessionId === existingSession.id &&
           binding.gameId === invitation.gameId &&
           binding.revokedAt === null,
       )
@@ -1228,8 +1233,10 @@ export class InMemoryGameService {
         "invitation_unavailable",
         "This browser already has spectator access.",
       );
+    const session = this.#resolveOrCreateSession(input.credential);
     const bindingId = randomUUID();
     invitation.bindingId = bindingId;
+    invitation.claimedSessionId = session.sessionId;
     invitation.claimId = input.claimId;
     invitation.claimedAt = now;
     invitation.claimedAfterSequence = game.state.event_sequence;
@@ -1263,12 +1270,7 @@ export class InMemoryGameService {
     const binding =
       session === undefined
         ? undefined
-        : this.#spectatorBindings.find(
-            (candidate) =>
-              candidate.gameId === gameId &&
-              candidate.sessionId === session.id &&
-              candidate.revokedAt === null,
-          );
+        : this.#findActiveSpectatorBinding(session.id, gameId);
     if (binding === undefined || session === undefined)
       throw new ServiceError(
         "unauthorized",
@@ -1294,6 +1296,66 @@ export class InMemoryGameService {
       state: cloneState(game.state),
       action_log: publicActionLog(game.actions),
     };
+  }
+
+  #findActiveSpectatorBinding(
+    sessionId: string,
+    gameId: string,
+  ): SpectatorBinding | undefined {
+    const candidates = this.#spectatorBindings.filter(
+      (binding) =>
+        binding.gameId === gameId &&
+        binding.sessionId === sessionId &&
+        binding.revokedAt === null,
+    );
+    if (candidates.length !== 1) return undefined;
+    const binding = candidates[0]!;
+    const invitation = this.#spectatorInvitations.get(
+      binding.invitationLookupId,
+    );
+    const game = this.#games.get(gameId);
+    if (invitation === undefined || game === undefined) return undefined;
+    const issue = game.actions[(invitation.activeAfterSequence ?? 0) - 1];
+    if (
+      binding.version !== 1 ||
+      binding.inactiveFromSequence !== undefined ||
+      invitation.gameId !== gameId ||
+      invitation.bindingId !== binding.id ||
+      invitation.claimedSessionId !== binding.sessionId ||
+      invitation.revokedAt !== null ||
+      invitation.revokedAtSequence !== undefined ||
+      invitation.claimedAt === null ||
+      !Number.isFinite(invitation.claimedAt) ||
+      !Number.isFinite(invitation.issuedAt) ||
+      invitation.expiresAt !==
+        invitation.issuedAt + SPECTATOR_INVITATION_LIFETIME_MS ||
+      invitation.claimedAt < invitation.issuedAt ||
+      invitation.claimedAt >= invitation.expiresAt ||
+      !Number.isSafeInteger(invitation.activeAfterSequence) ||
+      invitation.activeAfterSequence! < 1 ||
+      !Number.isSafeInteger(invitation.claimedAfterSequence) ||
+      invitation.claimedAfterSequence! < invitation.activeAfterSequence! ||
+      invitation.claimedAfterSequence! > game.state.event_sequence ||
+      binding.activeAfterSequence !== invitation.claimedAfterSequence ||
+      issue === undefined ||
+      issue.sequence !== invitation.activeAfterSequence ||
+      issue.kind !== "host_management" ||
+      issue.commandName !== "issueSpectatorInvitation" ||
+      [...this.#spectatorInvitations.values()].filter(
+        (candidate) =>
+          candidate.gameId === gameId &&
+          candidate.activeAfterSequence === invitation.activeAfterSequence,
+      ).length !== 1 ||
+      this.#spectatorBindings.filter((candidate) => candidate.id === binding.id)
+        .length !== 1 ||
+      this.#spectatorBindings.filter(
+        (candidate) =>
+          candidate.gameId === gameId &&
+          candidate.invitationLookupId === invitation.lookupId,
+      ).length !== 1
+    )
+      return undefined;
+    return binding;
   }
 
   claimInvitation(input: {
@@ -1359,6 +1421,7 @@ export class InMemoryGameService {
         gameId: invitation.gameId,
         seat: invitation.allowedSeat,
         sessionId: session.id,
+        sessionExpiresAt: session.expiresAt,
         state: this.getGameState(invitation.gameId),
       };
     }
@@ -2300,6 +2363,7 @@ export class InMemoryGameService {
         gameId: grant.gameId,
         seat: grant.side,
         sessionId: session.id,
+        sessionExpiresAt: session.expiresAt,
         state: this.getGameState(grant.gameId),
       };
     }
@@ -2475,7 +2539,12 @@ export class InMemoryGameService {
           "The recovered host binding is no longer available.",
         );
       }
-      return { credential, gameId: grant.gameId, sessionId: session.id };
+      return {
+        credential,
+        gameId: grant.gameId,
+        sessionId: session.id,
+        sessionExpiresAt: session.expiresAt,
+      };
     }
     const oldBinding = this.#hostBindings.find(
       (binding) =>
@@ -2574,16 +2643,13 @@ export class InMemoryGameService {
     const session = this.#findSession(credential);
     if (
       session === undefined ||
-      ![
-        ...this.#hostBindings,
-        ...this.#seatBindings,
-        ...this.#spectatorBindings,
-      ].some(
+      (![...this.#hostBindings, ...this.#seatBindings].some(
         (binding) =>
           binding.gameId === gameId &&
           binding.sessionId === session.id &&
           binding.revokedAt === null,
-      )
+      ) &&
+        this.#findActiveSpectatorBinding(session.id, gameId) === undefined)
     )
       throw new ServiceError(
         "unauthorized",
@@ -2651,6 +2717,9 @@ export class InMemoryGameService {
                 ...(invitation.bindingId === undefined
                   ? {}
                   : { bindingId: invitation.bindingId }),
+                ...(invitation.claimedSessionId === undefined
+                  ? {}
+                  : { claimedSessionId: invitation.claimedSessionId }),
                 revokedAt: invitation.revokedAt,
                 ...(invitation.activeAfterSequence === undefined
                   ? {}
@@ -2806,6 +2875,7 @@ export class InMemoryGameService {
         else invitation.revokedAtSequence = sequence;
       }
       delete invitation.sealedClaimCredential;
+      delete invitation.claimedSessionId;
       this.#destroyInvitationSecret(invitation.lookupId);
     }
   }
@@ -2967,6 +3037,7 @@ export class InMemoryGameService {
     if (
       session === undefined ||
       session.revokedAt !== null ||
+      !Number.isFinite(session.expiresAt) ||
       session.expiresAt <= this.#now()
     ) {
       return undefined;
@@ -3021,7 +3092,11 @@ export class InMemoryGameService {
       };
       this.#sessionsByHash.set(renewed.credentialHash, renewed);
       this.#sessionsById.set(renewed.id, renewed);
-      return { credential: effectiveCredential, sessionId: renewed.id };
+      return {
+        credential: effectiveCredential,
+        sessionId: renewed.id,
+        sessionExpiresAt: renewed.expiresAt,
+      };
     }
 
     const createdCredential = requestedCredential ?? generateCredential();
@@ -3037,7 +3112,11 @@ export class InMemoryGameService {
     };
     this.#sessionsByHash.set(session.credentialHash, session);
     this.#sessionsById.set(session.id, session);
-    return { credential: createdCredential, sessionId: session.id };
+    return {
+      credential: createdCredential,
+      sessionId: session.id,
+      sessionExpiresAt: session.expiresAt,
+    };
   }
 }
 

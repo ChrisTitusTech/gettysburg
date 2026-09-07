@@ -36,6 +36,84 @@ function fixture() {
 }
 
 describe("revocable read-only spectator access", () => {
+  it("denies orphan or inconsistent grants on ordinary reads, not only replay", () => {
+    const f = fixture();
+    const observer = f.service.claimSpectatorInvitation(f.issue());
+    const other = f.service.createGame("union");
+    const snapshot = f.service.exportSnapshot();
+    const binding = snapshot.spectatorBindings![0]!;
+    const corruptions: GameServiceSnapshot[] = [
+      { ...snapshot, spectatorInvitations: [] },
+      { ...snapshot, spectatorBindings: [binding, binding] },
+      { ...snapshot, spectatorBindings: [{ ...binding, version: 2 }] },
+      {
+        ...snapshot,
+        spectatorBindings: [{ ...binding, invitationLookupId: randomUUID() }],
+      },
+    ];
+    for (const patch of [
+      { claimedAt: null },
+      { revokedAt: f.clock.now },
+      { bindingId: randomUUID() },
+      { claimedSessionId: randomUUID() },
+      { claimedAfterSequence: 99 },
+      { expiresAt: 0 },
+    ])
+      corruptions.push({
+        ...snapshot,
+        spectatorInvitations: snapshot.spectatorInvitations!.map(
+          ([id, invitation]) => [id, { ...invitation, ...patch }],
+        ),
+      });
+    for (const corrupted of corruptions) {
+      const restored = new InMemoryGameService({
+        pepper: f.pepper,
+        snapshot: corrupted,
+        now: () => f.clock.now,
+      });
+      expect(() =>
+        restored.authenticateSpectator(observer.credential, f.host.gameId),
+      ).toThrow(/Current spectator access/);
+      expect(() =>
+        restored.getSpectatorView(observer.credential, f.host.gameId),
+      ).toThrow(/Current spectator access/);
+      expect(() =>
+        restored.getReplay(observer.credential, f.host.gameId),
+      ).toThrow(/Current game access/);
+      expect(
+        restored.getGameView(f.host.credential, f.host.gameId).is_host,
+      ).toBe(true);
+    }
+    const reassigned = new InMemoryGameService({
+      pepper: f.pepper,
+      now: () => f.clock.now,
+      snapshot: {
+        ...snapshot,
+        spectatorBindings: [{ ...binding, sessionId: other.sessionId }],
+      },
+    });
+    expect(() =>
+      reassigned.getSpectatorView(other.credential, f.host.gameId),
+    ).toThrow(/Current spectator access/);
+    expect(reassigned.getGameView(other.credential, other.gameId).is_host).toBe(
+      true,
+    );
+  });
+
+  it("does not renew the browser session when a duplicate spectator claim is rejected", () => {
+    const f = fixture();
+    const observer = f.service.claimSpectatorInvitation(f.issue());
+    const next = f.issue();
+    const before = f.service.exportSnapshot();
+    f.clock.now += 1000;
+    expect(() =>
+      f.service.claimSpectatorInvitation({
+        ...next,
+        credential: observer.credential,
+      }),
+    ).toThrow(/already has spectator access/);
+    expect(f.service.exportSnapshot()).toEqual(before);
+  });
   it("rejects mismatched or duplicate snapshot keys and synthetic unbound claims", () => {
     const f = fixture();
     f.issue();
@@ -255,6 +333,13 @@ describe("revocable read-only spectator access", () => {
     });
     const before = f.service.exportSnapshot();
     expect(f.execute("deleteGame", { confirm: true }).ok).toBe(true);
+    expect(
+      f.service
+        .exportSnapshot()
+        .spectatorInvitations!.find(
+          ([, invitation]) => invitation.gameId === f.host.gameId,
+        )![1],
+    ).not.toHaveProperty("claimedSessionId");
     expect(f.service.exportSnapshot().spectatorBindings).toHaveLength(1);
     expect(
       f.service.getSpectatorView(observer.credential, other.gameId).game_id,

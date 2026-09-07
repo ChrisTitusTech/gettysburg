@@ -71,6 +71,19 @@ postgres("PostgreSQL durability", () => {
       firstClosed = true;
       await restarted.migrate();
       expect(await restarted.claimSpectatorInvitation(input)).toEqual(observer);
+      const mirroredObserver = () =>
+        administration.query(
+          "SELECT id FROM browser_sessions WHERE id = $1::uuid",
+          [observer.sessionId],
+        );
+      expect((await mirroredObserver()).rowCount).toBe(1);
+      // Repair a missing mirror left by the previous differential cleanup.
+      await administration.query(
+        "DELETE FROM browser_sessions WHERE id = $1::uuid",
+        [observer.sessionId],
+      );
+      expect(await restarted.claimSpectatorInvitation(input)).toEqual(observer);
+      expect((await mirroredObserver()).rowCount).toBe(1);
       expect(
         await restarted.getSpectatorView(observer.credential, host.gameId),
       ).toEqual(observer.view);
@@ -99,6 +112,21 @@ postgres("PostgreSQL durability", () => {
       expect(
         (await restarted.getReplay(host.credential, host.gameId)).sequence,
       ).toBe(2);
+      expect((await mirroredObserver()).rowCount).toBe(1);
+      expect(
+        (
+          await restarted.executeHostCommand(
+            await restarted.authenticateHost(host.credential, host.gameId),
+            {
+              ...command,
+              command_id: randomUUID(),
+              command_name: "deleteGame",
+              payload: { confirm: true },
+            },
+          )
+        ).ok,
+      ).toBe(true);
+      expect((await mirroredObserver()).rowCount).toBe(0);
     } finally {
       if (!firstClosed) await first.close();
       await restarted.close();

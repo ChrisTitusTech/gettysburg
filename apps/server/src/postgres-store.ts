@@ -717,13 +717,17 @@ export class PostgresGameService implements GameService {
         gameId,
       ]);
     }
+    const spectatorSessionIds = new Set(
+      (snapshot.spectatorBindings ?? []).map((binding) => binding.sessionId),
+    );
     await client.query(
       `DELETE FROM browser_sessions AS session
        WHERE NOT EXISTS (
          SELECT 1 FROM host_bindings WHERE browser_session_id = session.id
        ) AND NOT EXISTS (
          SELECT 1 FROM seat_bindings WHERE browser_session_id = session.id
-       )`,
+       ) AND NOT (session.id = ANY($1::uuid[]))`,
+      [[...spectatorSessionIds]],
     );
 
     for (const [gameId, game] of snapshot.games) {
@@ -785,7 +789,12 @@ export class PostgresGameService implements GameService {
       (previous?.sessions ?? []).map((session) => [session.id, session]),
     );
     for (const session of snapshot.sessions) {
-      if (!changed(session, previousSessions.get(session.id))) continue;
+      // Also repair missing observer-only mirror rows from older cleanup logic.
+      if (
+        !spectatorSessionIds.has(session.id) &&
+        !changed(session, previousSessions.get(session.id))
+      )
+        continue;
       await client.query(
         `INSERT INTO browser_sessions (id, credential_hash, expires_at, revoked_at)
          VALUES ($1::uuid, $2, $3, $4)
