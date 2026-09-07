@@ -144,6 +144,7 @@ h2 {
 .invitation-panel,
 .tabletop-controls,
 .board-workspace,
+.replay-controls,
 .action-log {
   border: 1px solid #716448;
   background: rgb(21 30 22 / 96%);
@@ -886,6 +887,18 @@ footer {
   .invitation-panel input {
     width: 100%;
   }
+}
+
+.replay-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+}
+
+.replay-controls > button {
+  justify-self: start;
 }
 
 .replay-viewer {

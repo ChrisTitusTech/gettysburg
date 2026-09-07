@@ -3,6 +3,31 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createGame, getReplay, resumeGame, sendHostCommand } from "./api";
 
 describe("API requests", () => {
+  it.each([
+    ["60", 60],
+    ["0", 0],
+    ["invalid", undefined],
+    ["-1", undefined],
+    ["999999999999", undefined],
+  ])(
+    "preserves a bounded numeric Retry-After header %s",
+    async (header, expected) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ error: "replay_rate_limited" }), {
+            status: 429,
+            headers: { "Retry-After": header! },
+          }),
+        ),
+      );
+      await expect(getReplay("game", 1)).rejects.toMatchObject({
+        status: 429,
+        code: "replay_rate_limited",
+        retryAfterSeconds: expected,
+      });
+    },
+  );
   it("requests an authorized replay cursor with same-origin credentials", async () => {
     const fetcher = vi
       .fn()

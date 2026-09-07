@@ -9,6 +9,7 @@ import { chromium } from "@playwright/test";
 
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { runEnforcedGame } from "./browser-enforced-game.mjs";
+import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -362,6 +363,7 @@ async function runScenario(browser, origin, options) {
     await viewer
       .getByText("Read-only history; no commands are sent.")
       .waitFor();
+    await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
     const replayBoard = viewer.locator(".board-svg");
     const beforePan = await replayBoard.getAttribute("viewBox");
     await viewer.locator('[data-coordinate="J5"]').scrollIntoViewIfNeeded();
@@ -396,6 +398,7 @@ async function runScenario(browser, origin, options) {
       await unionPage.mouse.up();
     }
     assert.notEqual(await replayBoard.getAttribute("viewBox"), beforePan);
+    const inspectedViewport = await replayBoard.getAttribute("viewBox");
     await viewer
       .getByRole("button", { name: "Next event", exact: true })
       .click();
@@ -403,7 +406,28 @@ async function runScenario(browser, origin, options) {
     await viewer
       .getByRole("button", { name: /Wadsworth, E4, selectable/ })
       .waitFor();
-    await viewer.screenshot({
+    assert.equal(await replayBoard.getAttribute("viewBox"), inspectedViewport);
+    assert.equal(
+      await viewer
+        .getByRole("button", { name: /Wadsworth, E4, selectable/ })
+        .getAttribute("aria-pressed"),
+      "true",
+    );
+    const replayControls = unionPage.getByRole("region", {
+      name: "Replay controls",
+      exact: true,
+    });
+    const containerBox = await replayControls.boundingBox();
+    const viewerBox = await viewer.boundingBox();
+    const toggleBox = await replayControls
+      .getByRole("button", { name: "Return to live game" })
+      .boundingBox();
+    assert(containerBox && viewerBox && toggleBox);
+    assert(
+      toggleBox.height < 80 && viewerBox.y >= toggleBox.y + toggleBox.height,
+    );
+    assert(viewerBox.width > containerBox.width * 0.9);
+    await replayControls.screenshot({
       path: resolve(evidenceDirectory, `${options.label}-replay.png`),
     });
     await viewer
@@ -501,6 +525,11 @@ try {
     opponentName: "Confederate",
     viewport: { height: 768, width: 1024 },
   });
+  for (const options of [
+    { label: "desktop", viewport: { height: 900, width: 1440 } },
+    { label: "tablet", viewport: { height: 768, width: 1024 } },
+  ])
+    await checkReplayManagement(browser, origin, evidenceDirectory, options);
   if (process.env.GETTYSBURG_FULL_GAME === "true") {
     for (const options of [
       {

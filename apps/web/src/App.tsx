@@ -94,6 +94,10 @@ export function App({
       : { ...initialInvitation, kind: "invitation" as const });
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
+  const [replayEventCursor, setReplayEventCursor] = useState<{
+    game_id: string;
+    event_sequence: number;
+  } | null>(null);
   const [actionLog, setActionLog] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("disconnected");
@@ -120,6 +124,10 @@ export function App({
   const enterGame = useCallback(
     (session: SessionResponse, shareUrl?: string) => {
       setReplayOpen(false);
+      setReplayEventCursor({
+        game_id: session.game_id,
+        event_sequence: session.state.event_sequence,
+      });
       setActiveGame({
         ...session,
         ...(shareUrl ? { invitationUrl: shareUrl } : {}),
@@ -283,7 +291,8 @@ export function App({
           [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
         );
       });
-      connectedRoom.onMessage<ManagementEvent>("managementEvent", (event) => {
+      const recordManagementEvent = (event: ManagementEvent | AuditEvent) => {
+        if (!active) return;
         const cursor = eventCursorReference.current;
         if (cursor === null) return;
         const accepted = acceptManagementEvent(cursor, event);
@@ -295,26 +304,19 @@ export function App({
           return;
         }
         eventCursorReference.current = accepted.cursor;
+        setReplayEventCursor({
+          game_id: activeGame.game_id,
+          event_sequence: accepted.cursor.event_sequence,
+        });
         setActionLog((entries) =>
           [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
         );
-      });
-      connectedRoom.onMessage<AuditEvent>("auditEvent", (event) => {
-        const cursor = eventCursorReference.current;
-        if (cursor === null) return;
-        const accepted = acceptManagementEvent(cursor, event);
-        if (!accepted.ok) {
-          setError(
-            "An event delivery gap was detected; restoring current state.",
-          );
-          void refreshAuthoritativeState();
-          return;
-        }
-        eventCursorReference.current = accepted.cursor;
-        setActionLog((entries) =>
-          [`v${event.state_version}: ${event.summary}`, ...entries].slice(0, 8),
-        );
-      });
+      };
+      connectedRoom.onMessage<ManagementEvent>(
+        "managementEvent",
+        recordManagementEvent,
+      );
+      connectedRoom.onMessage<AuditEvent>("auditEvent", recordManagementEvent);
       connectedRoom.onError((_code, message) => {
         setError(message ?? "The multiplayer connection reported an error.");
       });
@@ -907,7 +909,7 @@ export function App({
         )}
       </section>
 
-      <section className="action-log" aria-label="Replay controls">
+      <section className="replay-controls" aria-label="Replay controls">
         <button
           type="button"
           aria-expanded={replayOpen}
@@ -919,7 +921,12 @@ export function App({
           <ReplayViewer
             key={activeGame.game_id}
             gameId={activeGame.game_id}
-            latestSequence={activeGame.state.event_sequence}
+            latestSequence={Math.max(
+              activeGame.state.event_sequence,
+              replayEventCursor?.game_id === activeGame.game_id
+                ? replayEventCursor.event_sequence
+                : 0,
+            )}
           />
         ) : null}
       </section>

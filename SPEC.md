@@ -675,8 +675,15 @@ until their own handlers are implemented; no mandatory fallback is allowed.
 The client exposes read-only opening/previous/next/jump/latest navigation,
 counter inspection for both sides, and recorded combat dice. Replay replaces
 gameplay controls until the player returns to live state; it never routes a
-game command. Closing aborts pending reads, stale responses are ignored, and
-failed authorized reads clear the historical board. Retained-version coverage,
+game command. Adjacent event reads preserve zoom, pan, and selected-counter
+context while clearly labelling the previously verified event during loading.
+Closing aborts pending reads, stale or other-game responses are ignored, and
+failed authorization/history reads clear the historical board. HTTP 429 is
+separate: retain the last verified event and disable navigation for the server's
+bounded numeric Retry-After interval (60 seconds when unavailable), without an
+automatic retry. Live management/audit events update the latest replay cursor
+without inventing a gameplay-state change. The replay toggle and viewer use a
+single-column container at desktop and tablet widths. Retained-version coverage,
 measured capacity/checkpointing, and
 spectator authorization remain separate implementation/release gates.
 
