@@ -898,6 +898,15 @@ can cause a retry; the eventual browser worker must deduplicate using the
 stable reminder ID. Provider dispatch and actual notifications remain disabled
 until their separate implementation and acceptance gates pass.
 
+The worker implementation processes one lease at a time and pauses five seconds
+between polls. Claim/outcome transactions have bounded cancellable capacity;
+idle polls do not rewrite an unchanged snapshot. After provider DNS resolution,
+dispatch authorization verifies the current consent, game decision, and lease
+under a shared canonical-row lock. Only synchronous request dispatch holds that
+lock; provider response waiting does not block game mutations. Shutdown cancels
+the worker before database closure and leaves abandoned leases recoverable.
+Startup and browser permission wiring remain separate acceptance gates.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
