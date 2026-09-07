@@ -82,6 +82,8 @@ export interface SeatBinding {
 }
 
 export interface Invitation {
+  readonly activeAfterSequence?: number;
+  revokedAtSequence?: number;
   readonly allowedSeat: Side;
   claimId?: string;
   claimedAt: number | null;
@@ -1525,6 +1527,7 @@ export class InMemoryGameService {
           );
         }
         target.revokedAt = now;
+        target.revokedAtSequence = game.state.event_sequence + 1;
         this.#destroyInvitationSecret(command.payload.lookup_id);
         summary = `${target.allowedSeat} invitation revoked`;
         break;
@@ -2267,10 +2270,23 @@ export class InMemoryGameService {
             ),
             invitations: [...this.#invitations.values()]
               .filter((invitation) => invitation.gameId === gameId)
-              .map(({ gameId, lookupId, allowedSeat }) => ({
-                gameId,
-                lookupId,
-                allowedSeat,
+              .map((invitation) => ({
+                gameId: invitation.gameId,
+                lookupId: invitation.lookupId,
+                allowedSeat: invitation.allowedSeat,
+                claimedAt: invitation.claimedAt,
+                expiresAt: invitation.expiresAt,
+                revokedAt: invitation.revokedAt,
+                ...(invitation.activeAfterSequence === undefined
+                  ? {}
+                  : {
+                      activeAfterSequence: invitation.activeAfterSequence,
+                    }),
+                ...(invitation.revokedAtSequence === undefined
+                  ? {}
+                  : {
+                      revokedAtSequence: invitation.revokedAtSequence,
+                    }),
               })),
           },
         ),
@@ -2451,6 +2467,9 @@ export class InMemoryGameService {
     const secret = generateCredential();
     const lookupId = randomUUID();
     this.#invitations.set(lookupId, {
+      activeAfterSequence: this.#games.has(gameId)
+        ? this.#requireActiveGame(gameId).state.event_sequence + 1
+        : 0,
       allowedSeat,
       claimedAt: null,
       expiresAt: this.#now() + INVITATION_LIFETIME_MS,

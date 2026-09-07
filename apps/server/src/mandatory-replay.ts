@@ -21,7 +21,14 @@ export interface ReplayManagementEvidence {
   readonly hosts: readonly HostBinding[];
   readonly invitations: readonly Pick<
     Invitation,
-    "gameId" | "lookupId" | "allowedSeat"
+    | "gameId"
+    | "lookupId"
+    | "allowedSeat"
+    | "claimedAt"
+    | "expiresAt"
+    | "revokedAt"
+    | "activeAfterSequence"
+    | "revokedAtSequence"
   >[];
 }
 
@@ -267,6 +274,21 @@ export function replayMandatoryActions(
                 ["union", "confederate"].includes(target[0]!.allowedSeat),
               "missing or ambiguous historical invitation",
             );
+          if (host.command_name === "revokeInvitation") {
+            const invitation = target[0]!;
+            assertReplay(
+              Number.isSafeInteger(invitation.activeAfterSequence) &&
+                invitation.activeAfterSequence! >= 0 &&
+                sequence > invitation.activeAfterSequence! &&
+                invitation.claimedAt === null &&
+                invitation.revokedAtSequence === sequence &&
+                Number.isFinite(invitation.revokedAt) &&
+                invitation.revokedAt !== null &&
+                Number.isFinite(invitation.expiresAt) &&
+                invitation.revokedAt < invitation.expiresAt,
+              "invitation was not available at this sequence",
+            );
+          }
           const summary =
             host.command_name === "deleteGame"
               ? "Game deleted"
