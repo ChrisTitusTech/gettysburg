@@ -1367,6 +1367,21 @@ validation remain separate gates.
     review found no actionable regressions and reran 177 server tests; its 16
     database skips are covered above. Exact-head CI and hosted thread checks
     remain required before merge; no live spectator UI is claimed yet.
+  - Late PR #33 follow-up: Its green-CI merge ran despite two new unresolved
+    findings returned by the final thread query. This was a merge-gate failure,
+    not a clean review closeout. PR #34 verifies claimed spectator records
+    against unique bindings (including synthetic-claim regression coverage) and
+    now rejects mismatched/duplicate invitation tuple identifiers on restore.
+    Fresh full validation, independent review, exact-head CI, and explicit
+    review-thread resolution are required before this corrective merge. Owner:
+    ChrisTitusTech; no deployment occurred with the unresolved findings.
+    Repair validation passes: complete local gate with 573 workspace/nine
+    harness tests, all 194 PostgreSQL tests, and both desktop/tablet enforced
+    games plus input fixtures in `test-results/spectator-restore-identifiers`
+    and its `-fixtures` directory. Both games covered all three pending choices,
+    reload, and exact replay. Fresh independent review found no actionable
+    regressions and reran typecheck, 178 server tests, and whitespace; its 16
+    database skips are covered above. New-head CI remains pending publication.
 - [ ] Add audited host-managed spectator invitations.
   - Scope: Separate 24-hour spectator invitations from player invitations;
     cap outstanding grants at eight, preserve command-id retries with sealed

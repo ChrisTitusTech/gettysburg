@@ -783,6 +783,11 @@ export class InMemoryGameService {
       }
       for (const [lookupId, invitation] of options.snapshot
         .spectatorInvitations ?? []) {
+        if (
+          lookupId !== invitation.lookupId ||
+          this.#spectatorInvitations.has(lookupId)
+        )
+          throw new Error("Invalid spectator invitation identifier");
         this.#spectatorInvitations.set(lookupId, structuredClone(invitation));
       }
       this.#spectatorBindings.push(

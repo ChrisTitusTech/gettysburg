@@ -36,6 +36,49 @@ function fixture() {
 }
 
 describe("revocable read-only spectator access", () => {
+  it("rejects mismatched or duplicate snapshot keys and synthetic unbound claims", () => {
+    const f = fixture();
+    f.issue();
+    const snapshot = f.service.exportSnapshot();
+    const [id, invitation] = snapshot.spectatorInvitations![0]!;
+    for (const spectatorInvitations of [
+      [[randomUUID(), invitation]],
+      [
+        [id, invitation],
+        [id, invitation],
+      ],
+    ] as const)
+      expect(
+        () =>
+          new InMemoryGameService({
+            pepper: f.pepper,
+            snapshot: {
+              ...snapshot,
+              spectatorInvitations: spectatorInvitations.map(([key, value]) => [
+                key,
+                value,
+              ]),
+            },
+            now: () => f.clock.now,
+          }),
+      ).toThrow(/Invalid spectator invitation identifier/);
+    const synthetic = new InMemoryGameService({
+      pepper: f.pepper,
+      snapshot: {
+        ...snapshot,
+        spectatorInvitations: [
+          [
+            id,
+            { ...invitation, claimedAt: f.clock.now, claimedAfterSequence: 1 },
+          ],
+        ],
+      },
+      now: () => f.clock.now,
+    });
+    expect(() => synthetic.getReplay(f.host.credential, f.host.gameId)).toThrow(
+      /Replay is unavailable/,
+    );
+  });
   it("preserves a separate legitimate host/seat binding when spectator access is revoked", () => {
     const f = fixture();
     const input = f.issue();
