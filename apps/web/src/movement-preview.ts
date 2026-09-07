@@ -19,7 +19,11 @@ export function previewMandatoryMovement(
   clamp = false,
 ): PreparedNormalMovement {
   const prepared = prepareNormalMovement(state, side, ids, target);
-  if (prepared.ok || !clamp || prepared.error !== "movement_exceeded")
+  if (
+    prepared.ok ||
+    !clamp ||
+    !["movement_exceeded", "occupied"].includes(prepared.error)
+  )
     return prepared;
   const movers = ids.map((id) => state.units[id]!);
   const origin = movers[0]?.location;
@@ -34,7 +38,7 @@ export function previewMandatoryMovement(
     origin,
     target,
   );
-  if (route === null) return prepared;
+  if (route === null || route.cost <= plan.allowance) return prepared;
   let cost = 0;
   const candidates: HexCoordinate[] = [];
   for (let index = 1; index < route.path.length; index += 1) {

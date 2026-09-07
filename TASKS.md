@@ -493,11 +493,20 @@ validation remain separate gates.
     roads, weighted overshoot, unaffordable woods, closed moves, and general
     accompaniment. Rendered desktop/tablet evidence was visually inspected in
     `test-results/mandatory-movement-preview`. The fixture check also runs in
-    Application CI. Frozen install, format, lint, typecheck, 408 default workspace
+    Application CI. Frozen install, format, lint, typecheck, 410 default workspace
     tests plus six harness tests, build, smoke, Markdown lint, and all 93 isolated
     PostgreSQL server tests pass. Existing two-session desktop/tablet and 24-turn
-    full-game regression also pass (`test-results/mandatory-movement-preview-regression`).
+    full-game regression also pass (`test-results/mandatory-movement-preview-review`).
     Independent review and exact-head CI remain required before merge.
+  - Hosted review follow-up: Preserve an active pair when it stops with a
+    stationary friendly counter; show weighted cost in the SVG overlay; exercise
+    a genuine touch drag at tablet width; and clamp beyond-budget friendly full
+    targets while retaining source-capacity and reachable-target errors.
+    Added unit/browser regressions for these findings. The first overlay test
+    used HTML-only `innerText` on SVG; switching to `textContent` fixes the harness
+    without weakening its exact `1 / 1` assertion. All local gates and browser
+    checks passed again after these fixes; fresh independent review and exact-head
+    CI remain required on the repaired head before merge.
 - [ ] Complete mandatory night withdrawal and browser guidance.
   - Scope: End-of-movement enforcement searches affordable legal withdrawals
     using the same weighted movement calculator and validator as normal moves.

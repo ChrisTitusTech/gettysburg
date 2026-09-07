@@ -14,8 +14,10 @@ import { createRoot } from "react-dom/client";
 import { Board } from "../Board";
 import "../styles.css";
 
-export type MovementFixtureName = "roads" | "woods" | "activation" | "bonus";
+export type MovementFixtureName =
+  "roads" | "woods" | "activation" | "bonus" | "continuation";
 function initialState(name: MovementFixtureName): GameState {
+  const accompanied = name === "bonus" || name === "continuation";
   const a: UnitState = {
     id: "a",
     label: "Fixture infantry",
@@ -30,7 +32,7 @@ function initialState(name: MovementFixtureName): GameState {
     status: "deployed",
     strength: "full",
     steps_remaining: 2,
-    movement_spent: name === "bonus" ? 1 : 0,
+    movement_spent: accompanied ? 1 : 0,
   };
   return {
     game_id: "11111111-1111-4111-8111-111111111111",
@@ -59,24 +61,33 @@ function initialState(name: MovementFixtureName): GameState {
       railroads: [],
       streams: [],
     },
-    units:
-      name === "bonus"
-        ? {
-            a,
-            g: {
-              ...a,
-              id: "g",
-              label: "Fixture general",
-              kind: "general",
-              combat: null,
-              movement: 5,
-            },
-          }
-        : { a },
+    units: accompanied
+      ? {
+          a,
+          g: {
+            ...a,
+            id: "g",
+            label: "Fixture general",
+            kind: "general",
+            combat: null,
+            movement: 5,
+          },
+          ...(name === "continuation"
+            ? {
+                b: {
+                  ...a,
+                  id: "b",
+                  label: "Stationary friend",
+                  movement_spent: 0,
+                },
+              }
+            : {}),
+        }
+      : { a },
     normal_movement: {
-      active_unit_ids: name === "bonus" ? ["a", "g"] : [],
+      active_unit_ids: accompanied ? ["a", "g"] : [],
       closed_unit_ids: name === "activation" ? ["a"] : [],
-      bonus_unit_ids: name === "bonus" ? ["a"] : [],
+      bonus_unit_ids: accompanied ? ["a"] : [],
     },
     victory: { confederate: 0, union: 0, status: "in-progress" },
   };

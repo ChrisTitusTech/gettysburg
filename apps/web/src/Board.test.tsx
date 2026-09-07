@@ -101,6 +101,45 @@ function prepareBoardPoint(
 }
 
 describe("Board", () => {
+  it("continues the active pair without picking up a stationary friendly counter", () => {
+    const onMove = vi.fn();
+    const infantry = state.units["fixture-confederate-1"]!;
+    const ids = [infantry.id, "general"];
+    const mandatory: GameState = {
+      ...state,
+      ruleset_version: MANDATORY_RULESET_VERSION,
+      terrain: {},
+      movement_edges: { roads: [], railroads: [], streams: [] },
+      normal_movement: {
+        active_unit_ids: ids,
+        closed_unit_ids: [],
+        bonus_unit_ids: [infantry.id],
+      },
+      units: {
+        ...state.units,
+        general: {
+          ...infantry,
+          id: "general",
+          label: "General",
+          kind: "general",
+          combat: null,
+        },
+        friend: { ...infantry, id: "friend", label: "Stationary friend" },
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={mandatory} />,
+    );
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+      { key: "Enter" },
+    );
+    fireEvent.click(container.querySelector('[data-coordinate="G5"]')!);
+    expect(onMove).toHaveBeenCalledWith(ids, "G5");
+  });
+
   it("does not submit a drag that became disabled before release", () => {
     const onMove = vi.fn();
     const { container, rerender } = render(

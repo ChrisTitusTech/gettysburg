@@ -85,16 +85,57 @@ try {
       const from = await counter().boundingBox();
       const to = await hex("F2").boundingBox();
       assert(from && to);
-      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-      await page.mouse.down();
-      await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
-        steps: 10,
-      });
+      const touch = hasTouch ? await context.newCDPSession(page) : null;
+      if (touch) {
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [
+            { x: from.x + from.width / 2, y: from.y + from.height / 2 },
+          ],
+        });
+        for (let step = 1; step <= 10; step += 1) {
+          await touch.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [
+              {
+                x:
+                  from.x +
+                  from.width / 2 +
+                  ((to.x + to.width / 2 - from.x - from.width / 2) * step) / 10,
+                y:
+                  from.y +
+                  from.height / 2 +
+                  ((to.y + to.height / 2 - from.y - from.height / 2) * step) /
+                    10,
+              },
+            ],
+          });
+        }
+      } else {
+        await page.mouse.move(
+          from.x + from.width / 2,
+          from.y + from.height / 2,
+        );
+        await page.mouse.down();
+        await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, {
+          steps: 10,
+        });
+      }
       await page.getByText(/1 of 1 movement points to F3/).waitFor();
+      assert.equal(
+        await page.locator(".movement-route text").textContent(),
+        "1 / 1",
+      );
       await page
         .locator(".board-workspace")
         .screenshot({ path: resolve(evidence, `${name}-weighted-drag.png`) });
-      await page.mouse.up();
+      if (touch) {
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await touch.detach();
+      } else await page.mouse.up();
       await state().filter({ hasText: "v1: a=F3" }).waitFor();
 
       await fixture("woods");
@@ -115,6 +156,9 @@ try {
       await fixture("bonus");
       await selectTarget("F3");
       await state().filter({ hasText: "v1: a=F3, g=F3" }).waitFor();
+      await fixture("continuation");
+      await selectTarget("F3");
+      await state().filter({ hasText: "v1: a=F3, g=F3, b=F5" }).waitFor();
       assert.deepEqual(issues, []);
     } finally {
       await context.close();

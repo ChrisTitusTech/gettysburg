@@ -65,6 +65,7 @@ interface DragStart {
 }
 
 interface UnitDrag {
+  readonly movementCost?: number;
   readonly combatId: string | null;
   readonly decline: boolean;
   readonly destinationHexes: readonly HexCoordinate[];
@@ -240,6 +241,18 @@ export function Board({
     const unit = state.units[unitId];
     if (unit?.location === null || unit === undefined) return [];
     if (single) return [unitId];
+    const activeIds = state.normal_movement?.active_unit_ids ?? [];
+    if (
+      mandatory &&
+      activeIds.includes(unitId) &&
+      activeIds.every(
+        (id) =>
+          state.units[id]?.status === "deployed" &&
+          state.units[id]?.side === seat &&
+          state.units[id]?.location === unit.location,
+      )
+    )
+      return [...activeIds];
     return deployedUnits
       .filter(
         (candidate) =>
@@ -639,7 +652,12 @@ export function Board({
           true,
         );
         const path = preview.ok ? preview.route.path : [unit.location];
-        const drag = { ...unitMove, decline: false, path } satisfies UnitDrag;
+        const drag = {
+          ...unitMove,
+          decline: false,
+          path,
+          movementCost: preview.ok ? preview.route.cost : 0,
+        } satisfies UnitDrag;
         unitDragReference.current = drag;
         setUnitDrag(drag);
         setMovementNotice(
@@ -957,7 +975,7 @@ export function Board({
                         ? unitDrag.decline
                           ? "Release to decline"
                           : `Advance ${unitDrag.unitIds.length} together`
-                        : `${unitDrag.path.length - 1} / ${movementAllowance(unitDrag.unitIds)}`}
+                        : `${mandatory ? (unitDrag.movementCost ?? 0) : unitDrag.path.length - 1} / ${movementAllowance(unitDrag.unitIds)}`}
                   </text>
                 );
               })()}

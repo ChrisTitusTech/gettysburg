@@ -80,6 +80,35 @@ describe("mandatory movement preview", () => {
       previewMandatoryMovement(current, "confederate", ["a"], "L3", true),
     ).toMatchObject({ ok: true, route: { cost: 0.5, path: ["L6", "L5"] } });
   });
+  it("clamps beyond-budget friendly full targets but preserves reachable capacity and source errors", () => {
+    const current = state({
+      units: { a: unit("a"), friend: unit("friend", { location: "L3" }) },
+    });
+    expect(
+      previewMandatoryMovement(current, "confederate", ["a"], "L3", true),
+    ).toMatchObject({ ok: true, route: { cost: 1, path: ["L6", "L5", "L4"] } });
+    expect(
+      previewMandatoryMovement(
+        state({
+          units: { a: unit("a"), friend: unit("friend", { location: "L4" }) },
+        }),
+        "confederate",
+        ["a"],
+        "L4",
+        true,
+      ),
+    ).toMatchObject({ ok: false, error: "occupied" });
+    const general = unit("g", { kind: "general", combat: null });
+    expect(
+      previewMandatoryMovement(
+        state({ units: { a: unit("a"), b: unit("b"), g: general } }),
+        "confederate",
+        ["g"],
+        "L3",
+        true,
+      ),
+    ).toMatchObject({ ok: false, error: "occupied" });
+  });
   it("uses an earned general bonus even after printed movement is exhausted", () => {
     const movers = [
       unit("a"),
