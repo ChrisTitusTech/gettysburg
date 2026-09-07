@@ -1919,6 +1919,13 @@ consent/replay/observer checks, and input fixtures in
 `test-results/accessibility-home-screen` and its `-fixtures` directory. Fresh
 independent review is clean and reran the baseline assertion and 38 focused web
 tests. PR #52 is merged; real Home Screen installation remains manual.
+Hosted review found live audits could run before lazy notification controls
+appeared. Wait for both named player notification regions before auditing them;
+a regression proves both readiness waits finish first. The full local gate
+passes 753 workspace/23 harness tests, and both layouts pass in
+`test-results/accessibility-lazy-ready`. Fresh independent review is clean and
+reran both focused regressions. Publish the repair before resolving its thread
+and require a new exact-head CI run before merge.
 
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
