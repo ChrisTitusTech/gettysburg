@@ -13,12 +13,12 @@ phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 
 ## Current status
 
-The reviewed source through PR #55 was deployed on 2026-09-07 as
-`dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd`, after passing post-merge CI,
-exact-image vulnerability scanning, encrypted backup/restore checks, and public
-readiness/two-client HTTPS/WebSocket checks. Subsequent public-browser acceptance
-failed on room connection timeouts; the candidate is held in maintenance mode
-pending repair. Phase 2 historical operational closeout remains
+The reviewed repair candidate `1baebbd2a31963bfdb3974b714914a29bd839957`
+was deployed on 2026-09-07 after exact-head CI, independent review, retained-data
+VPS full games, vulnerability scanning, and encrypted backup/restore checks.
+Public readiness and two-client HTTPS/WebSocket checks pass; the extended public
+browser run is in progress. PR #56 remains unmerged pending required code-owner
+approval. Phase 2 historical operational closeout remains
 complete. The deployed candidate uses
 `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
 weighted movement, continuous stack activation, reinforcement costs, connected

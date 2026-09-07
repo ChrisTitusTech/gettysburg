@@ -28,7 +28,40 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Current development rollout: 2026-09-07
+## Current repair rollout: 2026-09-07
+
+The owner authorized repair and reopening for acceptance. Reviewed PR #56 source
+`1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as immutable image
+`459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
+The clean detached VPS checkout was advanced using a verified Git bundle.
+The PR remains unmerged pending required code-owner approval; deployment of this
+reviewed development candidate does not bypass that merge requirement.
+
+Exact-head Application, Documentation, Firefox/WebKit, Security, and CodeQL pass;
+independent Codex and CodeRabbit reviews found no actionable defects. Both
+24-turn retained-data games pass on an isolated VPS restore, including reload,
+exact replay, and normal cleanup. Earlier incomplete runs remain recorded in
+`TASKS.md`; no test or application deadline was increased.
+
+Trivy 0.74.0, with the verified binary checksum recorded below, found zero
+HIGH/CRITICAL findings including unfixed advisories in 18 Alpine and 363 Node
+packages. Immutable-image scan and rollback files are retained in
+`/srv/gettysburg/backups/deploy-20260907T184725Z`. Pre-deployment encrypted backup
+`20260907T175422Z` passed isolated restore and off-host checksum/decryption checks.
+The scanner warned that Alpine 3.24 was missing from its EOL metadata list;
+zero vulnerability findings do not establish lifecycle support. Engineering
+owns a scanner/lifecycle metadata follow-up. The bundle-size warning remains;
+Quadlet provides the health check ignored by the OCI image builder.
+No live games were purged or database volumes removed. Temporary test copies
+were rebuilt from the verified encrypted backup, then removed after validation.
+
+Public readiness and authenticated two-client HTTPS/WebSocket movement/resume
+pass. Extended public browser checks, a candidate restart probe, and final
+post-test backup/acknowledgement are in progress. Real push remains disabled;
+no VAPID key, host upgrade, or reboot was performed. Final release and Phase 3/4
+acceptance remain open in `RELEASE_ACCEPTANCE.md`.
+
+## Historical failed development rollout: 2026-09-07
 
 The owner authorized updating the VPS and release acceptance worksheet. Source
 `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` (through PR #55) passed post-merge

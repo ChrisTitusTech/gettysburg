@@ -2,7 +2,74 @@
 
 ## Current source rollup: 2026-09-07
 
-### Room-delivery repair in validation
+### Repair deployed; public validation in progress
+
+Reviewed source `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as
+immutable image
+`459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
+Exact-head Application `34152244060`, Firefox/WebKit `34152244030`, Documentation
+`34152244048`, Security `34152244015`, and CodeQL `34152241466` all pass.
+Independent Codex and CodeRabbit reviews found no actionable regression; all
+three hosted feedback threads are resolved. PR #56 remains unmerged because
+GitHub requires code-owner approval; no approval requirement was bypassed.
+
+Both retained-data VPS full games pass within their unchanged eight-minute
+bounds, with pending-result reload and exact replay. Desktop covers retreat/
+advance; tablet covers loss/advance. Both normally delete their owned games.
+Evidence: `test-results/vps-private-write-repair` and protected logs under
+`/home/titus/.local/state/gettysburg/acceptance/20260907-repair`.
+Temporary local and VPS fixtures are disposable copies, not the live database.
+
+The deployment's exact-image Trivy scan found zero HIGH/CRITICAL findings,
+including unfixed advisories, across 18 Alpine and 363 Node packages.
+The scanner's missing Alpine 3.24 EOL metadata warning remains an engineering
+follow-up, not proof of lifecycle support. The bundle-size and OCI image
+HEALTHCHECK warnings are retained; Quadlet supplies the running health check.
+Rollback and scan evidence: `/srv/gettysburg/backups/deploy-20260907T184725Z`.
+Encrypted pre-deployment backup `20260907T175422Z` passed isolated restore and
+off-host verification. Public readiness and authenticated two-client
+HTTPS/WebSocket movement/resume pass. The extended public browser suite,
+candidate restart probe, and final off-host acknowledgement are still pending.
+Owner: engineering. Performance/capacity, physical-device, gameplay adjudication,
+real push delivery/key recovery, reboot, rollback exercise, and final release
+approval remain open; Phases 3/4 are not complete.
+
+Public Chromium 151.0.7922.34 on Fedora 44 x86_64 passes consent, both-width
+connection/movement/reconnect/replay, replay management, and private spectators.
+Desktop completes turn 24 with loss/retreat/advance, pending-result reload, and
+exact replay. The combined suite then timed out waiting for the tablet game's
+initial invitation. Ten games (including deployment smoke) had been created
+between 18:48:56 and 18:56:04 UTC, before the 19:03:18 failure. This suggests the
+10-per-source/15-minute creation limit; the failed HTTP response was not captured,
+so the cause is not proven. A post-window creation probe succeeds and is normally
+deleted. The unfinished tablet full game is rerunning with creation-status
+diagnostics and unchanged limits/timeouts. Engineering owns better initial-error
+capture in the harness; do not relax admission or creation safeguards.
+Public board captures at both widths were visually inspected. Reconnect takes
+about 2.9 seconds; input-to-both-players is about 2.8-3.4 seconds and misses its
+target. Report mode retains that miss; strict calibrated-hardware acceptance
+and target-VPS capacity remain open.
+
+The focused public tablet run completed turn 24, verified replay, and normally
+deleted its game, but its final console audit rejected a native HTTP 503 message.
+A separate two-player reload diagnostic reproduced an observed 503 specifically
+at `/matchmake/joinOrCreate/game`, followed by successful connections through
+five observation cycles. The harness now records only matching, fresh, observed
+same-origin POST admission 503 console messages as diagnostics (one message per
+response); unrelated errors still fail. This aligns the audit with intentional
+bounded admission retries; connection/workflow/time-limit assertions remain
+unchanged. Unit regressions cover wrong origin/path/status/method/location/type,
+unobserved/stale/duplicate messages, and required diagnostic recording. Validate
+this harness increment independently and rerun tablet; do not claim the prior
+strict console audit passed. Runtime code/image remains `1baebbd`/`459eeb03`.
+The harness increment passes frozen installation, formatting, lint, typecheck,
+766 workspace/39 harness tests, all 338 PostgreSQL tests, build, and smoke.
+Fresh independent Codex review and CodeRabbit 0.7.6 report zero actionable
+findings, including the new classifier and negative tests. The final public
+tablet rerun has recorded the expected admission diagnostic and remains in
+progress; exact-head CI is required after this harness/documentation push.
+
+### Room-delivery repair investigation and validation history
 
 The owner authorized repairing and reopening the site for acceptance testing.
 PostgreSQL read paths now project only the requested game's canonical record,
@@ -143,7 +210,7 @@ Codex review found no actionable regression and passed 309 server tests and
 typecheck; its database cases were skipped, covered by the engineer's full run.
 CodeRabbit 0.7.6 also completed this four-file review with zero findings.
 
-### VPS rollout and acceptance blocker: 2026-09-07
+### Historical failed VPS rollout: 2026-09-07
 
 The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55
 head `c7510e2` merged as `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` with a
@@ -312,7 +379,7 @@ and evidence; they do not supersede this current status or close owner gates.
 
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
-| Phases 0-2 | Historical closeout complete; VPS candidate is `dc6b73b` | Current rollout is blocked on public-browser room delivery; maintenance required |
+| Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd` | Extended public validation and final backup/restart checks are in progress |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |

@@ -802,6 +802,12 @@ Player/spectator clients retry only that status, at most four attempts with
 500/1000/2000 ms backoff, and cancel pending backoff on navigation. Denied or
 revoked access is not retried. The server deadline and revocation lock remain
 unchanged; retry is not a promise that unbounded host load can be accepted.
+Browser acceptance records the native console diagnostic for an observed
+same-origin POST admission 503 instead of treating that expected response as
+an application error. Classification requires the exact matchmaking endpoint,
+matching console location/status, and a fresh unconsumed response observation.
+Other HTTP errors still fail the audit; connection and workflow assertions,
+retry exhaustion, and all time bounds remain mandatory.
 
 An abortable two-slot admission queue owns delivery-pool capacity. A disconnected
 or replaced join is removed immediately before it can request a pool connection;

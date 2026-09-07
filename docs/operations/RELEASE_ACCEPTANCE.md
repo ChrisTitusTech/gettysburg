@@ -18,16 +18,29 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
 - All 253 terrain hexes are owner-verified; B2/F11 are woods. Connections are
   approved best guesses, not a request to repeat or overwrite the terrain audit.
 - Phase 2 is complete. The 2026-09-07 development VPS rollout uses source
-  `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` and immutable image
-  `d82327daa7268779d61cc095f6faf957e44e05d35bb4b9a502435f0cc9842490`.
+  `1baebbd2a31963bfdb3974b714914a29bd839957` and immutable image
+  `459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
   This is not final public-release or Phase 3/4 acceptance.
-  Public traffic is held in maintenance after repeated browser connection
-  timeouts. Do not reopen it until a reviewed repair passes the failed checks.
+  The repair passed both retained-data VPS full games and exact-head CI.
+  Public readiness/two-client smoke pass; extended public checks are in progress.
+  PR #56 remains unmerged pending required code-owner approval.
   Failed-run environment: Codex engineering automation on ChrisTitusTech's
   Fedora Linux 44 x86_64 workstation, headless Chromium 151.0.7922.34,
   1440x900 desktop consent-fixture viewport. Neither physical-device acceptance
   nor the later two-layout checks completed. Protected diagnostic copies are in
   `/home/titus/.local/state/gettysburg/acceptance/20260907-rollout`.
+
+## Start an owner acceptance game
+
+1. Open [Gettysburg](https://gettysburg.christitus.com) and host as either side.
+2. Open the private opposing-seat invitation in a separate browser/profile or
+   private-browsing session, then claim the seat. Keep invitation links private.
+3. Confirm both screens say connected. In the active-side session, move a counter
+   and check the other screen. Reload both sessions and confirm the same saved
+   state returns.
+4. Work through the checks below against the physical board/rules. Record the
+   source/image above, browser/OS/device, display coordinates, expected result,
+   and actual result. Redact invitation links and credentials from screenshots.
 
 ## Owner gameplay acceptance
 
@@ -78,28 +91,26 @@ engineering executes and records the reviewed procedures in `VPS.md`.
 The owner authorized the application rollout on 2026-09-07. That authorization
 does not close separate disruptive exercises or final public-release approval.
 
-- [x] Approve and execute the reviewed application rollout. Exact merge-commit
+- [x] Approve and execute the reviewed application rollout. Exact candidate-commit
   Application, Documentation, and Firefox/WebKit CI passed. Trivy 0.74.0 found
-  zero HIGH/CRITICAL findings across 18 Alpine and 361 Node packages in the exact
+  zero HIGH/CRITICAL findings across 18 Alpine and 363 Node packages in the exact
   deployed image, including unfixed advisories.
 - [x] Verify an encrypted pre-deployment database/state/ledger backup, isolated
-  restore, and off-host checksum/decryption checks. Backup `20260907T155353Z`
-  preserved 26 deleted games and ledger watermark 26; no active games existed.
-- [x] Verify the post-test recovery set and ledger acknowledgement. Encrypted
-  backup `20260907T160346Z` passed isolated restore and off-host checks; final
-  state is zero active/30 deleted games, with database and acknowledgement at 30.
+  restore, and off-host checksum/decryption checks. Backup `20260907T175422Z`
+  preserved 30 deleted games and ledger watermark 30; no active games existed.
+- [ ] Verify the repaired candidate's post-test recovery set and ledger
+  acknowledgement after all browser/restart probe cleanup is complete.
 - [ ] Verify actual VAPID key continuity and off-host recovery. Push remains
   disabled and no signing key was provisioned; absent-key backup checks are not
   evidence of real key recovery or provider delivery.
 - [x] Verify public health/readiness and authenticated two-client HTTPS/WebSocket
   movement and saved-state resume against the deployed immutable image.
 - [ ] Complete desktop/tablet public-site browser and full 24-turn checks.
-  Two Chromium runs failed at the consent fixture's connected-session wait;
-  the server logged a room-delivery timeout. Owner: engineering, with reproduction,
-  reviewed repair, exact-head CI, and both-layout rerun required. See `TASKS.md`.
-- [x] Verify both saved credentials and authoritative state after an application
-  restart, then back up the resulting deletion receipt. Both credentials resumed
-  identical state; the probe was normally deleted and included in the final backup.
+  The reviewed repair passes both full games on an isolated retained-data VPS
+  copy; the exact deployed image's public suite is running. Prior connection and
+  time-limit failures remain recorded in `TASKS.md`. Owner: engineering.
+- [ ] Verify both saved credentials and authoritative state after restarting
+  the repaired candidate, then back up the resulting deletion receipt.
 - [ ] Exercise migration and compatible rollback on an isolated copy. Saved
   rollback files alone do not establish compatibility with newer game writes.
 - [ ] Approve and exercise VPS reboot/recovery. A pending reboot marker was
