@@ -12,6 +12,14 @@ export const ACCESSIBILITY_TAGS = Object.freeze([
   "wcag22aa",
 ]);
 
+export async function waitForPlayerControls(pages) {
+  await Promise.all(
+    pages.map((page) =>
+      page.getByRole("region", { name: "Turn notifications" }).waitFor(),
+    ),
+  );
+}
+
 export async function auditAccessibility(page, evidenceDirectory, label) {
   const results = await new AxeBuilder({ page })
     .withTags([...ACCESSIBILITY_TAGS])

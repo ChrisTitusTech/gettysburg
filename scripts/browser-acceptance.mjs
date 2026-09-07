@@ -12,7 +12,10 @@ import { runEnforcedGame } from "./browser-enforced-game.mjs";
 import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
 import { checkPushWorker } from "./browser-push-worker.mjs";
-import { auditAccessibility } from "./browser-accessibility.mjs";
+import {
+  auditAccessibility,
+  waitForPlayerControls,
+} from "./browser-accessibility.mjs";
 import { checkHomeScreen } from "./browser-home-screen.mjs";
 import { startBrowserHttps } from "./browser-https.mjs";
 import {
@@ -277,6 +280,7 @@ async function runScenario(browser, origin, options) {
     assert.equal(new URL(opponentPage.url()).hash, "");
     await opponentPage.getByRole("button", { name: "Claim seat" }).click();
     await opponentPage.getByText("connected", { exact: true }).waitFor();
+    await waitForPlayerControls([hostPage, opponentPage]);
     await auditAccessibility(
       hostPage,
       evidenceDirectory,

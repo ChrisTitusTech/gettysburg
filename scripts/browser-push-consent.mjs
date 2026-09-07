@@ -123,6 +123,9 @@ export async function checkPushConsent(browser, origin, evidence, options) {
     guest.once("dialog", (dialog) => dialog.accept());
     await guest.getByRole("button", { name: "Surrender seat" }).click();
     await guest.waitForURL(`${origin}/`);
+    await guest
+      .getByRole("region", { name: "Turn notifications" })
+      .waitFor({ state: "detached" });
     assert.equal(
       await guest.getByRole("region", { name: "Turn notifications" }).count(),
       0,

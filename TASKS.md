@@ -1988,6 +1988,13 @@ gates and the corrected two-layout Firefox run pass in
 `test-results/firefox-notification-loaded`; application code is unchanged.
 Fresh independent review of the reload wait is clean; syntax and whitespace
 checks pass. Publish this fixture-only repair and rerun exact-head CI.
+WebKit run `34127922076` then exposed a post-surrender assertion running after
+the URL changed but before React removed the notification region. Await actual
+detachment before retaining the zero-count and protected 401 assertions; do not
+weaken either check. Integrate the live-audit readiness regression as well.
+All local gates pass 755 workspace/26 harness tests, and WebKit passes both
+layouts in `test-results/webkit-consent-ready`. Fresh independent review is
+clean and reran five focused tests. Publish and require new exact-head CI.
 
 ### Accessibility audit increment
 
