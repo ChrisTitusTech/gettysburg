@@ -162,7 +162,8 @@ export function createGettysburgRoom(
         const authorization = client.auth as RoomAuthorization | undefined;
         return authorization !== undefined &&
           isSpectator(authorization) &&
-          this.#canReceive(client)
+          this.#canReceive(client) &&
+          Number.isFinite(this.#deliveredSequence.get(client))
           ? [authorization]
           : [];
       });

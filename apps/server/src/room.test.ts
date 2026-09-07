@@ -178,6 +178,8 @@ describe("authorized broadcast ordering", () => {
       leave: vi.fn(),
     } as unknown as Client);
     const observerClient = {
+      ref: new EventEmitter(),
+      state: ClientState.JOINED,
       auth: observerAuthorization,
       send: (_type: string, event: ManagementEvent) =>
         observerEvents.push(event.event_sequence),
@@ -206,6 +208,17 @@ describe("authorized broadcast ordering", () => {
       });
     try {
       await room.onCreate!({ gameId: host.gameId });
+      vi.spyOn(service, "deliverAuthorizedState").mockImplementationOnce(
+        async (_authorization, deliver) => {
+          deliver({
+            ...(await service.getGameState(host.gameId)),
+            event_sequence: 0,
+          });
+        },
+      );
+      await room.onJoin!(observerClient, {});
+      await vi.waitFor(() => expect(observerEvents).toEqual([0]));
+      observerEvents.length = 0;
       publish(1);
       publish(2);
       await new Promise<void>((resolve) => setImmediate(resolve));
