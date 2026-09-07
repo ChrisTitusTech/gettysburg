@@ -4,8 +4,8 @@ import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
 export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
 export const RULESET_VERSION = "gettysburg-terrain-v3";
-// Under construction: deliberately absent from the server version registry and
-// not selected for new games until every mandatory rule family is validated.
+// Selected for new games with the pinned mandatory content revision. Legacy
+// saves retain their own registered version; never silently reinterpret them.
 export const MANDATORY_RULESET_VERSION = "gettysburg-mandatory-v4";
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
