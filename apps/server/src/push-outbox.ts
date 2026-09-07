@@ -60,8 +60,24 @@ function valid(value: unknown): value is StoredPushIntent {
 // service supplies current authorization and persists every mutation atomically.
 export class PushOutbox {
   readonly #items = new Map<string, StoredPushIntent>();
+  readonly #receipts = new Map<string, StoredPushIntent>();
 
-  constructor(records: unknown = []) {
+  constructor(records: unknown = [], receipts: unknown = []) {
+    if (Array.isArray(receipts)) {
+      const duplicates = new Set<string>();
+      for (const receipt of receipts) {
+        if (
+          !valid(receipt) ||
+          !receipt.leaseToken ||
+          receipt.leaseExpiresAt === null
+        )
+          continue;
+        if (this.#receipts.has(receipt.leaseToken))
+          duplicates.add(receipt.leaseToken);
+        this.#receipts.set(receipt.leaseToken, structuredClone(receipt));
+      }
+      for (const token of duplicates) this.#receipts.delete(token);
+    }
     if (!Array.isArray(records)) return;
     const duplicates = new Set<string>();
     for (const record of records) {
@@ -76,7 +92,23 @@ export class PushOutbox {
     return structuredClone([...this.#items.values()]);
   }
 
-  prune(now: number, authorized: (intent: StoredPushIntent) => boolean): void {
+  receipts(): readonly StoredPushIntent[] {
+    return structuredClone([...this.#receipts.values()]);
+  }
+
+  prune(
+    now: number,
+    authorized: (intent: StoredPushIntent) => boolean,
+    receiptAuthorized: (intent: StoredPushIntent) => boolean = authorized,
+  ): void {
+    for (const [token, receipt] of this.#receipts) {
+      if (
+        (receipt.leaseExpiresAt ?? 0) <= now ||
+        receipt.expiresAt <= now ||
+        !receiptAuthorized(receipt)
+      )
+        this.#receipts.delete(token);
+    }
     for (const [bindingId, item] of this.#items) {
       if (
         item.expiresAt <= now ||
@@ -137,6 +169,7 @@ export class PushOutbox {
       leaseExpiresAt: Math.min(now + PUSH_LEASE_MS, item.expiresAt),
     };
     this.#items.set(item.bindingId, claimed);
+    this.#receipts.set(claimed.leaseToken, structuredClone(claimed));
     return structuredClone(claimed);
   }
 
@@ -146,6 +179,12 @@ export class PushOutbox {
     outcome: PushDeliveryOutcome,
     now: number,
   ): string | undefined {
+    const receipt = this.#receipts.get(leaseToken);
+    const currentReceipt =
+      receipt?.id === id &&
+      (receipt.leaseExpiresAt ?? 0) > now &&
+      receipt.expiresAt > now;
+    if (currentReceipt) this.#receipts.delete(leaseToken);
     const item = [...this.#items.values()].find(
       (candidate) => candidate.id === id,
     );
@@ -155,7 +194,9 @@ export class PushOutbox {
       (item.leaseExpiresAt ?? 0) <= now ||
       item.expiresAt <= now
     )
-      return undefined;
+      return currentReceipt && outcome === "gone"
+        ? receipt.bindingId
+        : undefined;
     const delay = RETRY_DELAYS_MS[item.attempts - 1];
     if (
       outcome !== "retry" ||

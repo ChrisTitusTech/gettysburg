@@ -886,6 +886,10 @@ Internal workers claim through 30-second leases and use fresh consent,
 binding, session, game, and required-decision checks. Outcomes must match the
 current unexpired lease; a stale worker cannot acknowledge newer work or remove
 replacement consent. Provider-gone outcomes retire the matching subscription.
+Completion receipts retain the original consent identity only until their
+30-second lease expires, even when decision pruning or newer work removes the
+original reminder. A matching gone outcome can therefore retire that same
+subscription without acknowledging newer work or touching replacement consent.
 Retry delays are one minute, five minutes, 15 minutes, and one hour, with no
 more than five attempts including abandoned leases. Pending work and leases
 are private service records, not game actions or recovery exports. A crash

@@ -292,6 +292,7 @@ export interface GameServiceSnapshot {
   readonly spectatorBindings?: readonly SpectatorBinding[];
   readonly pushSubscriptions?: readonly StoredPushSubscription[];
   readonly pushOutbox?: readonly StoredPushIntent[];
+  readonly pushDeliveryReceipts?: readonly StoredPushIntent[];
   readonly recoveryGrants: readonly [string, RecoveryGrant][];
   readonly seatBindings: readonly SeatBinding[];
   readonly sessions: readonly BrowserSession[];
@@ -888,7 +889,10 @@ export class InMemoryGameService {
         }
       }
       this.#prunePushSubscriptions();
-      this.#pushOutbox = new PushOutbox(options.snapshot.pushOutbox);
+      this.#pushOutbox = new PushOutbox(
+        options.snapshot.pushOutbox,
+        options.snapshot.pushDeliveryReceipts,
+      );
       this.#prunePushOutbox();
     }
   }
@@ -897,6 +901,7 @@ export class InMemoryGameService {
     this.#prunePushSubscriptions();
     this.#prunePushOutbox();
     const pushOutbox = this.#pushOutbox.snapshot();
+    const pushDeliveryReceipts = this.#pushOutbox.receipts();
     return structuredClone({
       games: [...this.#games].map(([gameId, game]) => [
         gameId,
@@ -919,6 +924,7 @@ export class InMemoryGameService {
         ? {}
         : { pushSubscriptions: [...this.#pushSubscriptions.values()] }),
       ...(pushOutbox.length === 0 ? {} : { pushOutbox }),
+      ...(pushDeliveryReceipts.length === 0 ? {} : { pushDeliveryReceipts }),
       recoveryGrants: [...this.#recoveryGrants],
       seatBindings: this.#seatBindings,
       sessions: [...this.#sessionsById.values()],
@@ -926,27 +932,43 @@ export class InMemoryGameService {
   }
 
   #prunePushOutbox(): void {
-    this.#pushOutbox.prune(this.#now(), (intent) => {
-      const consent = this.#pushSubscriptions.get(intent.bindingId);
-      const binding = this.#seatBindings.find(
-        (item) => item.id === intent.bindingId && item.revokedAt === null,
-      );
-      const game = this.#games.get(intent.gameId);
-      return (
-        consent !== undefined &&
-        binding !== undefined &&
-        binding.gameId === intent.gameId &&
-        game !== undefined &&
-        game.deletedAt === null &&
-        intent.eventSequence <= game.state.event_sequence &&
-        intent.createdAt <= this.#now() &&
-        intent.expiresAt <= consent.expiresAt &&
-        intent.consentTag ===
-          createHash("sha256").update(consent.sealed).digest("hex") &&
-        intent.decisionFingerprint ===
-          turnDecisionFingerprint(game.state, binding.side)
-      );
-    });
+    this.#pushOutbox.prune(
+      this.#now(),
+      (intent) => {
+        const binding = this.#seatBindings.find(
+          (item) => item.id === intent.bindingId,
+        );
+        const game = this.#games.get(intent.gameId);
+        return (
+          this.#currentPushConsent(intent) &&
+          binding !== undefined &&
+          game !== undefined &&
+          intent.decisionFingerprint ===
+            turnDecisionFingerprint(game.state, binding.side)
+        );
+      },
+      (receipt) => this.#currentPushConsent(receipt),
+    );
+  }
+
+  #currentPushConsent(intent: StoredPushIntent): boolean {
+    const consent = this.#pushSubscriptions.get(intent.bindingId);
+    const binding = this.#seatBindings.find(
+      (item) => item.id === intent.bindingId && item.revokedAt === null,
+    );
+    const game = this.#games.get(intent.gameId);
+    return (
+      consent !== undefined &&
+      binding !== undefined &&
+      binding.gameId === intent.gameId &&
+      game !== undefined &&
+      game.deletedAt === null &&
+      intent.eventSequence <= game.state.event_sequence &&
+      intent.createdAt <= this.#now() &&
+      intent.expiresAt <= consent.expiresAt &&
+      intent.consentTag ===
+        createHash("sha256").update(consent.sealed).digest("hex")
+    );
   }
 
   // Internal worker API only. The PostgreSQL adapter persists claims/outcomes

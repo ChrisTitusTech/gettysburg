@@ -147,10 +147,24 @@ postgres("PostgreSQL durability", () => {
       expect(
         await first.getPushSubscriptionStatus(guest.credential, host.gameId),
       ).toMatchObject({ enabled: true });
-      await restarted.finishPushDelivery(intent.id, intent.leaseToken!, "sent");
+      expect(
+        (
+          await first.executeCommand(
+            await first.authenticate(guest.credential, host.gameId),
+            { ...command, command_id: randomUUID(), expected_version: 1 },
+          )
+        ).ok,
+      ).toBe(true);
+      expect(await restarted.claimPushDelivery()).toBeUndefined();
+      // The old decision is gone from the canonical outbox, but its matching
+      // in-flight provider outcome still retires this unchanged subscription.
+      await restarted.finishPushDelivery(intent.id, intent.leaseToken!, "gone");
+      expect(
+        await first.getPushSubscriptionStatus(guest.credential, host.gameId),
+      ).toMatchObject({ enabled: false });
       expect(await first.claimPushDelivery()).toBeUndefined();
-      expect(await restarted.getActions(host.gameId)).toHaveLength(1);
-      expect((await restarted.getGameState(host.gameId)).version).toBe(1);
+      expect(await restarted.getActions(host.gameId)).toHaveLength(2);
+      expect((await restarted.getGameState(host.gameId)).version).toBe(2);
     } finally {
       await Promise.all([first.close(), restarted.close()]);
     }

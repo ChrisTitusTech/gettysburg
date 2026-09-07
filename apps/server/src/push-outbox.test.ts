@@ -13,6 +13,59 @@ function input(eventSequence = 1) {
 }
 
 describe("bounded push outbox", () => {
+  it("retains only lease-bounded receipts across decision pruning and coalescing", () => {
+    const queue = new PushOutbox();
+    const item = input();
+    queue.enqueue(item, 1_000, Infinity);
+    const claimed = queue.claim(1_000)!;
+    queue.prune(
+      1_001,
+      () => false,
+      () => true,
+    );
+    expect(queue.snapshot()).toEqual([]);
+    const restarted = new PushOutbox(queue.snapshot(), queue.receipts());
+    restarted.enqueue({ ...item, eventSequence: 2 }, 1_002, Infinity);
+    expect(
+      restarted.finish(claimed.id, claimed.leaseToken!, "gone", 1_003),
+    ).toBe(item.bindingId);
+    expect(restarted.snapshot()).toHaveLength(1);
+    expect(restarted.receipts()).toEqual([]);
+    expect(
+      restarted.finish(claimed.id, claimed.leaseToken!, "gone", 1_004),
+    ).toBeUndefined();
+    const next = restarted.claim(1_004)!;
+    restarted.prune(
+      1_004 + PUSH_LEASE_MS,
+      () => true,
+      () => true,
+    );
+    expect(restarted.receipts()).toEqual([]);
+    expect(
+      restarted.finish(
+        next.id,
+        next.leaseToken!,
+        "gone",
+        1_004 + PUSH_LEASE_MS,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("drops damaged, duplicate, and unauthorized completion receipts", () => {
+    const queue = new PushOutbox();
+    queue.enqueue(input(), 1_000, Infinity);
+    const claimed = queue.claim(1_000)!;
+    expect(new PushOutbox([], [claimed, claimed, {}, null]).receipts()).toEqual(
+      [],
+    );
+    queue.prune(
+      1_001,
+      () => true,
+      () => false,
+    );
+    expect(queue.receipts()).toEqual([]);
+  });
+
   it("coalesces newer intents and rejects stale outcomes without losing newer work", () => {
     const queue = new PushOutbox();
     const item = input();
@@ -23,7 +76,7 @@ describe("bounded push outbox", () => {
     expect(queue.snapshot()[0]).toEqual(first);
     queue.enqueue({ ...item, eventSequence: 2 }, 1_003, Infinity);
     expect(
-      queue.finish(first.id, first.leaseToken!, "gone", 1_004),
+      queue.finish(first.id, first.leaseToken!, "sent", 1_004),
     ).toBeUndefined();
     expect(queue.claim(1_004)).toMatchObject({ eventSequence: 2, attempts: 1 });
   });
