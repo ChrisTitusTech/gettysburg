@@ -79,6 +79,8 @@ jobs:
       - name: Run two-player and full enforced-game browser acceptance
         env:
           GETTYSBURG_FULL_GAME: "true"
+          # Shared-runner timings are diagnostics, not calibrated desktop acceptance.
+          GETTYSBURG_PERFORMANCE_MODE: report
         run: pnpm browser:acceptance
 
       - name: Verify mandatory movement inputs in browser fixtures

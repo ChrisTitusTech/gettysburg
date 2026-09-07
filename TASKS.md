@@ -2,6 +2,36 @@
 
 ## Current source rollup: 2026-09-07
 
+Owner-approved timing policy: shared CI uses diagnostic-only timing, retaining
+misses and warnings. Strict mode remains the default and enforces 100 ms on
+calibrated desktop hardware for release acceptance. Incomplete interactions
+still fail in both modes. This approval supersedes the pending policy decision
+in the historical PR #55 failure entries below, not their measured results.
+Implementation, fresh review, and exact-head CI are required before merge;
+the calibrated-hardware performance and other release gates remain open.
+Policy implementation validation: full local gates pass (755 workspace/32
+harness tests); a separate PostgreSQL run passes all 329 server tests. Both
+Chromium layouts pass report-mode consent/reconnect/replay/spectator/accessibility
+checks in `test-results/performance-report-approved`. New mode regressions prove
+strict rejection, diagnostic retention, invalid-setting rejection, and failure
+on incomplete confirmation. Independent Codex review and CodeRabbit 0.7.6 review
+both found no actionable defects. No application runtime or deployment changed.
+Hosted review subsequently required a Node-side deadline (a frozen renderer can
+suspend its own timer) and failure evidence for initial Fit/locator setup.
+Bound the complete setup/click/evaluation externally, prevent delayed setup from
+clicking after cancellation, and bound best-effort cleanup too. Regressions
+cover setup failures, frozen evaluation/cleanup, and strict/report behavior.
+These repairs require fresh validation/review and published CI before merge.
+The deadline/setup repair passes full local gates (755 workspace/34 harness
+tests), fresh independent review, and both report-mode Chromium layouts in
+`test-results/performance-bounded-approved`. The preceding policy head also
+passes both strict-mode 24-turn games and input fixtures in
+`test-results/performance-strict-approved` and its `-fixtures` directory;
+tablet covers loss/advance/retreat, desktop loss/advance. These local checks do
+not claim calibrated-hardware or VPS acceptance. Application runtime is unchanged.
+CodeRabbit's second review also completed with zero findings on the three-file
+deadline/setup repair; hosted threads are resolved only after publishing it.
+
 This rollup distinguishes merged source from the last verified VPS deployment.
 Older incremental entries below preserve their contemporaneous stopping points
 and evidence; they do not supersede this current status or close owner gates.
@@ -12,19 +42,23 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, and encrypted key-recovery wiring are merged through PRs #49-51 | Home Screen acceptance, actual VPS key recovery, and real provider/device acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
+| Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
+| Phase 4 release | Original presentation approved; supplied scans remain private; local candidate image scan and runtime evidence recorded below | Remaining accessibility/device/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
 below. No phase is completed merely by passing the automated game script.
+`docs/operations/RELEASE_ACCEPTANCE.md` consolidates the remaining owner,
+device/accessibility, and controlled-VPS checks without changing their scope.
 
 CI evidence correction: hosted review of the alternate-browser workflow found
 that default pull-request checkout uses GitHub's synthetic merge commit. Earlier
 Application results were associated with the listed PR head, but did not prove
-that exact checkout. Pin Application checkout to the PR head SHA (or push SHA),
-as Documentation already does, and rerun before merging the accessibility
-increment. The browser workflow receives the same correction separately.
+that exact checkout. PR #53 now pins Application checkout to the PR head SHA
+(or push SHA), as Documentation already does. PR #54 applies the same correction
+to the browser workflow. All final required jobs passed on those exact heads
+before either PR merged.
 Historical evidence is retained, not reclassified as an exact-head execution.
 No Phase 3/4 or new VPS/release completion is inferred from those earlier runs.
 The workflow-only repair passes the full local gate (753 workspace/22 harness
@@ -39,12 +73,13 @@ claimed for this documentation update. Fresh independent review found no
 actionable defects. PR #42 head `5461aaa` passed Application `34105452083` and
 Documentation `34105452277`, had no unresolved threads, and merged as `3c61850`.
 
-Subsequent merge closeout (2026-09-07): each exact head passed Application and
-Documentation, independent review was clean, and final unresolved-thread
+Subsequent merge closeout (2026-09-07): each listed PR head had successful
+Application and Documentation checks, subject to the checkout correction above.
+Independent review was clean, and final unresolved-thread
 inspection was empty before a separate merge call. The implementation notes
 below retain earlier evidence and pending steps, superseded by this rollup.
 
-| PR | Exact head | Application / Documentation | Merge |
+| PR | PR head | Application / Documentation | Merge |
 | --- | --- | --- | --- |
 | #40 observer browser | `9ad2f66` | `34113686517` / `34113686564` | `3d10581` |
 | #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
@@ -58,6 +93,14 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #50 browser consent UI | `f9d5efd` | `34122292052` / `34122292041` | `88f96fc` |
 | #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
 | #52 Home Screen metadata | `54ee652` | `34123054048` / `34123054108` | `6790e3a` |
+
+Verified exact-checkout closeout: PR #53 head `14a8c8f` passed Application
+`34129078601` and Documentation `34129078631`, then merged as `6622f0b`.
+PR #54 head `18e759c` passed Application `34129213403`, Documentation
+`34129213391`, and both Firefox/WebKit jobs in `34129213526`, then merged as
+`628a85a`. Each had fresh clean independent review and no unresolved review
+threads before a separate merge call. The local performance increment below
+is based on these merged fixes; it does not change the deployed VPS revision.
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1898,6 +1941,126 @@ validation remain separate gates.
 - [ ] Automate backups and exercise restore, migration, rollback, and reboot.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
+
+### Browser-response performance increment
+
+Add a bounded, browser-local zoom-response audit to both acceptance layouts.
+Twenty real clicks alternate zoom-in and Fit without changing game state.
+Measure from the browser click handler until the zoom text confirms the update
+and a subsequent animation frame provides a paint opportunity. A two-second
+deadline prevents suspended animation frames from waiting indefinitely.
+Retain only numeric timings, browser version, viewport, and explicit limitations
+in each layout's performance JSON; no resource URLs or private session values.
+Report nearest-rank median/p95/maximum and reject samples above SPEC.md's 100 ms
+feedback budget, preserving evidence before failure. Statistical regressions
+cover percentile boundaries, input immutability, and invalid samples.
+
+This is unthrottled test-machine evidence for zoom controls, not a claim about
+physical touch latency, all movement/combat interactions, broadband initial
+load, cross-player delivery, reconnect time, or supported VPS room capacity.
+Those measurements and owner release/device acceptance remain open. Full local
+gates, both complete games/input fixtures, independent review, and exact-head
+CI follow before this increment can merge.
+The first complete run passes 753 workspace/23 harness tests, both 24-turn
+games with all three choices, reload/replay/observers, and input fixtures in
+`test-results/performance-confirmed` and its `-fixtures` directory. Zoom p95 is
+31.9 ms desktop and 32.1 ms tablet; all 40 samples meet 100 ms locally.
+Independent review identified that a separate zoom confirmation wait could
+outlive the measurement deadline and lose failure evidence. Remove that wait;
+confirmation and input failures now save a sanitized failed sample and terminate
+before another measurement. Three harness regressions and a two-layout rerun
+pass in `test-results/performance-deadline` (32.0 ms p95 at both widths). Fresh
+review and final integration gates remain required.
+Also retain one observed initial-lobby interactivity, reload/reconnect, and
+input-to-both-player confirmation time per layout. Compare with the declared
+3,000/5,000/500 ms targets without claiming a percentile, typical-broadband,
+Internet-excluded command, or production-capacity result. Include automation
+and rendering overhead in these conservative observations; retain no URLs.
+These single-flow observations report target misses rather than declaring an
+entire performance gate complete. Application CI explicitly checks out the
+reviewed head; historical synthetic-merge results are not substituted.
+Integrated local gates pass 753 workspace/26 harness tests. Both layouts pass
+WCAG/consent/reconnect/replay/observer checks in `test-results/performance-session`.
+Desktop initial/reconnect/both-player observations are 63.5/234.0/120.5 ms;
+tablet observations are 62.0/353.8/238.3 ms. Zoom p95 is 32.0 ms at both widths.
+Fresh independent review found no actionable defects and reran all four
+performance regressions plus changed-script formatting.
+After browser-engine integration, all local gates pass 755 workspace/29 harness
+tests. Both layouts pass in Chromium 151 and WebKit 26.5, including WCAG,
+consent, reload, replay, and observers. Firefox's first run exposed an aborted
+lazy notification module during immediate reload; wait for the notification
+region before the deliberate reload rather than suppressing its warning.
+The corrected Firefox 153 run passes both layouts too. Evidence directories are
+`test-results/performance-chromium`, `test-results/performance-webkit`, and
+`test-results/performance-firefox-loaded`. All 120 zoom samples meet 100 ms;
+desktop/tablet p95 values are 31.7/31.7 ms Chromium, 49.0/35.0 ms WebKit, and
+15.0/15.0 ms Firefox. All six single-flow session observations are within their
+declared targets. This remains local evidence, not physical-device/VPS acceptance.
+The shared live-audit/surrender readiness repairs pass all local gates (755
+workspace/30 harness tests) and both Chromium layouts in
+`test-results/performance-controls-ready`. Fresh independent review is clean
+and reran five focused tests; the earlier four-test performance review was also
+clean. Application runtime code is unchanged by these fixture repairs.
+
+Local candidate image
+`d894f236995ec57a97895331141b69f40f90c406085ca8da417a721bc0a8fa21`
+was built from `f195e526afbeb6983639e584a36c3a0cb883b4de`; subsequent changes
+are fixture/documentation integration, not application runtime changes. The
+verified Trivy 0.74.0 binary refreshed its database and found no HIGH/CRITICAL
+issues across 18 Alpine and 361 Node packages. Raw evidence is retained in
+`/tmp/gettysburg-scanner.K2VSLN/browser-performance-image.json`. That exact image
+passed both full 24-turn Chromium games, WCAG checks, protected consent, reload,
+exact replay, spectators, and performance observations in
+`test-results/candidate-image-browser`. Tablet covers all three combat choices;
+desktop covers loss/retreat. The isolated container ran as UID 1000 with a
+read-only root filesystem, dropped capabilities, and the explicit Quadlet
+readiness command; PostgreSQL readiness and clean exit were verified. Its
+temporary application/database containers, state volume, and network were
+removed, preserving the image and evidence. This is not VPS deployment,
+backup/restore/reboot acceptance, or a public capacity claim. The OCI build's
+ignored embedded HEALTHCHECK warning is addressed by the explicitly configured
+runtime health command, as in the deployed Quadlet.
+Desktop/tablet Fit captures from this exact-image run were visually inspected;
+the board and controls are intact in both views. The new release-acceptance
+worksheet passes Markdown/diff checks and independent review without changing
+owner decisions or closing manual gates.
+Final integration onto merged PR #54 passes frozen install, format, lint,
+typecheck, 755 workspace/30 harness tests, build, smoke, and Markdown/full-diff
+checks. A separate PostgreSQL run passes all 329 server tests, including the
+26 omitted by the default database-free suite. Fresh independent review of the
+seven-file increment found no actionable defects and reran four performance
+regressions. Published exact-head CI remains required before merge.
+PR #55 head `58bfd69` failed its first WebKit CI timing gate in job
+`101769294512` (`34130528806`): desktop p95 113 ms, two of 20 samples above
+100 ms. Browser installation/startup, native notification checks, and lobby
+accessibility passed before the timing failure; Firefox's full run passed.
+The complete relevant job log was inspected. The Node 20 action-deprecation
+notice and retained bundle-size warning are not this failure's cause.
+An isolated two-CPU WebKit profile records 1-2 ms React updates but substantially
+longer frame scheduling/render opportunities. Disabling counter shadows did not
+materially improve the timings, so no speculative artwork/runtime edit was kept.
+Retain per-sample confirmation-frame and total timing diagnostics (numeric only)
+and print them on a budget miss before another reviewed exact-head CI run.
+The 100 ms gate is unchanged; the first failure remains evidence, and neither
+VPS performance nor Phase 4 is accepted by a later passing sample.
+The diagnostics-only repair passes the full local gate (755 workspace/30 harness
+tests), independent review, and a two-CPU isolated WebKit probe (20 samples,
+70 ms p95, none over budget). Local raw numeric profiles remain in
+`test-results/zoom-confirmation-diagnostics.json` and
+`test-results/webkit-profile-diagnostics-performance.json`. This does not
+explain away or replace the hosted failure; CI must rerun on the published head.
+The second hosted WebKit run on `32a38d5` also failed in job `101772865267`
+(`34131626489`): desktop p95 166 ms, all 20 samples above 100 ms. The first
+confirmation frame was usually 10-14 ms; the following frame added roughly
+120 ms. Local two-page, foregrounded-page, hidden-label, and hidden-board
+controls still showed similar frame scheduling delays to the original local
+probe, without reproducing the hosted magnitude. These observations do not
+identify an application renderer defect or justify removing artwork/labels.
+No such speculative change was retained. PR #55 remains blocked, not merge-ready.
+
+| Remaining performance gate | Responsible owner | Attempted result | Reason and follow-up |
+| --- | --- | --- | --- |
+| Hosted zoom budget | Engineering; ChrisTitusTech for acceptance policy | Two WebKit heads failed the unchanged 100 ms check despite passing local probes; exact failed jobs above | Continue diagnosis or explicitly approve reporting shared-CI frame timings separately from a strict, calibrated desktop-hardware release benchmark; do not silently turn off the assertion or claim Phase 4 performance acceptance |
 
 ### Browser-engine acceptance increment
 

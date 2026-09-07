@@ -1,0 +1,234 @@
+import assert from "node:assert/strict";
+import { writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+
+export function performanceMode(value = "strict") {
+  assert(value === "strict" || value === "report", "Unknown performance mode");
+  return value;
+}
+
+// This timer lives outside the renderer, so a frozen page cannot suspend it.
+export async function withMeasurementDeadline(operation, timeoutMs = 2_000) {
+  const controller = new AbortController();
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => operation(controller.signal)),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          controller.abort();
+          reject(new Error("Measurement deadline exceeded"));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function summarizeSessionTimings(measurements) {
+  const budgets = {
+    initialInteractiveMs: 3_000,
+    reconnectMs: 5_000,
+    inputToBothPlayersMs: 500,
+  };
+  return Object.fromEntries(
+    Object.entries(budgets).map(([name, budgetMs]) => {
+      const durationMs = measurements[name];
+      assert(Number.isFinite(durationMs) && durationMs >= 0, `Invalid ${name}`);
+      return [
+        name,
+        { durationMs, budgetMs, withinBudget: durationMs <= budgetMs },
+      ];
+    }),
+  );
+}
+
+export async function recordSessionTimings(evidence, label, measurements) {
+  const timings = summarizeSessionTimings(measurements);
+  await writeFile(
+    resolve(evidence, `${label}-session-performance.json`),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        timings,
+        limitations: [
+          "One sample per flow/layout; not a percentile or a capacity test.",
+          "Initial lobby load uses an empty browser context without network throttling.",
+          "Reconnect includes a reload with this context's existing asset cache.",
+          "Input-to-both-players includes automation/input/render overhead and all network latency.",
+          "These observations do not prove broadband, physical-device, or VPS acceptance.",
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(
+    `${label}: session timings ${Object.entries(timings)
+      .map(
+        ([name, value]) =>
+          `${name}=${value.durationMs.toFixed(1)} (${value.withinBudget ? "within" : "outside"} target)`,
+      )
+      .join(", ")}`,
+  );
+}
+
+export function summarizeResponseTimes(samples) {
+  assert(samples.length > 0, "At least one timing sample is required");
+  assert(samples.every((sample) => Number.isFinite(sample) && sample >= 0));
+  const sorted = [...samples].sort((a, b) => a - b);
+  const percentile = (fraction) =>
+    sorted[Math.ceil(sorted.length * fraction) - 1];
+  return {
+    samples: samples.length,
+    medianMs: percentile(0.5),
+    p95Ms: percentile(0.95),
+    maximumMs: sorted.at(-1),
+    budgetMs: 100,
+    overBudget: samples.filter((sample) => sample > 100).length,
+  };
+}
+
+// Browser-local click-to-render opportunity, not network latency or VPS capacity.
+// Two animation frames include a paint opportunity after the React zoom update.
+// Keep only numeric timings and public environment metadata; never retain URLs,
+// cookies, invitations, game identifiers, or raw performance resource entries.
+export async function measureBoardResponse(
+  page,
+  evidence,
+  label,
+  mode = "strict",
+) {
+  performanceMode(mode);
+  const samples = [];
+  const frameDiagnostics = [];
+  let failure;
+  try {
+    await withMeasurementDeadline(() =>
+      page
+        .getByRole("button", { name: "Fit", exact: true })
+        .click({ timeout: 2_000 }),
+    );
+  } catch {
+    samples.push(2_000);
+    failure = "measurement-input-or-page-failed";
+  }
+  for (let index = 0; index < 20 && !failure; index++) {
+    try {
+      const sample = await withMeasurementDeadline(async (signal) => {
+        const zoomIn = index % 2 === 0;
+        const button = page.getByRole("button", {
+          name: zoomIn ? "Zoom in" : "Fit",
+          exact: true,
+        });
+        await button.evaluate(
+          (element, expectedZoom) => {
+            window.__gettysburgTiming = new Promise((resolveSample) => {
+              element.addEventListener(
+                "click",
+                () => {
+                  const start = performance.now();
+                  let confirmedAtMs = null;
+                  const finish = (confirmed) => {
+                    clearTimeout(timeout);
+                    resolveSample({
+                      durationMs: performance.now() - start,
+                      confirmed,
+                      confirmedAtMs,
+                    });
+                  };
+                  const timeout = setTimeout(() => finish(false), 2_000);
+                  const observeUpdate = () => {
+                    if (performance.now() - start > 2_000) {
+                      finish(false);
+                      return;
+                    }
+                    if (
+                      document.querySelector('[aria-label="Current zoom"]')
+                        ?.textContent === expectedZoom
+                    ) {
+                      confirmedAtMs = performance.now() - start;
+                      requestAnimationFrame(() => finish(true));
+                    } else requestAnimationFrame(observeUpdate);
+                  };
+                  requestAnimationFrame(observeUpdate);
+                },
+                { capture: true, once: true },
+              );
+            });
+          },
+          zoomIn ? "135%" : "100%",
+        );
+        signal.throwIfAborted();
+        await button.click({ timeout: 2_000 });
+        signal.throwIfAborted();
+        return page.evaluate(() => window.__gettysburgTiming);
+      });
+      samples.push(sample.durationMs);
+      frameDiagnostics.push({
+        confirmedAtMs: sample.confirmedAtMs ?? null,
+        durationMs: sample.durationMs,
+      });
+      if (!sample.confirmed) failure = "zoom-not-confirmed-before-deadline";
+    } catch {
+      samples.push(2_000);
+      failure = "measurement-input-or-page-failed";
+    } finally {
+      await withMeasurementDeadline(
+        () =>
+          page.evaluate(() => {
+            delete window.__gettysburgTiming;
+          }),
+        100,
+      ).catch(() => {});
+    }
+    if (failure) break;
+  }
+  const summary = summarizeResponseTimes(samples);
+  await writeFile(
+    resolve(evidence, `${label}-performance.json`),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        mode,
+        measurement: "local-click-to-confirmed-zoom-and-paint-opportunity",
+        browser: page.context().browser().version(),
+        viewport: page.viewportSize(),
+        ...summary,
+        frameDiagnostics,
+        failure: failure ?? null,
+        limitations: [
+          "No CPU or network throttling; this is the current test machine.",
+          "Zoom controls only; not all board interactions or physical touch latency.",
+          "Not initial broadband load, cross-player latency, reconnect, or VPS capacity.",
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(
+    `${label}: board response p95 ${summary.p95Ms.toFixed(1)} ms; ${summary.overBudget}/${summary.samples} samples exceed 100 ms`,
+  );
+  if (summary.overBudget > 0)
+    console.log(
+      `${label}: frame diagnostics ${JSON.stringify(frameDiagnostics)}`,
+    );
+  // Persist evidence before rejecting a missed response budget.
+  assert.equal(
+    failure,
+    undefined,
+    `${label}: incomplete board response measurement; inspect performance evidence`,
+  );
+  if (mode === "strict")
+    assert.equal(
+      summary.overBudget,
+      0,
+      `${label}: board response exceeded the 100 ms budget; inspect performance evidence`,
+    );
+  else if (summary.overBudget > 0)
+    console.warn(
+      `${label}: diagnostic-only timing miss; the strict desktop release benchmark remains required`,
+    );
+}

@@ -49,6 +49,8 @@ jobs:
         env:
           GETTYSBURG_BROWSER: ${{ matrix.browser }}
           GETTYSBURG_FULL_GAME: "true"
+          # Keep misses visible without treating this shared VM as desktop hardware.
+          GETTYSBURG_PERFORMANCE_MODE: report
           GETTYSBURG_CONTAINER_ENGINE: docker
           GETTYSBURG_EVIDENCE_DIR: test-results/${{ matrix.browser }}
         run: pnpm browser:acceptance

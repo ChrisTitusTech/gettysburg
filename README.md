@@ -33,6 +33,7 @@ of production readiness.
 - `SPEC.md` - required behavior, architecture, security, and acceptance criteria
 - `ROADMAP.md` - ordered implementation phases and exit criteria
 - `TASKS.md` - current reviewable work and validation status
+- `docs/operations/RELEASE_ACCEPTANCE.md` - remaining owner/device/VPS checks
 - `docs/references/SOURCE_ASSETS.md` - local-only source inventory and missing inputs
 - `docs/references/TERRAIN_ADJUSTMENTS.md` - per-hex terrain/modifier owner-review
   worksheet
@@ -94,6 +95,23 @@ historical replay, and await durable cleanup. The games have an eight-minute
 per-game bound; commands are paced below the room's abuse limit even on fast
 runners. CI allows 25 minutes for these games plus the other required gates.
 These automated checks do not replace owner tabletop adjudication.
+Browser acceptance also records 20 click-to-confirmed-zoom/paint-opportunity
+samples at each layout in `desktop-performance.json` and
+`tablet-performance.json`. Strict mode (the default) fails the specified 100 ms
+feedback budget when exceeded. Shared CI explicitly sets
+`GETTYSBURG_PERFORMANCE_MODE=report`: misses retain their numeric evidence and
+warnings without failing otherwise complete interactions. Missing confirmation,
+input failure, and invalid configuration still fail in either mode.
+These are unthrottled test-machine measurements, not broadband-load,
+physical-device, cross-player-latency, or VPS-capacity claims.
+Release acceptance still requires `GETTYSBURG_PERFORMANCE_MODE=strict` on
+calibrated desktop hardware, recording hardware, OS/browser, workload, and
+evidence. A green report-mode CI run does not close that gate.
+Companion `desktop-session-performance.json` and `tablet-session-performance.json`
+record one initial-lobby, reload/reconnect, and input-to-both-player observation
+against the 3,000/5,000/500 ms targets. They include automation/render/network
+overhead and do not establish percentiles or isolate Internet latency.
+
 `GETTYSBURG_BROWSER=firefox GETTYSBURG_FULL_GAME=true pnpm browser:acceptance`
 also passes locally at both widths with keyboard/mouse input. Chromium remains
 the default and supplies continuous tablet-touch and native notification-worker

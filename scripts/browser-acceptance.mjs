@@ -17,6 +17,11 @@ import {
   waitForPlayerControls,
 } from "./browser-accessibility.mjs";
 import { checkHomeScreen } from "./browser-home-screen.mjs";
+import {
+  measureBoardResponse,
+  performanceMode,
+  recordSessionTimings,
+} from "./browser-performance.mjs";
 import { startBrowserHttps } from "./browser-https.mjs";
 import {
   captureScreenshot,
@@ -152,13 +157,16 @@ async function selectAndMove(page, counterName, destination, inputMode) {
   const target = page.locator(`[data-coordinate="${destination}"]`);
   if (inputMode === "touch") {
     await counter.tap();
+    const started = performance.now();
     await target.tap();
-    return;
+    return started;
   }
 
   await counter.focus();
   await page.keyboard.press("Enter");
+  const started = performance.now();
   await target.click();
+  return started;
 }
 
 async function dragWithinMovement(page, prefix, inputMode) {
@@ -242,7 +250,12 @@ async function runScenario(browser, origin, options) {
   watchPage(opponentPage, issues);
 
   try {
+    const navigationStarted = performance.now();
     await hostPage.goto(origin);
+    await hostPage
+      .getByRole("button", { name: `Host as ${options.hostName}` })
+      .waitFor();
+    const initialInteractiveMs = performance.now() - navigationStarted;
     await auditAccessibility(
       hostPage,
       evidenceDirectory,
@@ -265,12 +278,20 @@ async function runScenario(browser, origin, options) {
       await image.decode();
     });
     intentionalReloads.add(hostPage);
+    const reconnectStarted = performance.now();
     try {
       await hostPage.reload();
     } finally {
       intentionalReloads.delete(hostPage);
     }
     await hostPage.getByText("connected", { exact: true }).waitFor();
+    const reconnectMs = performance.now() - reconnectStarted;
+    await measureBoardResponse(
+      hostPage,
+      evidenceDirectory,
+      options.label,
+      timingMode,
+    );
     await hostPage
       .getByRole("button", { exact: true, name: "Revoke" })
       .waitFor();
@@ -307,7 +328,7 @@ async function runScenario(browser, origin, options) {
       options.hostName === "Confederate" ? hostPage : opponentPage;
     let unionPage = options.hostName === "Union" ? hostPage : opponentPage;
 
-    await selectAndMove(
+    const moveStarted = await selectAndMove(
       unionPage,
       /Wadsworth, D3, selectable/,
       "E4",
@@ -315,6 +336,11 @@ async function runScenario(browser, origin, options) {
     );
     await waitForVersion(unionPage, 1);
     await waitForVersion(confederatePage, 1);
+    await recordSessionTimings(evidenceDirectory, options.label, {
+      initialInteractiveMs,
+      reconnectMs,
+      inputToBothPlayersMs: performance.now() - moveStarted,
+    });
     await confederatePage
       .getByRole("button", {
         name: /Wadsworth, E4/,
@@ -539,6 +565,7 @@ async function runScenario(browser, origin, options) {
 }
 
 const browserName = process.env.GETTYSBURG_BROWSER ?? "chromium";
+const timingMode = performanceMode(process.env.GETTYSBURG_PERFORMANCE_MODE);
 assert(
   ["chromium", "firefox", "webkit"].includes(browserName),
   "Unsupported browser engine",
