@@ -2,6 +2,48 @@
 
 ## Current source rollup: 2026-09-07
 
+### Public repository security hardening
+
+The public-repository audit found no confirmed credential exposure. This change
+repairs the empty Dependabot ecosystem with weekly npm, Actions, and container
+updates; pins workflow Actions to reviewed commit SHAs; adds maintainer ownership,
+contribution/issue guidance, private vulnerability reporting, and a redacted
+Gitleaks history/tree workflow. The scanner permits only the exact known
+BrowserSession schema prose, not a whole file or credential rule. Secret files
+and exports are excluded from Git and both container build contexts while
+preserving SQL migrations and sanitized Git-tracked environment examples.
+
+HTTP middleware now applies a 1,200-request process budget and a 600-request
+source budget per minute before body parsing, database readiness, host commands,
+and static-file delivery. IPv6 sources are grouped by /56; cookies cannot reset
+the source budget. Rejected requests return 429 with Retry-After. Cheap liveness
+remains accessible when budgets are exhausted. Limits are process-local and
+reset on restart; they are not a distributed capacity guarantee and do not
+remove the remaining full-snapshot reconstruction cost. A multi-process rollout
+needs a shared limiter or edge budget and measured capacity acceptance.
+
+The initial 240-request source budget passed API tests but failed browser replay
+management under multiple sessions sharing one address. A diagnostic rerun
+confirmed an HTTP 429 game read; the final budget was raised to 600 and its
+source, aggregate, and IPv6 regression checks pass. No live VPS changes were
+made. The two CodeQL missing-rate-limiting findings are addressed with recognized
+middleware; GitHub must analyze the published revision before closure is claimed.
+
+Validation: frozen installation, formatting, lint, typecheck, 758 workspace
+unit tests and 34 harness tests, build, and startup smoke passed. A separate
+PostgreSQL-backed run passed all 332 server tests. Rootless Podman smoke
+passed restart/resume and fail-closed readiness; real container-context probes
+confirmed 12 secret/export exclusions for both ignore files while retaining
+migrations. Gitleaks history/current-tree scans and Markdown checks passed.
+CodeRabbit 0.7.6 review returned zero findings before the source-budget
+adjustment. Final desktop/tablet browser acceptance passes at the adjusted
+budget. Final CodeRabbit review returned zero findings. GitHub Actions remains
+the required published-revision gate; engineering owns verification. The prior
+main Application run timed out in a database restart/revocation test under
+concurrent workspace load. CI now runs PostgreSQL integration checks in a
+separate step after the unit suite, preserving the existing test and runtime
+deadlines. No release phase or production deployment is closed here.
+
 Owner-approved timing policy: shared CI uses diagnostic-only timing, retaining
 misses and warnings. Strict mode remains the default and enforces 100 ms on
 calibrated desktop hardware for release acceptance. Incomplete interactions

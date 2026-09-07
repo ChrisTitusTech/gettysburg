@@ -19,6 +19,7 @@
     "canonicalize": "4.0.0",
     "cookie": "2.0.1",
     "express": "5.2.1",
+    "express-rate-limit": "8.7.0",
     "ipaddr.js": "2.5.0",
     "pg": "8.23.0",
     "web-push": "3.6.7"

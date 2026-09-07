@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 
 import type { ActionEvent, AuditEvent } from "@gettysburg/game";
 import { parseCookie, stringifySetCookie } from "cookie";
+import { rateLimit } from "express-rate-limit";
 import express, {
   type Application,
   type NextFunction,
@@ -221,6 +222,31 @@ export function configureHttpApplication(
     response.setHeader("Cache-Control", "no-store");
     next();
   });
+  // Liveness stays cheap and available even when public request budgets run out.
+  application.get("/healthz", (_request, response) => {
+    response.status(200).json({ status: "ok" });
+  });
+
+  // Apply the aggregate budget first to bound the number of source buckets.
+  // These process-local windows cover API, readiness, and static-file work.
+  application.use(
+    rateLimit({
+      windowMs: 60_000,
+      limit: 1_200,
+      keyGenerator: () => "process",
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: { error: "http_rate_limited" },
+    }),
+    rateLimit({
+      windowMs: 60_000,
+      limit: 600,
+      ipv6Subnet: 56,
+      standardHeaders: "draft-8",
+      legacyHeaders: false,
+      message: { error: "http_rate_limited" },
+    }),
+  );
   // Public capability metadata is cheap and never triggers a database read.
   application.get("/api/push-config", (_request, response) => {
     response.json(
@@ -272,10 +298,6 @@ export function configureHttpApplication(
     },
   );
   application.use(express.json({ limit: "16kb", strict: true }));
-
-  application.get("/healthz", (_request, response) => {
-    response.status(200).json({ status: "ok" });
-  });
 
   application.get("/readyz", async (_request, response, next) => {
     try {

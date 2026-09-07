@@ -1,0 +1,14 @@
+name: Feature request
+description: Propose a focused improvement.
+body:
+  - type: textarea
+    attributes:
+      label: Problem to solve
+      description: Explain the player or maintainer need.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Proposed behavior and alternatives
+    validations:
+      required: true

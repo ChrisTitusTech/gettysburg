@@ -1,0 +1,11 @@
+# Security-sensitive and operational changes need maintainer review.
+/.github/ @ChrisTitusTech
+/.gitleaks.toml @ChrisTitusTech
+/ops/ @ChrisTitusTech
+/scripts/vps-* @ChrisTitusTech
+/scripts/offhost-backup.sh @ChrisTitusTech
+/apps/server/ @ChrisTitusTech
+/Containerfile @ChrisTitusTech
+/.gitignore @ChrisTitusTech
+/.containerignore @ChrisTitusTech
+/.dockerignore @ChrisTitusTech

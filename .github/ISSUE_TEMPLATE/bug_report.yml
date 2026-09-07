@@ -1,0 +1,28 @@
+name: Bug report
+description: Report a reproducible gameplay or application problem.
+body:
+  - type: checkboxes
+    attributes:
+      label: Privacy check
+      options:
+        - label:
+            This report contains no secrets, private links, personal logs, or
+            security vulnerability details.
+          required: true
+  - type: input
+    attributes:
+      label: Revision and environment
+      description: Commit, browser, operating system, and local or hosted setup.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Reproduction steps
+      description: Use synthetic data and redact screenshots and logs.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

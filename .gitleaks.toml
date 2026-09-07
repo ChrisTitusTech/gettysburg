@@ -1,0 +1,8 @@
+[extend]
+useDefault = true
+
+# Exact schema prose only; never allowlist a whole file or credential rule.
+[[allowlists]]
+description = "BrowserSession schema prose is not an API key"
+regexTarget = "line"
+regexes = ['''(?m)^- `BrowserSession`: id, credential hash, creation/expiry/revocation timestamps$''']
