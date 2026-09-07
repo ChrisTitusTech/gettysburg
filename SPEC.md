@@ -797,6 +797,22 @@ expiry so the host can revoke them. Claimed does not imply a connected or
 currently authorized observer. No bearer secrets, session IDs, or binding IDs
 are returned. This read never renews sessions or changes state.
 
+Current hosts can refresh and revoke those grants from a dedicated browser
+panel, including after reload or host-only recovery. Players without a host
+binding do not see it. The panel refreshes claim status before choosing the
+existing audited revocation command and reuses the application's host-command
+authorization/retry flow. Races are rejected by the server and remain retryable
+through visible refresh/revoke controls. Link creation and the observer screen
+remain separate UI delivery gates; this panel never displays bearer secrets.
+All browser host commands share a serial queue through response application,
+so spectator revocation cannot overlap a seat invitation or game deletion and
+apply an older host response afterward. Failed commands do not poison the queue.
+
+Link creation and the spectator browser interface remain separate delivery
+gates. A spectator
+invitation cannot claim a player seat. Do not advertise usable live spectators
+until those gates and desktop/tablet acceptance pass.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:

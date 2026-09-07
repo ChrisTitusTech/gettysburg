@@ -10,6 +10,7 @@ import { chromium } from "@playwright/test";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { runEnforcedGame } from "./browser-enforced-game.mjs";
 import { checkReplayManagement } from "./browser-replay-management.mjs";
+import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -530,6 +531,11 @@ try {
     { label: "tablet", viewport: { height: 768, width: 1024 } },
   ])
     await checkReplayManagement(browser, origin, evidenceDirectory, options);
+  for (const options of [
+    { label: "desktop", viewport: { height: 900, width: 1440 } },
+    { label: "tablet", viewport: { height: 768, width: 1024 } },
+  ])
+    await checkSpectatorManagement(browser, origin, evidenceDirectory, options);
   if (process.env.GETTYSBURG_FULL_GAME === "true") {
     for (const options of [
       {
