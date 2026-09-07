@@ -60,6 +60,8 @@ export interface BrowserSession {
 }
 
 export interface HostBinding {
+  readonly activeAfterSequence?: number;
+  inactiveFromSequence?: number;
   readonly gameId: string;
   readonly id: string;
   readonly sessionId: string;
@@ -68,6 +70,10 @@ export interface HostBinding {
 }
 
 export interface SeatBinding {
+  // Optional only for retained pre-chronology saves. Interpreted mandatory replay
+  // requires these boundaries; never infer them from current revocation time.
+  readonly activeAfterSequence?: number;
+  inactiveFromSequence?: number;
   readonly gameId: string;
   readonly id: string;
   readonly sessionId: string;
@@ -77,6 +83,8 @@ export interface SeatBinding {
 }
 
 export interface Invitation {
+  readonly activeAfterSequence?: number;
+  revokedAtSequence?: number;
   readonly allowedSeat: Side;
   claimId?: string;
   claimedAt: number | null;
@@ -89,6 +97,9 @@ export interface Invitation {
 }
 
 export interface RecoveryGrant {
+  auditSequence?: number;
+  operatorRequestId?: string;
+  newBindingId?: string;
   claimId?: string;
   consumedAt: number | null;
   readonly expiresAt: number;
@@ -1089,6 +1100,7 @@ export class InMemoryGameService {
     });
     this.#hostBindings.push({
       gameId,
+      activeAfterSequence: 0,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -1096,6 +1108,7 @@ export class InMemoryGameService {
     });
     this.#seatBindings.push({
       gameId,
+      activeAfterSequence: 0,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -1226,6 +1239,8 @@ export class InMemoryGameService {
     this.#destroyInvitationSecret(invitation.lookupId);
     this.#seatBindings.push({
       gameId: invitation.gameId,
+      activeAfterSequence: this.#requireActiveGame(invitation.gameId).state
+        .event_sequence,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -1550,6 +1565,7 @@ export class InMemoryGameService {
           );
         }
         target.revokedAt = now;
+        target.revokedAtSequence = game.state.event_sequence + 1;
         this.#destroyInvitationSecret(command.payload.lookup_id);
         summary = `${target.allowedSeat} invitation revoked`;
         break;
@@ -1572,8 +1588,10 @@ export class InMemoryGameService {
           if (
             binding.gameId === authorization.gameId &&
             binding.revokedAt === null
-          )
+          ) {
             binding.revokedAt = now;
+            binding.inactiveFromSequence = game.state.event_sequence + 1;
+          }
         }
         for (const binding of this.#hostBindings) {
           if (
@@ -1792,6 +1810,7 @@ export class InMemoryGameService {
       )!;
       const now = this.#now();
       binding.revokedAt = now;
+      binding.inactiveFromSequence = game.state.event_sequence + 2;
       for (const invitation of this.#invitations.values()) {
         if (
           invitation.gameId === authorization.gameId &&
@@ -2050,6 +2069,8 @@ export class InMemoryGameService {
       session.credential,
     );
     oldBinding.revokedAt = now;
+    oldBinding.inactiveFromSequence =
+      this.#requireActiveGame(grant.gameId).state.event_sequence + 1;
     grant.consumedAt = now;
     for (const invitation of this.#invitations.values()) {
       if (
@@ -2061,6 +2082,8 @@ export class InMemoryGameService {
     }
     this.#seatBindings.push({
       gameId: grant.gameId,
+      activeAfterSequence:
+        this.#requireActiveGame(grant.gameId).state.event_sequence + 1,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -2073,6 +2096,9 @@ export class InMemoryGameService {
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#seatBindings.at(-1)!.id;
     options.afterCommit?.(event);
 
     return {
@@ -2203,15 +2229,22 @@ export class InMemoryGameService {
     grant.consumedAt = now;
     this.#hostBindings.push({
       gameId: grant.gameId,
+      activeAfterSequence:
+        this.#requireActiveGame(grant.gameId).state.event_sequence + 1,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
       version: oldBinding.version + 1,
     });
+    oldBinding.inactiveFromSequence =
+      this.#requireActiveGame(grant.gameId).state.event_sequence + 1;
     const event = this.#appendOperatorAudit(
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#hostBindings.at(-1)!.id;
     options.afterCommit?.(event);
     return { ...session, gameId: grant.gameId };
   }
@@ -2397,6 +2430,9 @@ export class InMemoryGameService {
     const secret = generateCredential();
     const lookupId = randomUUID();
     this.#invitations.set(lookupId, {
+      activeAfterSequence: this.#games.has(gameId)
+        ? this.#requireActiveGame(gameId).state.event_sequence + 1
+        : 0,
       allowedSeat,
       claimedAt: null,
       expiresAt: this.#now() + INVITATION_LIFETIME_MS,

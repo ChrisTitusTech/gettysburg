@@ -479,6 +479,119 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Verify mandatory replay, then expose authorized replay controls.
+  - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
+    accepted commands, resolving the historical seat binding and recorded dice.
+    Match automatic skirmish rolls by participants rather than JSON key order.
+    Verify command hashes, sequence/state versions, event metadata, every
+    resulting gameplay state, and an optional final snapshot. Historical prefixes
+    supply a replay cursor. Management/operator records consume sequence only;
+    their private payloads are neither executed nor exposed. Surrender retains
+    its separate server-owned state-version behavior.
+  - Boundary: This pure verifier is not a public API, an authorization mechanism,
+    or a cryptographic proof of an untampered database. It does not generate
+    replacement dice or use recorded resulting states as replay starting points.
+    Authorized server/API integration, replay UI, retained-version behavior,
+    and the full rules-enforced acceptance game remain open.
+  - Validation: Thirty cases cover all 47 no-contact phase transitions across
+    24 turns, paid continuation and prefixes, recorded dice, two independent
+    skirmishes with reordered keys, input isolation, recovered historical seats,
+    surrendered seats, private management/audit records, corrupted state,
+    malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
+    The no-contact test is not a representative owner-adjudicated acceptance game.
+    Frozen install, format, lint, typecheck, 510 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 145 PostgreSQL tests pass.
+    Two-session desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-replay-chronology`); mandatory browser fixtures pass
+    (`test-results/mandatory-replay-chronology-fixtures`). Independent built-in
+    review found no actionable defects. Hosted review then identified duplicate
+    operator request IDs and altered gameplay summaries that the verifier did
+    not reject. Both checks and three regression cases are added; the complete
+    local and browser gates pass again. Fresh independent built-in repair review
+    found no actionable defects. Exact-head CI must pass before merge.
+    CodeRabbit is limited and skipped per owner direction.
+    A second hosted pass found reused surrendered bindings and non-UUID
+    automatic combat IDs. Replay now remembers surrendered binding tuples and
+    requires server-generated UUID-v4 automatic combat IDs; replacement-seat
+    replay and malformed-ID regression checks cover both repairs. Related checks
+    reject invalid audit/management identifiers, invalid authorization versions,
+    and any action after terminal deletion. Fresh combined independent built-in
+    review found no actionable defects. Reverify exact-head CI before merge.
+    A third hosted pass requires exact command-schema UUID validation, null
+    operator IDs on gameplay, and binding activation chronology. All new seat
+    bindings now persist their activation sequence in the canonical service
+    snapshot; recovery, surrender, and deletion also record retirement bounds.
+    Replay rejects attribution before activation or after retirement and fails
+    closed if historical chronology is missing. Retained saves are not rewritten
+    and ordinary resume is unchanged. Host command IDs reuse the gameplay
+    envelope's UUID schema. Focused chronology, replacement-seat, malformed-ID,
+    and missing-metadata cases cover the repairs. Combined local, database, and
+    browser gates pass. Fresh independent built-in repair review found no
+    actionable defects; exact-head CI remains pre-merge.
+    A fourth hosted pass led to full host-command schema/hash/event validation
+    and fixed-version, nonblank operator attribution checks. Redacted host
+    records are now rejected rather than certified; validation never executes or
+    exposes their contents. The request to preserve deleted-game seat bindings
+    was declined against the deletion policy: deleted games are inaccessible,
+    the API denies them, and this helper must fail closed without its required
+    historical inputs. A regression proves that intentional missing-input
+    failure; no deletion/retention behavior was weakened. The full local and
+    database gates pass again. Browser evidence above is unchanged by these
+    verifier-only repairs. Fresh independent built-in review found no actionable
+    defects; exact-head CI remains pre-merge.
+    A fifth hosted pass requires host-binding chronology and invitation-derived
+    revoke summaries. Host creation/recovery now persist activation/retirement
+    bounds just like seats. Replay indexes only this game's historical actors
+    once, rejects unknown/ambiguous/temporally invalid host attribution, and
+    derives revoke text from the retained invitation side instead of trusting
+    the recorded summary. Missing evidence fails closed; deletion and ordinary
+    resume policies are unchanged. Focused recovery and altered-summary checks,
+    full local/database gates, and two-session desktop/tablet acceptance pass
+    (`test-results/mandatory-replay-host`). The first fixture run lost its page
+    during a concurrent rebuild and timed out; rerunning without concurrent
+    builds passed (`test-results/mandatory-replay-host-fixtures`). Keep browser
+    fixtures isolated from rebuilding their watched workspace. Fresh independent
+    local review found no actionable defects and reran 130 server tests
+    (12 database checks skipped there; the separate database gate passed).
+    Exact-head CI remains before merge.
+    A sixth hosted pass requires historical invitation availability, not just
+    matching side text. New invitations retain activation sequence; explicit
+    revocation retains its sequence. Replay also requires an unclaimed target,
+    the matching revocation boundary, and a revoke timestamp before expiry.
+    Retargeting a rehashed action to a claimed invitation, earlier revocation,
+    future activation, missing revocation, or expired evidence is rejected.
+    All 507 workspace tests plus six harness tests and all 142 PostgreSQL tests
+    pass with the complete local gate. Desktop/tablet two-session acceptance and
+    mandatory input fixtures pass in `test-results/mandatory-replay-invitation`
+    and `test-results/mandatory-replay-invitation-fixtures`. Fresh independent
+    local review found no actionable defects and reran 130 server tests;
+    its 12 database skips are covered above. Exact-head CI remains before merge.
+    A seventh hosted pass requires issued-invitation evidence, literal gameplay
+    success, and recovery-audit linkage. Each issuance now matches exactly one
+    retained side/activation record. Gameplay result/event envelopes are exact
+    and require boolean `ok: true`. Consumed recovery grants now retain audit
+    request/sequence and replacement binding IDs; replay matches operator,
+    unrevoked/unexpired consumption, old retirement, new activation/version,
+    and side against those records. Fabricated audits, altered recovery evidence,
+    changed issue sides, and malformed success records are covered. All 509
+    workspace plus six harness tests and all 144 PostgreSQL tests pass with the
+    complete local gate. Both browser suites pass in
+    `test-results/mandatory-replay-audit` and
+    `test-results/mandatory-replay-audit-fixtures`. Fresh independent local
+    review found no actionable regressions and reran 132 server tests; its 12
+    database skips are covered above. Exact-head CI remains before merge.
+    An eighth hosted pass requires surrender's authoritative seat retirement,
+    not only rejection of later commands from that seat. Replay now requires
+    the surrender boundary at the next sequence and a finite revocation time;
+    retired actor evidence and recovered old-binding activation must also be
+    internally consistent. Regression cases reject an active surrendered seat,
+    a delayed retirement, and recovery of a not-yet-active binding. All 510
+    workspace plus six harness tests and all 145 PostgreSQL tests pass with the
+    complete local gate. Both browser suites pass in
+    `test-results/mandatory-replay-retirement` and
+    `test-results/mandatory-replay-retirement-fixtures`. Fresh independent
+    review found no actionable regressions and reran 133 server tests; its 12
+    database skips are covered above. Exact-head CI remains a merge gate.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,
@@ -503,8 +616,9 @@ validation remain separate gates.
     (`test-results/mandatory-version-regression`); mandatory browser fixtures
     pass (`test-results/mandatory-version-fixtures`), including the parent PR's
     repaired held-drag capture. Fresh independent built-in review found no
-    actionable regressions. Publish only after the parent merges; exact-head CI
-    and published review checks remain required before merge.
+    actionable regressions. PR #24 merged as `5ed70d0` after hosted Codex review
+    and exact-head CI passed. No unresolved threads remained; CodeRabbit was
+    limited and skipped under owner direction.
 - [ ] Pin and activate the complete mandatory content/version pair.
   - Scope: Add an isolated initial-state constructor with all approved terrain,
     existing movement edges, unchanged Scenario Five units/schedules/objectives,
@@ -534,8 +648,11 @@ validation remain separate gates.
     and actual input release remain unchanged. The full local gate and repaired
     desktop/tablet browser fixtures pass; the held-drag image was visually
     inspected (`test-results/mandatory-content-capture-repair`). Fresh independent
-    review found no actionable regression. Require all repaired-head CI gates
-    and published review checks before merge.
+    review found no actionable regression. PR #23 merged as `9365b34` after
+    repaired-head Application/Documentation CI and hosted Codex review passed.
+    No unresolved threads remained. CodeRabbit initially hit its limit and was
+    skipped; its final Free-plan status completed without a comprehensive
+    line-by-line review, so independent built-in review supplies that gate.
 - [ ] Complete mandatory reinforcement/night guidance and live acceptance.
   - Scope: Select scheduled counters for single or joint entry; preview actual
     costs and nearest legal enemy-free alternatives, and explain friendly
