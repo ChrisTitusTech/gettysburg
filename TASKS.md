@@ -479,6 +479,29 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory reinforcement/night guidance and live acceptance.
+  - Scope: Select scheduled counters for single or joint entry; preview actual
+    costs and nearest legal enemy-free alternatives, and explain friendly
+    congestion without inventing substitute entries. Selection alone never
+    commits a move. Pending requests disable controls; authoritative updates
+    reset selection. Night guidance names counters with an affordable withdrawal
+    and blocks ending movement until they withdraw; missing pinned data fails
+    closed, while genuinely trapped counters can proceed to combat.
+  - Boundary: Mandatory-v4 remains unavailable to new games. Complete pinned
+    content/version activation and full two-player rules-enforced acceptance
+    remain open. Existing rules retain their reinforcement controls.
+  - Validation: Eight component cases and real desktop keyboard/tablet touch
+    fixtures cover joint road entry, blocked alternatives, congestion, stale
+    selection, pending requests, night withdrawal, trapped counters, unavailable
+    data, and inactive seats. Rendered entry/night controls were inspected in
+    `test-results/mandatory-turn-guidance`. Frozen install, format, lint,
+    typecheck, 440 default workspace tests plus six harness tests, build, smoke,
+    Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
+    desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-turn-guidance-regression`). A formatting failure
+    was corrected before rerunning the full gate. Fresh independent built-in
+    review found no actionable regressions. Exact-head CI and published review
+    checks remain required before merge; skip CodeRabbit if limited.
 - [ ] Complete mandatory advance controls and full-game acceptance.
   - Scope: Preview advance with the same pure reducer used by the server. Offer
     legal victorious groups and destinations, including a smaller infantry/general
@@ -499,8 +522,10 @@ validation remain separate gates.
     typecheck, 432 default workspace tests plus six harness tests, build, smoke,
     Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
     desktop/tablet and 24-turn regression pass
-    (`test-results/mandatory-advance-controls-regression`). Independent review
-    and exact-head CI remain required before merge.
+    (`test-results/mandatory-advance-controls-regression`). PR #21 merged as
+    `1317e14` after fresh independent built-in review, hosted Codex review, and
+    exact-head CI passed. No unresolved threads remained; CodeRabbit was limited
+    and skipped under owner direction.
 - [ ] Complete mandatory normal-movement group and exit controls.
   - Scope: Offer all legal subsets of a selected stack, retaining source capacity,
     printed budgets, general accompaniment, and active/closed move boundaries.

@@ -437,7 +437,8 @@ summary {
 }
 
 .movement-group-controls fieldset,
-.mandatory-advance fieldset {
+.mandatory-advance fieldset,
+.reinforcement-entry-controls fieldset {
   display: grid;
   gap: 0.5rem;
   border: 0;
@@ -446,7 +447,8 @@ summary {
 }
 
 .movement-group-controls label,
-.mandatory-advance label {
+.mandatory-advance label,
+.reinforcement-entry-controls label {
   display: flex;
   align-items: center;
   gap: 0.75rem;

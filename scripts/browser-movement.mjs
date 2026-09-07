@@ -326,6 +326,75 @@ try {
           .innerText(),
         "a=F4, spent=5",
       );
+      async function turn(kind) {
+        await page.goto(origin);
+        await page.evaluate(async (selected) => {
+          const { mountTurnFixture } =
+            await import("/src/test/TurnFixture.tsx");
+          mountTurnFixture(selected);
+        }, kind);
+        await page
+          .getByRole("heading", { name: "Turn test fixture - not a live game" })
+          .waitFor();
+        await page.getByRole("button", { name: "Fit", exact: true }).click();
+      }
+      async function checkCounter(label) {
+        const checkbox = page.getByRole("checkbox", {
+          name: new RegExp(label),
+        });
+        if (hasTouch) await checkbox.tap();
+        else await checkbox.press("Space");
+      }
+      await turn("entry");
+      await checkCounter("Fixture infantry");
+      await checkCounter("Fixture general");
+      assert.equal(await state().innerText(), "v0: confederate movement");
+      await page
+        .getByRole("region", { name: "Reinforcement entry" })
+        .screenshot({ path: resolve(evidence, `${name}-joint-entry.png`) });
+      await choose("Enter selected at A2 (0.5 movement each)");
+      await state().filter({ hasText: "v1: confederate movement" }).waitFor();
+      assert.match(
+        await page
+          .getByRole("status", { name: "Fixture counters" })
+          .innerText(),
+        /^a=A2, spent=0.5; g=A2, spent=0.5;/,
+      );
+
+      await turn("blocked-entry");
+      await checkCounter("Fixture infantry");
+      const alternate = page
+        .getByRole("button", { name: /^Enter selected/ })
+        .first();
+      const entryLabel = await alternate.innerText();
+      const entryHex = entryLabel.match(/at ([A-W]\d+)/)?.[1];
+      assert(entryHex && entryHex !== "A2");
+      await choose(entryLabel);
+      await state().filter({ hasText: "v1: confederate movement" }).waitFor();
+      assert(
+        (
+          await page
+            .getByRole("status", { name: "Fixture counters" })
+            .innerText()
+        ).startsWith(`a=${entryHex}, spent=1;`),
+      );
+
+      await turn("night");
+      assert.equal(
+        await page
+          .getByRole("button", {
+            name: "Withdraw 1 counter(s) before ending movement",
+          })
+          .isDisabled(),
+        true,
+      );
+      await page.locator(".turn-summary").screenshot({
+        path: resolve(evidence, `${name}-night-withdrawal.png`),
+      });
+      await selectTarget("F6");
+      await state().filter({ hasText: "v1: confederate movement" }).waitFor();
+      await choose("End movement phase");
+      await state().filter({ hasText: "v2: union movement" }).waitFor();
       assert.deepEqual(issues, []);
     } finally {
       await context.close();
@@ -336,9 +405,7 @@ try {
     0,
     "The browser deadline must not expire",
   );
-  console.log(
-    `Mandatory movement/retreat mouse/keyboard/touch checks passed: ${evidence}`,
-  );
+  console.log(`Mandatory rules browser input checks passed: ${evidence}`);
 } finally {
   clearTimeout(timeout);
   await Promise.all([browser?.close(), server.close()]);
