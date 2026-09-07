@@ -126,9 +126,14 @@ try {
         await page.locator(".movement-route text").textContent(),
         "1 / 1",
       );
-      await page
-        .locator(".board-workspace")
-        .screenshot({ path: resolve(evidence, `${name}-weighted-drag.png`) });
+      // The pointer is still held: locator screenshots can scroll the target
+      // and wait indefinitely for actionability during the captured drag.
+      // Capture the page without moving it; the route assertions above prove
+      // the pending preview before we release the actual mouse/touch input.
+      await page.screenshot({
+        fullPage: true,
+        path: resolve(evidence, `${name}-weighted-drag.png`),
+      });
       if (touch) {
         await touch.send("Input.dispatchTouchEvent", {
           type: "touchEnd",

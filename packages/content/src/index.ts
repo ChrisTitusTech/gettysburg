@@ -4,3 +4,4 @@ export * from "./scenario.js";
 export * from "./types.js";
 export * from "./terrain.js";
 export * from "./terrain-edges.js";
+export * from "./mandatory.js";
