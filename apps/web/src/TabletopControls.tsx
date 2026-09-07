@@ -9,10 +9,12 @@ import {
   automaticCombatResolution,
   currentCombatValue,
   MANDATORY_RULESET_VERSION,
+  mandatoryNightWithdrawals,
 } from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
 import { RetreatControls } from "./RetreatControls";
 import { AdvanceControls } from "./AdvanceControls";
+import { ReinforcementControls } from "./ReinforcementControls";
 
 interface TabletopControlsProps {
   readonly disabled: boolean;
@@ -252,6 +254,22 @@ export function TabletopControls({
   state,
 }: TabletopControlsProps) {
   const active = state.active_side === seat && state.phase !== "completed";
+  const nightWithdrawals = useMemo(
+    () =>
+      state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      active &&
+      state.night &&
+      state.phase === "movement"
+        ? mandatoryNightWithdrawals(state, seat)
+        : [],
+    [state, seat, active],
+  );
+  const nightBlocker =
+    nightWithdrawals === null
+      ? "Pinned night movement data unavailable"
+      : nightWithdrawals.length > 0
+        ? `Withdraw ${nightWithdrawals.length} counter(s) before ending movement`
+        : null;
   const available = useMemo(
     () =>
       Object.values(state.units).filter(
@@ -294,6 +312,7 @@ export function TabletopControls({
             : `Waiting for ${choiceOwner} ${choiceName}`;
   const phaseButtonLabel =
     combatBlockerLabel ??
+    nightBlocker ??
     (active
       ? `End ${state.phase} phase`
       : state.phase === "completed"
@@ -321,6 +340,21 @@ export function TabletopControls({
               counters unable to withdraw will fight.
             </p>
           ) : null}
+          {nightWithdrawals === null ? (
+            <p role="alert">
+              The pinned movement data is unavailable. Ending the phase is
+              blocked until it is restored.
+            </p>
+          ) : nightWithdrawals.length > 0 ? (
+            <p className="night-guidance">
+              Must withdraw:{" "}
+              {nightWithdrawals
+                .map((unit) => `${unit.label} (${unit.location})`)
+                .join(", ")}
+              . Use the board's group selector when only part of a stack can
+              withdraw. An affordable edge exit also counts.
+            </p>
+          ) : null}
           <p>
             Victory points: Confederate {state.victory.confederate} · Union{" "}
             {state.victory.union}
@@ -330,7 +364,12 @@ export function TabletopControls({
           </p>
         </div>
         <button
-          disabled={disabled || !active || unresolvedCombat !== undefined}
+          disabled={
+            disabled ||
+            !active ||
+            unresolvedCombat !== undefined ||
+            nightBlocker !== null
+          }
           onClick={() => onCommand("endPhase", {})}
         >
           {phaseButtonLabel}
@@ -348,6 +387,14 @@ export function TabletopControls({
           </summary>
           {available.length === 0 ? (
             <p>No scheduled counters are available for this seat this turn.</p>
+          ) : state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+            <ReinforcementControls
+              key={`${state.game_id}:${state.version}:${seat}`}
+              state={state}
+              seat={seat}
+              disabled={disabled}
+              onCommand={onCommand}
+            />
           ) : (
             <>
               <p className="reinforcement-guidance">
