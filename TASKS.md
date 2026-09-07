@@ -1898,6 +1898,13 @@ validation remain separate gates.
 ### Browser push foundation
 
 - [ ] Persist notification work atomically with accepted gameplay commands.
+  - Integrated closeout: full local gates pass 647 workspace/nine harness
+    tests, all 270 PostgreSQL tests pass, and fresh independent review passes
+    246 server tests without actionable findings. Subscription and transport
+    connection-reuse changes are integrated. Existing full desktop/tablet
+    outbox browser/input evidence covers unchanged UI/protocol behavior.
+    Publish a separate ready-for-review PR; exact-head CI/final threads and
+    dependency merges remain required before this increment is merged.
   - Scope: One pending reminder per consented binding, coalesced to its newest
     required decision; 24-hour maximum lifetime capped by consent expiry.
     Internal delivery claims use expiring leases, bounded retries, and fresh
