@@ -545,6 +545,19 @@ validation remain separate gates.
     `test-results/authorized-replay-audit-fixtures`. Fresh independent local
     review found no actionable defects and reran 152 server tests; its 13
     database skips are covered above. Exact-head CI remains before merge.
+    A further hosted pass found that the API readiness middleware hydrated the
+    PostgreSQL snapshot before the replay limits ran. The replay gate now runs
+    before body parsing and readiness. All three limiter tests assert denied
+    requests never call readiness or replay; an anonymous unavailable-service
+    regression proves repeated 503 requests are bounded too. The complete local
+    gate passes with 531 workspace plus six harness tests and all 167 PostgreSQL
+    tests. Two-session desktop/tablet and no-contact full-turn acceptance pass
+    in `test-results/authorized-replay-early-limits`; mandatory input fixtures
+    pass in `test-results/authorized-replay-early-limits-fixtures`. Fresh
+    independent review found no actionable regressions and reran 154 server
+    tests; its 13 database skips are covered above. General API capacity and
+    readiness cost remain in the Phase 4 hardening scope. Reverify exact-head CI
+    before merge.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,

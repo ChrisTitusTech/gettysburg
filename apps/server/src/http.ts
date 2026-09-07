@@ -231,6 +231,22 @@ export function configureHttpApplication(
     response.setHeader("Cache-Control", "no-store");
     next();
   });
+  // Register this gate before readiness: PostgreSQL readiness hydrates the
+  // saved snapshot too, so even unavailable/unauthenticated reads need a bound.
+  application.get("/api/games/:gameId/replay", (request, response, next) => {
+    const sessionKey = createHash("sha256")
+      .update(readSessionCredential(request) ?? "anonymous")
+      .digest("hex");
+    if (
+      !replaySourceLimiter.allow(request.ip ?? "unknown") ||
+      !replaySessionLimiter.allow(sessionKey)
+    ) {
+      response.setHeader("Retry-After", "60");
+      response.status(429).json({ error: "replay_rate_limited" });
+      return;
+    }
+    next();
+  });
   application.use(express.json({ limit: "16kb", strict: true }));
 
   application.get("/healthz", (_request, response) => {
@@ -536,17 +552,6 @@ export function configureHttpApplication(
     async (request, response, next) => {
       try {
         const credential = readSessionCredential(request);
-        const sessionKey = createHash("sha256")
-          .update(credential ?? "anonymous")
-          .digest("hex");
-        if (
-          !replaySourceLimiter.allow(request.ip ?? "unknown") ||
-          !replaySessionLimiter.allow(sessionKey)
-        ) {
-          response.setHeader("Retry-After", "60");
-          response.status(429).json({ error: "replay_rate_limited" });
-          return;
-        }
         const cursor = request.query.sequence;
         if (
           Object.keys(request.query).some((key) => key !== "sequence") ||

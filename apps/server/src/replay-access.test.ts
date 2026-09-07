@@ -258,7 +258,7 @@ describe("replay work bounds", () => {
 
 describe("replay HTTP boundary", () => {
   it.each(["session", "source", "global"] as const)(
-    "limits %s attempts before reconstruction and expires the window",
+    "limits %s attempts before readiness/reconstruction and expires the window",
     async (scope) => {
       const f = fixture();
       const service = new InMemoryAsyncGameService(f.service);
@@ -269,7 +269,8 @@ describe("replay HTTP boundary", () => {
       });
       let now = Date.now();
       const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
-      const app = createHttpApplication({ isReady: () => true }, service);
+      const isReady = vi.fn(() => true);
+      const app = createHttpApplication({ isReady }, service);
       const server = app.listen(0, "127.0.0.1");
       await new Promise<void>((resolve) => server.once("listening", resolve));
       const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/games/${f.host.gameId}/replay`;
@@ -293,9 +294,11 @@ describe("replay HTTP boundary", () => {
         expect(denied.headers.get("cache-control")).toBe("no-store");
         expect(await denied.json()).toEqual({ error: "replay_rate_limited" });
         expect(replay).toHaveBeenCalledTimes(limit);
+        expect(isReady).toHaveBeenCalledTimes(limit);
         now += 60_001;
         expect((await request(limit)).status).toBe(200);
         expect(replay).toHaveBeenCalledTimes(limit + 1);
+        expect(isReady).toHaveBeenCalledTimes(limit + 1);
       } finally {
         clock.mockRestore();
         replay.mockRestore();
@@ -305,6 +308,32 @@ describe("replay HTTP boundary", () => {
       }
     },
   );
+
+  it("bounds anonymous readiness reads when the service is unavailable", async () => {
+    const f = fixture();
+    const service = new InMemoryAsyncGameService(f.service);
+    const replay = vi.spyOn(service, "getReplay");
+    const isReady = vi.fn(() => false);
+    const app = createHttpApplication({ isReady }, service);
+    const server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/games/${f.host.gameId}/replay`;
+    try {
+      for (let attempt = 0; attempt < 30; attempt++)
+        expect((await fetch(url)).status).toBe(503);
+      const denied = await fetch(url);
+      expect(denied.status).toBe(429);
+      expect(denied.headers.get("cache-control")).toBe("no-store");
+      expect(denied.headers.get("retry-after")).toBe("60");
+      expect(isReady).toHaveBeenCalledTimes(30);
+      expect(replay).not.toHaveBeenCalled();
+    } finally {
+      replay.mockRestore();
+      await new Promise<void>((resolve, reject) =>
+        server.close((error) => (error ? reject(error) : resolve())),
+      );
+    }
+  });
 
   it("checks access, strict cursors, no-store responses, and readiness", async () => {
     const f = fixture();
