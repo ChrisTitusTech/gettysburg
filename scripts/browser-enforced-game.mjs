@@ -3,6 +3,10 @@ import { resolve } from "node:path";
 import { expect } from "@playwright/test";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { createCommandPacer } from "./browser-command-pacing.mjs";
+import {
+  captureScreenshot,
+  isScreenshotDiagnostic,
+} from "./browser-screenshot.mjs";
 
 // All mutations use player-visible controls. Authenticated reads only verify
 // committed results; no fixture state, commands, or dice enter the live server.
@@ -10,6 +14,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
   const contexts = await Promise.all(
     ["union", "confederate"].map(() =>
       browser.newContext({
+        ...options.contextOptions,
         viewport: options.viewport,
         hasTouch: options.inputMode === "touch",
       }),
@@ -28,6 +33,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
   for (const page of Object.values(pages)) {
     page.on("pageerror", (error) => issues.push(error.message));
     page.on("console", (message) => {
+      if (isScreenshotDiagnostic(page, message)) return;
       if (["error", "warning"].includes(message.type()))
         issues.push(`${message.type()}: ${message.text()}`);
     });
@@ -259,7 +265,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
       await page
         .getByRole("heading", { name: /Turn 24 · completed/ })
         .waitFor();
-    await pages.union.locator("main").screenshot({
+    await captureScreenshot(pages.union, pages.union.locator("main"), {
       mask: [pages.union.getByLabel("One-time invitation URL")],
       path: resolve(evidence, `${options.label}-enforced-game-complete.png`),
     });

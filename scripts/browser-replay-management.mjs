@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
+import {
+  captureScreenshot,
+  isScreenshotDiagnostic,
+} from "./browser-screenshot.mjs";
 
 export async function checkReplayManagement(
   browser,
@@ -8,14 +12,21 @@ export async function checkReplayManagement(
   evidence,
   options,
 ) {
-  const hostContext = await browser.newContext({ viewport: options.viewport });
-  const guestContext = await browser.newContext({ viewport: options.viewport });
+  const hostContext = await browser.newContext({
+    ...options.contextOptions,
+    viewport: options.viewport,
+  });
+  const guestContext = await browser.newContext({
+    ...options.contextOptions,
+    viewport: options.viewport,
+  });
   const host = await hostContext.newPage();
   const guest = await guestContext.newPage();
   const issues = [];
   for (const page of [host, guest]) {
     page.on("pageerror", (error) => issues.push(error.message));
     page.on("console", (message) => {
+      if (isScreenshotDiagnostic(page, message)) return;
       if (["error", "warning"].includes(message.type()))
         issues.push(message.text());
     });
@@ -63,11 +74,13 @@ export async function checkReplayManagement(
     await replay.getByRole("button", { name: "Next event" }).click();
     await replay.getByText(/Viewing event 3 of 3/).waitFor();
     await guest.getByText("v1", { exact: true }).first().waitFor();
-    await guest
-      .getByRole("region", { name: "Replay controls", exact: true })
-      .screenshot({
+    await captureScreenshot(
+      guest,
+      guest.getByRole("region", { name: "Replay controls", exact: true }),
+      {
         path: resolve(evidence, `${options.label}-replay-management.png`),
-      });
+      },
+    );
     await deleteAcceptanceGame(host);
     assert.deepEqual(issues, []);
   } finally {

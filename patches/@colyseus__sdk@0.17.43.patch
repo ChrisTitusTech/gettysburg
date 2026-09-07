@@ -1,0 +1,44 @@
+diff --git a/build/transport/WebSocketTransport.cjs b/build/transport/WebSocketTransport.cjs
+index c6b18fba09012b93d0195fa7d14156337974bb37..77e4d698a668a0956826d5be4cef8e77a664942c 100644
+--- a/build/transport/WebSocketTransport.cjs
++++ b/build/transport/WebSocketTransport.cjs
+@@ -25,7 +25,9 @@ class WebSocketTransport {
+      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
+      */
+     connect(url, headers) {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
+             this.ws = new WebSocket(url, { headers, protocols: this.protocols });
+         }
+diff --git a/build/transport/WebSocketTransport.mjs b/build/transport/WebSocketTransport.mjs
+index 1716bcd4f2c44f89b3b692e7fabe322d55261c98..b7bfb8119b0d6f0f1487448690d8e0c7e6637d2d 100644
+--- a/build/transport/WebSocketTransport.mjs
++++ b/build/transport/WebSocketTransport.mjs
+@@ -26,7 +26,9 @@ class WebSocketTransport {
+      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
+      */
+     connect(url, headers) {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
+             this.ws = new WebSocket(url, { headers, protocols: this.protocols });
+         }
+diff --git a/src/transport/WebSocketTransport.ts b/src/transport/WebSocketTransport.ts
+index 83a4782d78e86667142be24eb59a139f7b95a33b..a778f9f9a3871fd434f517a008f0d4ea6bacfea8 100644
+--- a/src/transport/WebSocketTransport.ts
++++ b/src/transport/WebSocketTransport.ts
+@@ -27,6 +27,8 @@ export class WebSocketTransport implements ITransport {
+      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
+      */
+     public connect(url: string, headers?: any): void {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
+             this.ws = new WebSocket(url, { headers, protocols: this.protocols });

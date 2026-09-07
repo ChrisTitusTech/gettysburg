@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node --test scripts/browser-performance.test.mjs scripts/browser-accessibility.test.mjs scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs scripts/browser-push-consent.test.mjs scripts/scan-container.test.mjs scripts/vapid-backup.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
+    "test": "node --test scripts/browser-performance.test.mjs scripts/browser-accessibility.test.mjs scripts/browser-screenshot.test.mjs scripts/browser-https.test.mjs scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs scripts/browser-push-consent.test.mjs scripts/scan-container.test.mjs scripts/vapid-backup.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

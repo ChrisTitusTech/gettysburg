@@ -5,7 +5,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { chromium } from "@playwright/test";
+import { chromium, firefox, webkit } from "@playwright/test";
 
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { runEnforcedGame } from "./browser-enforced-game.mjs";
@@ -18,6 +18,11 @@ import {
   measureBoardResponse,
   recordSessionTimings,
 } from "./browser-performance.mjs";
+import { startBrowserHttps } from "./browser-https.mjs";
+import {
+  captureScreenshot,
+  isScreenshotDiagnostic,
+} from "./browser-screenshot.mjs";
 import { checkPushConsent } from "./browser-push-consent.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
@@ -86,8 +91,20 @@ async function stopServer(server, serverOutput) {
   }
 }
 
+const intentionalReloads = new WeakSet();
 function watchPage(page, issues) {
   page.on("console", (message) => {
+    if (isScreenshotDiagnostic(page, message)) return;
+    if (
+      intentionalReloads.has(page) &&
+      message.type() === "warning" &&
+      message.text() === "Room connection was closed unexpectedly (1001): "
+    ) {
+      console.log(
+        "Expected WebSocket Going Away during deliberate page reload",
+      );
+      return;
+    }
     if (message.type() === "error" || message.type() === "warning") {
       issues.push(`${message.type()}: ${message.text()}`);
     }
@@ -113,20 +130,20 @@ async function captureBoardViews(page, prefix) {
   await page.getByText("100%", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Zoom out" }).click();
   await page.getByText("65%", { exact: true }).waitFor();
-  await board.screenshot({
+  await captureScreenshot(page, board, {
     path: resolve(evidenceDirectory, `${prefix}-minimum.png`),
   });
 
   await page.getByRole("button", { name: "Fit" }).click();
   await page.getByText("100%", { exact: true }).waitFor();
-  await board.screenshot({
+  await captureScreenshot(page, board, {
     path: resolve(evidenceDirectory, `${prefix}-fit.png`),
   });
 
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByRole("button", { name: "Zoom in" }).click();
   await page.getByText("170%", { exact: true }).waitFor();
-  await board.screenshot({
+  await captureScreenshot(page, board, {
     path: resolve(evidenceDirectory, `${prefix}-zoomed.png`),
   });
 }
@@ -190,7 +207,7 @@ async function dragWithinMovement(page, prefix, inputMode) {
   }
   await page.locator(".movement-route").getByText("5 / 5").waitFor();
   // Do not auto-scroll an element while its pointer capture is active.
-  await page.screenshot({
+  await captureScreenshot(page, page, {
     fullPage: true,
     mask: [page.getByLabel("One-time invitation URL")],
     path: resolve(evidenceDirectory, `${prefix}-movement-route.png`),
@@ -216,6 +233,7 @@ async function ctrlSelectSingleCounter(page) {
 async function runScenario(browser, origin, options) {
   const issues = [];
   const contextOptions = {
+    ...options.contextOptions,
     hasTouch: options.inputMode === "touch",
     viewport: options.viewport,
   };
@@ -246,8 +264,18 @@ async function runScenario(browser, origin, options) {
       .getByLabel("One-time invitation URL")
       .inputValue();
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
+    await hostPage.locator(".board-svg image").evaluate(async (element) => {
+      const image = new Image();
+      image.src = element.href.baseVal;
+      await image.decode();
+    });
+    intentionalReloads.add(hostPage);
     const reconnectStarted = performance.now();
-    await hostPage.reload();
+    try {
+      await hostPage.reload();
+    } finally {
+      intentionalReloads.delete(hostPage);
+    }
     await hostPage.getByText("connected", { exact: true }).waitFor();
     const reconnectMs = performance.now() - reconnectStarted;
     await measureBoardResponse(hostPage, evidenceDirectory, options.label);
@@ -420,7 +448,7 @@ async function runScenario(browser, origin, options) {
       x: panStart.x + panStart.width / 2,
       y: panStart.y + panStart.height / 2,
     };
-    if (options.label === "tablet") {
+    if (options.inputMode === "touch") {
       const touch = await unionPage.context().newCDPSession(unionPage);
       await touch.send("Input.dispatchTouchEvent", {
         type: "touchStart",
@@ -472,7 +500,7 @@ async function runScenario(browser, origin, options) {
       toggleBox.height < 80 && viewerBox.y >= toggleBox.y + toggleBox.height,
     );
     assert(viewerBox.width > containerBox.width * 0.9);
-    await replayControls.screenshot({
+    await captureScreenshot(unionPage, replayControls, {
       path: resolve(evidenceDirectory, `${options.label}-replay.png`),
     });
     await viewer
@@ -522,10 +550,22 @@ async function runScenario(browser, origin, options) {
   }
 }
 
+const browserName = process.env.GETTYSBURG_BROWSER ?? "chromium";
+assert(
+  ["chromium", "firefox", "webkit"].includes(browserName),
+  "Unsupported browser engine",
+);
+const browserType = { chromium, firefox, webkit }[browserName];
+// Continuous touch injection uses Chromium's CDP. Other engines still exercise
+// both layouts with actual keyboard/mouse input, never synthetic DOM events.
+const tabletInputMode = browserName === "chromium" ? "touch" : "keyboard";
 await mkdir(evidenceDirectory, { recursive: true });
 const configuredOrigin = process.env.GETTYSBURG_ACCEPTANCE_ORIGIN;
 const port = configuredOrigin === undefined ? await reservePort() : undefined;
-const origin = configuredOrigin ?? `http://127.0.0.1:${port}`;
+const backendOrigin = configuredOrigin ?? `http://127.0.0.1:${port}`;
+let origin = backendOrigin;
+let httpsFixture;
+let contextOptions = {};
 let output = "";
 let postgres;
 let runtimeDirectory;
@@ -534,6 +574,14 @@ let browser;
 let failure;
 try {
   if (configuredOrigin === undefined) {
+    if (
+      browserName === "webkit" ||
+      process.env.GETTYSBURG_BROWSER_HTTPS === "true"
+    ) {
+      httpsFixture = await startBrowserHttps(backendOrigin);
+      origin = httpsFixture.origin;
+      contextOptions = httpsFixture.contextOptions;
+    }
     postgres = await startPostgres();
     runtimeDirectory = await mkdtemp(join(tmpdir(), "gettysburg-browser-"));
     server = spawn(process.execPath, ["apps/server/dist/index.js"], {
@@ -554,16 +602,26 @@ try {
     server.stderr.on("data", (chunk) => (output += String(chunk)));
   }
 
-  await waitForReadiness(origin, () => output);
-  browser = await chromium.launch({ headless: true });
-  await checkHomeScreen(browser, origin);
-  await checkPushWorker(origin);
+  await waitForReadiness(backendOrigin, () => output);
+  browser = await browserType.launch({ headless: true });
+  console.log(
+    `Browser acceptance engine: ${browserName} ${browser.version()}; tablet input: ${tabletInputMode}`,
+  );
+  await checkHomeScreen(browser, origin, contextOptions);
+  // The standalone native Chromium worker fixture uses the backend loopback
+  // origin. It does not test session cookies or enroll a real provider.
+  await checkPushWorker(backendOrigin);
   for (const options of [
     { label: "desktop", viewport: { height: 900, width: 1440 } },
     { label: "tablet", viewport: { height: 768, width: 1024 } },
   ])
-    await checkPushConsent(browser, origin, evidenceDirectory, options);
+    await checkPushConsent(browser, origin, evidenceDirectory, {
+      ...options,
+      contextOptions,
+      configOrigin: backendOrigin,
+    });
   await runScenario(browser, origin, {
+    contextOptions,
     hostName: "Confederate",
     inputMode: "keyboard",
     label: "desktop",
@@ -571,8 +629,9 @@ try {
     viewport: { height: 900, width: 1440 },
   });
   await runScenario(browser, origin, {
+    contextOptions,
     hostName: "Union",
-    inputMode: "touch",
+    inputMode: tabletInputMode,
     label: "tablet",
     opponentName: "Confederate",
     viewport: { height: 768, width: 1024 },
@@ -581,12 +640,18 @@ try {
     { label: "desktop", viewport: { height: 900, width: 1440 } },
     { label: "tablet", viewport: { height: 768, width: 1024 } },
   ])
-    await checkReplayManagement(browser, origin, evidenceDirectory, options);
+    await checkReplayManagement(browser, origin, evidenceDirectory, {
+      ...options,
+      contextOptions,
+    });
   for (const options of [
     { label: "desktop", viewport: { height: 900, width: 1440 } },
     { label: "tablet", viewport: { height: 768, width: 1024 } },
   ])
-    await checkSpectatorManagement(browser, origin, evidenceDirectory, options);
+    await checkSpectatorManagement(browser, origin, evidenceDirectory, {
+      ...options,
+      contextOptions,
+    });
   if (process.env.GETTYSBURG_FULL_GAME === "true") {
     for (const options of [
       {
@@ -596,11 +661,14 @@ try {
       },
       {
         label: "tablet",
-        inputMode: "touch",
+        inputMode: tabletInputMode,
         viewport: { height: 768, width: 1024 },
       },
     ])
-      await runEnforcedGame(browser, origin, evidenceDirectory, options);
+      await runEnforcedGame(browser, origin, evidenceDirectory, {
+        ...options,
+        contextOptions,
+      });
   }
   console.log(
     `Browser acceptance passed at desktop and tablet widths; evidence: ${evidenceDirectory}`,
@@ -616,6 +684,13 @@ try {
   } catch (error) {
     cleanupErrors.push(
       new Error("Failed to close the browser", { cause: error }),
+    );
+  }
+  try {
+    await httpsFixture?.close();
+  } catch (error) {
+    cleanupErrors.push(
+      new Error("Failed to stop browser HTTPS fixture", { cause: error }),
     );
   }
   if (server !== undefined) {
