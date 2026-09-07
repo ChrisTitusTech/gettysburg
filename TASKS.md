@@ -522,17 +522,17 @@ validation remain separate gates.
     replacement dice or use recorded resulting states as replay starting points.
     Authorized server/API integration, replay UI, retained-version behavior,
     and the full rules-enforced acceptance game remain open.
-  - Validation: Twenty-one cases cover all 47 no-contact phase transitions across
+  - Validation: Twenty-three cases cover all 47 no-contact phase transitions across
     24 turns, paid continuation and prefixes, recorded dice, two independent
     skirmishes with reordered keys, input isolation, recovered historical seats,
     surrendered seats, redacted management/audit records, corrupted state,
     malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
     The no-contact test is not a representative owner-adjudicated acceptance game.
-    Frozen install, format, lint, typecheck, 501 default tests plus six harness
-    tests, build, smoke, Markdown lint, and all 136 PostgreSQL tests pass.
+    Frozen install, format, lint, typecheck, 503 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 138 PostgreSQL tests pass.
     Two-session desktop/tablet and 24-turn regression pass
-    (`test-results/mandatory-replay-identity`); mandatory browser fixtures pass
-    (`test-results/mandatory-replay-identity-fixtures`). Fresh independent built-in
+    (`test-results/mandatory-replay-chronology`); mandatory browser fixtures pass
+    (`test-results/mandatory-replay-chronology-fixtures`). Independent built-in
     review found no actionable defects. Hosted review then identified duplicate
     operator request IDs and altered gameplay summaries that the verifier did
     not reject. Both checks and three regression cases are added; the complete
@@ -546,6 +546,17 @@ validation remain separate gates.
     reject invalid audit/management identifiers, invalid authorization versions,
     and any action after terminal deletion. Fresh combined independent built-in
     review found no actionable defects. Reverify exact-head CI before merge.
+    A third hosted pass requires exact command-schema UUID validation, null
+    operator IDs on gameplay, and binding activation chronology. All new seat
+    bindings now persist their activation sequence in the canonical service
+    snapshot; recovery, surrender, and deletion also record retirement bounds.
+    Replay rejects attribution before activation or after retirement and fails
+    closed if historical chronology is missing. Retained saves are not rewritten
+    and ordinary resume is unchanged. Host command IDs reuse the gameplay
+    envelope's UUID schema. Focused chronology, replacement-seat, malformed-ID,
+    and missing-metadata cases cover the repairs. Combined local, database, and
+    browser gates pass. Fresh independent built-in repair review found no
+    actionable defects; exact-head CI remains pre-merge.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,

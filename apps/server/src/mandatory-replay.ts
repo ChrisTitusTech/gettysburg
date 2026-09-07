@@ -4,6 +4,7 @@ import {
   COMMAND_SCHEMA_VERSION,
   combatSkirmishes,
   gameplayCommandSchema,
+  moveUnitCommandSchema,
   reduceGameplayCommand,
   type GameState,
   type GameplayCommand,
@@ -25,8 +26,8 @@ const sameIds = (a: readonly string[], b: readonly string[]) =>
   equal([...a].sort(), [...b].sort());
 const generatedId =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const storedCommandId =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Host and gameplay envelopes use the same command-id schema.
+const storedCommandId = moveUnitCommandSchema.shape.command_id;
 
 function randomInputs(
   state: GameState,
@@ -138,7 +139,7 @@ export function replayMandatoryActions(
               ) &&
               action.canonicalizationVersion === COMMAND_SCHEMA_VERSION &&
               typeof action.commandId === "string" &&
-              storedCommandId.test(action.commandId) &&
+              storedCommandId.safeParse(action.commandId).success &&
               action.operatorRequestId === null,
             "invalid management metadata",
           );
@@ -171,7 +172,7 @@ export function replayMandatoryActions(
         continue;
       }
       assertReplay(
-        action.authorizingType === "seat",
+        action.authorizingType === "seat" && action.operatorRequestId === null,
         "gameplay actor is not a seat",
       );
       const actor = bindings.filter(
@@ -187,6 +188,22 @@ export function replayMandatoryActions(
       assertReplay(
         actor[0]!.side === "union" || actor[0]!.side === "confederate",
         "invalid historical side",
+      );
+      const activeAfter = actor[0]!.activeAfterSequence;
+      const inactiveFrom = actor[0]!.inactiveFromSequence;
+      assertReplay(
+        Number.isSafeInteger(activeAfter) &&
+          activeAfter! >= 0 &&
+          (inactiveFrom === undefined
+            ? actor[0]!.revokedAt === null
+            : Number.isSafeInteger(inactiveFrom) &&
+              inactiveFrom > activeAfter!),
+        "binding chronology unavailable",
+      );
+      assertReplay(
+        sequence > activeAfter! &&
+          (inactiveFrom === undefined || sequence < inactiveFrom),
+        "binding was not active at this sequence",
       );
       const bindingKey = JSON.stringify([actor[0]!.id, actor[0]!.version]);
       assertReplay(

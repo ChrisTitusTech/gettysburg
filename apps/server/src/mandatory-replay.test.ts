@@ -62,6 +62,58 @@ function fixture() {
 }
 
 describe("deterministic mandatory action replay", () => {
+  it("enforces persisted activation and retirement boundaries across recovery", () => {
+    const f = fixture();
+    f.act("union", "moveUnit", { unit_id: "u-devin", destination: "P7" });
+    const grant = f.service.issueSeatRecovery(
+      f.created.gameId,
+      "union",
+      "test operator",
+    );
+    f.credentials.union = f.service.claimSeatRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    }).credential;
+    f.act("union", "moveUnit", { unit_id: "u-devin", destination: "O7" });
+    const actions = f.service.getActions(f.created.gameId);
+    const bindings = f.service.exportSnapshot().seatBindings;
+    expect(f.replay(actions)).toEqual(f.state());
+    expect(
+      bindings.find((binding) => binding.id === actions[0]!.authorizingId),
+    ).toMatchObject({ activeAfterSequence: 0, inactiveFromSequence: 2 });
+    expect(
+      bindings.find((binding) => binding.id === actions[2]!.authorizingId),
+    ).toMatchObject({ activeAfterSequence: 2 });
+    for (const [target, source] of [
+      [0, 2],
+      [2, 0],
+    ] as const) {
+      const corrupt = structuredClone(actions);
+      Object.assign(corrupt[target]!, {
+        authorizingId: actions[source]!.authorizingId,
+        authorizingVersion: actions[source]!.authorizingVersion,
+      });
+      expect(() => f.replay(corrupt)).toThrow(
+        /binding was not active at this sequence/,
+      );
+    }
+    const unavailable = structuredClone(bindings);
+    for (const binding of unavailable)
+      Reflect.deleteProperty(binding, "activeAfterSequence");
+    expect(() =>
+      replayMandatoryActions(f.created.gameId, actions, unavailable),
+    ).toThrow(/binding chronology unavailable/);
+  });
+
+  it("rejects operator request IDs attached to gameplay", () => {
+    const f = fixture();
+    f.act("union", "moveUnit", { unit_id: "u-devin", destination: "P7" });
+    const actions = f.service.getActions(f.created.gameId);
+    expect(() =>
+      f.replay([{ ...actions[0]!, operatorRequestId: randomUUID() }]),
+    ).toThrow(/gameplay actor is not a seat/);
+  });
+
   it("rejects a replacement action attributed to the surrendered binding", () => {
     const f = fixture();
     f.act("union", "surrenderSeat");
@@ -90,7 +142,7 @@ describe("deterministic mandatory action replay", () => {
       authorizingVersion: actions[0]!.authorizingVersion,
     });
     expect(() => f.replay(corrupt)).toThrow(
-      /surrendered binding cannot act again/,
+      /binding was not active at this sequence/,
     );
   });
 
@@ -161,6 +213,11 @@ describe("deterministic mandatory action replay", () => {
     expect(() => replay([{ ...actions[0]!, commandId: "invalid" }])).toThrow(
       /invalid management metadata/,
     );
+    expect(() =>
+      replay([
+        { ...actions[0]!, commandId: "11111111-1111-4111-1111-111111111111" },
+      ]),
+    ).toThrow(/invalid management metadata/);
     expect(() => replay([{ ...actions[0]!, authorizingVersion: 0 }])).toThrow(
       /invalid authorization version/,
     );
