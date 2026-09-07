@@ -2220,6 +2220,34 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+The Home Screen PR now stacks on consent PR #50. Combined validation passes
+753 workspace/21 harness tests, all local gates, and fresh independent review
+(160 web tests). Both 24-turn games cover loss/retreat/advance, with native worker,
+consent isolation, reload, replay, spectators, and input fixtures passing in
+`test-results/home-screen-consent` and its `-fixtures` directory. No production
+subscription or device installation is claimed. Exact-head CI follows.
+
+Home Screen integration with merged PRs #45/#51 passes all local gates with
+740 workspace/18 harness tests. Fresh independent review is clean and reran
+147 web tests. The manifest/browser source is unchanged from the recorded
+desktop/tablet run; new exact-head CI follows.
+
+Home Screen metadata is the next small browser increment: stable root identity,
+standalone display, and no credential-bearing launch URL. The manifest introduces
+no new artwork, offline cache, automatic worker registration, or permission
+prompt. WebKit's monogram fallback avoids publishing unapproved icon assets.
+Unit and served-metadata checks, full local gates, desktop/tablet workflows,
+and independent review pass: 740 workspace/nine harness tests, frozen install,
+format, lint, typecheck, build, smoke, and Markdown/diff checks. The actual served
+manifest has the correct MIME type and does not register a worker on load.
+Both 24-turn desktop/tablet games, notification-worker checks, reload, replay,
+spectators, and input fixtures pass in `test-results/home-screen` and its
+`-fixtures` directory. Tablet covers all three combat choices; desktop
+loss/advance. The unchanged backend retains startup's 329-test PostgreSQL
+evidence. Exact-head CI follows. Owner-reviewed custom icons and
+Chromium install promotion remain open; actual iPad Home Screen launch/session,
+permission, delivery, and click-through require real-device acceptance.
+
 After integrating merged container and key-recovery PRs #45/#51, all local
 gates pass 752 workspace/21 harness tests. Fresh independent review is clean
 and reran 159 web/three consent-harness tests. Browser code is unchanged from

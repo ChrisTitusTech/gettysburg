@@ -1052,6 +1052,16 @@ counter, and explanatory assets.
 
 ## Performance and compatibility
 
+Home Screen metadata uses a stable root identity, credential-free root launch,
+and standalone display. Installation does not register a worker, request push
+permission, cache gameplay, or add offline support. WebKit can use its built-in
+monogram without new artwork; custom install icons require owner asset review.
+Physical iPad installation, permission, delivery, and notification-click checks
+remain acceptance gates; served-manifest tests do not replace them. See
+[WebKit Home Screen behavior](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+Chromium install-promotion requirements also include suitable icons, so no
+automatic install-prompt guarantee is made without approved icon assets.
+
 Active mandatory-game seats expose explicit browser notification controls only
 while connected. Merely opening a game never prompts for permission or registers
 a subscription. Consent is per seat and the most recently enabled browser
