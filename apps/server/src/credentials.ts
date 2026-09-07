@@ -6,7 +6,7 @@ const CREDENTIAL_LENGTH = 43;
 const BASE64URL_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 
 export type CredentialDomain =
-  "browser-session" | "invitation" | "recovery-grant";
+  "browser-session" | "invitation" | "spectator-invitation" | "recovery-grant";
 
 export function generateCredential(): string {
   return randomBytes(CREDENTIAL_BYTES).toString("base64url");

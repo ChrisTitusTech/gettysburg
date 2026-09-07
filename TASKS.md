@@ -479,7 +479,7 @@ validation remain separate gates.
 
 ### Phase 3
 
-- [ ] Repair late hosted replay-verifier findings after PR #25 merged.
+- [x] Repair late hosted replay-verifier findings after PR #25 merged.
   - Scope: Verify invitation retirement at surrender, reject issuance to an
     occupied seat, and reject overlapping host/same-seat binding intervals.
     Add focused corruption/valid-history regressions and preserve ordinary
@@ -518,7 +518,11 @@ validation remain separate gates.
     The combined local gate passes again (554 workspace/nine harness tests).
     Fresh independent review against the viewer parent found no actionable
     regressions and reran 159 server tests; database/browser evidence is above.
-- [ ] Repair late hosted replay-viewer findings after PR #28 merged.
+    PR #31 head `4654b0d` passed Application (`34086415225`, 13m1s) and
+    Documentation (`34086415201`) and merged as `079aa17`. Its late PR #25
+    threads were resolved after publishing the repair; no unresolved threads
+    remained at merge. This closes the repair, not Phase 3 owner acceptance.
+- [x] Repair late hosted replay-viewer findings after PR #28 merged.
   - Scope: Respect 429/Retry-After, preserve presentation across adjacent events,
     reflect live management/audit cursors, and remove the desktop grid layout
     that stretches the return button beside the board.
@@ -561,7 +565,9 @@ validation remain separate gates.
     Documentation (`34085234490`) with no review threads. The four late PR #28
     threads are resolved after publishing the repair. Merge still waits for
     parent PR #29's repaired exact-head CI.
-- [ ] Strengthen the full-game browser acceptance beyond no-contact turns.
+    After the parent passed and merged, PR #30 merged as `5aeb2d5` with the
+    same verified head and no unresolved threads.
+- [x] Strengthen the full-game browser acceptance beyond no-contact turns.
   - Scope: Use two actual browser sessions and visible keyboard/touch controls
     to play the pinned opening into two independent live combats, reload both
     clients with server results pending, resolve recorded choices, and continue
@@ -629,6 +635,10 @@ validation remain separate gates.
     Mandatory browser input fixtures pass in
     `test-results/enforced-game-time-budget-fixtures`. Reverify exact-head CI
     before merge; the failed older run remains historical evidence.
+    PR #29 head `7f7a84f` passed Application (`34086215407`, 11m32s) and
+    Documentation (`34086215405`) and merged as `eec9876`, with no unresolved
+    threads. This supersedes the earlier timeout failure and closes automated
+    workflow coverage, not representative physical-board adjudication.
 - [ ] Deliver read-only replay controls and finish replay acceptance.
   - Scope: Toggle live/replay views; navigate opening, previous/next, numbered,
     and latest events. Inspect either side, pan/zoom, and read recorded combat
@@ -1331,7 +1341,32 @@ validation remain separate gates.
 
 ### Phase 4
 
-- [ ] Consolidate ordinary resume into one authorized snapshot read.
+- [ ] Add audited host-managed spectator invitations.
+  - Scope: Separate 24-hour spectator invitations from player invitations;
+    cap outstanding grants at eight, preserve command-id retries with sealed
+    secrets, and support host-only issue/revoke events without gameplay-version
+    changes. Persist the optional collection in canonical PostgreSQL snapshots;
+    remove invitations/secrets on deletion and external-ledger restore. Verify
+    issue/revoke evidence during mandatory replay.
+  - Boundary: No spectator claim endpoint, binding, room access, or UI yet.
+    Follow with read-only claiming/authorization, immediate revocation of live
+    observers, replay access, then desktop/tablet controls and acceptance. Never
+    route spectator credentials to player or host mutations. Owner: ChrisTitusTech.
+  - Validation: Five focused cases pass for independent issuance, safe retries,
+    expiry/capacity, command isolation, deletion/restore, and corrupt replay
+    evidence. Add HTTP host-authorization and PostgreSQL restart regressions;
+    run the complete local/database/browser gates, fresh independent review,
+    and exact-head CI before merging this preparatory increment.
+    The full local gate passes with 564 workspace/nine harness tests and all
+    184 PostgreSQL server tests. HTTP issue/revoke is host-authorized; database
+    close/reopen preserves invitation retries and interpreted replay. Both
+    desktop/tablet full enforced games and input fixtures pass in
+    `test-results/spectator-invitations` and its `-fixtures` directory; both
+    games covered loss/advance, pending-result reload, and exact replay. Fresh
+    independent review found no actionable regressions and reran typecheck and
+    169 server tests; its 15 database skips are covered above. There is no new
+    spectator UI to inspect in this increment; existing browser workflows passed.
+- [x] Consolidate ordinary resume into one authorized snapshot read.
   - Scope: Replace the response's four/five independent snapshot hydrations with
     one read for current host/seat access, public action events, host-only
     invitation metadata, and game state. Preserve the HTTP contract, immediate
@@ -1354,6 +1389,10 @@ validation remain separate gates.
     independent review found no actionable regressions and reran typecheck and
     163 server tests; its 14 database skips are covered above. This is a read
     consolidation, not a query cache, schema migration, or VPS capacity result.
+    PR #32 head `b6ad555` passed Application (`34087110035`, 9m46s) and
+    Documentation (`34087109946`) and merged as `aba5694`, after independent
+    review and with no unresolved threads. Readiness/persistence cost, actual
+    VPS capacity, and the remaining Phase 4 features/gates stay open.
 - [ ] Finish responsive interaction design using the owner-approved original
   board, counter symbols, and clearly marked reduced strength. Current original
   presentation has explicit release approval; supplied scans stay private.

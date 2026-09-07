@@ -710,6 +710,28 @@ host baseline are specified in `docs/operations/VPS.md`.
 
 ## Proposed data contracts
 
+### Private spectator delivery
+
+Spectator access is host-controlled and separate from both player seats. The
+first backend increment accepts audited, idempotent `issueSpectatorInvitation`
+and `revokeSpectatorInvitation` host commands. Issuance is permitted with both
+player seats occupied. At most eight outstanding spectator invitations are
+allowed per game; an unclaimed invitation expires after 24 hours. Bearer secrets
+use a separate verifier domain, stay out of persisted action results/public
+events, and are sealed only for authorized same-command retries. Revocation,
+expiry cleanup, and game deletion destroy the retrievable secret. Canonical
+PostgreSQL snapshots retain the new optional invitation collection without a
+schema rewrite; old snapshots default to no spectator invitations.
+
+Mandatory replay verifies spectator issue/revoke metadata, lifetime, capacity,
+host attribution, hashes, and event sequence without exposing private evidence.
+This preparatory increment does not yet expose spectator claiming, bindings,
+room authorization, live viewing, or browser controls. A spectator invitation
+cannot claim a player seat. Those separate delivery gates must pass before
+advertising spectator access as usable.
+
+### Core records
+
 The precise schema is a Phase 1 deliverable, but it must represent:
 
 - `Game`: id, scenario, immutable ruleset version/content revision, status, turn,

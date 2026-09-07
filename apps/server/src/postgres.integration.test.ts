@@ -34,6 +34,73 @@ postgres("PostgreSQL durability", () => {
     await administration.end();
   });
 
+  it("persists spectator invitation retry and replay evidence across restart", async () => {
+    let firstClosed = false;
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await first.migrate();
+      const host = await first.createGame("union");
+      const command = {
+        command_id: randomUUID(),
+        command_name: "issueSpectatorInvitation",
+        payload: {},
+        game_id: host.gameId,
+        expected_version: 0,
+        schema: COMMAND_SCHEMA_VERSION,
+      };
+      const issued = await first.executeHostCommand(
+        await first.authenticateHost(host.credential, host.gameId),
+        command,
+      );
+      if (!issued.ok || !issued.invitation)
+        throw new Error("Missing invitation");
+      await first.close();
+      firstClosed = true;
+      await restarted.migrate();
+      expect(
+        await restarted.executeHostCommand(
+          await restarted.authenticateHost(host.credential, host.gameId),
+          command,
+        ),
+      ).toEqual(issued);
+      expect(
+        (await restarted.getReplay(host.credential, host.gameId)).sequence,
+      ).toBe(1);
+      expect(
+        (
+          await restarted.executeHostCommand(
+            await restarted.authenticateHost(host.credential, host.gameId),
+            {
+              ...command,
+              command_id: randomUUID(),
+              command_name: "revokeSpectatorInvitation",
+              payload: { lookup_id: issued.invitation.lookup_id },
+            },
+          )
+        ).ok,
+      ).toBe(true);
+      expect(
+        (await restarted.getReplay(host.credential, host.gameId)).sequence,
+      ).toBe(2);
+      expect(
+        await restarted.executeHostCommand(
+          await restarted.authenticateHost(host.credential, host.gameId),
+          command,
+        ),
+      ).not.toHaveProperty("invitation");
+    } finally {
+      if (!firstClosed) await first.close();
+      await restarted.close();
+    }
+  });
+
   it("hydrates one canonical snapshot per authorized resume view", async () => {
     const service = new PostgresGameService({
       connectionString: connectionString!,

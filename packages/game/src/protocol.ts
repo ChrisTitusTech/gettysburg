@@ -396,6 +396,20 @@ export const hostManagementCommandSchema = z.discriminatedUnion(
     z
       .object({
         ...baseEnvelope,
+        command_name: z.literal("issueSpectatorInvitation"),
+        payload: z.object({}).strict(),
+      })
+      .strict(),
+    z
+      .object({
+        ...baseEnvelope,
+        command_name: z.literal("revokeSpectatorInvitation"),
+        payload: hostManagementPayloadSchemas.revokeInvitation,
+      })
+      .strict(),
+    z
+      .object({
+        ...baseEnvelope,
         command_name: z.literal("issueInvitation"),
         payload: hostManagementPayloadSchemas.issueInvitation,
       })
