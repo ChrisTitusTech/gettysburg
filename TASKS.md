@@ -12,7 +12,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, and bounded encrypted provider transport are merged through PR #46 | Worker PR #47, optional startup configuration, browser opt-in/service worker, and real provider/device acceptance |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, bounded encrypted provider transport, and serial worker are merged through PR #47 | Optional startup PR #48, browser opt-in/service worker, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -40,6 +40,7 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #43 protected subscriptions | `e1991d1` | `34112288240` / `34112288184` | `fc70599` |
 | #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
 | #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
+| #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1882,6 +1883,14 @@ validation remain separate gates.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
 ### Container vulnerability closeout (release gate open)
+
+Merged worker integration passes the full gate (719 workspace/nine harness
+tests). Image `3120b0d4a36277199abd42ed06e061c72084d88c9d836f113b9a619c78965978`
+passes non-root container smoke and HIGH/CRITICAL scanning with zero findings
+across 18 OS/359 Node packages (`/tmp/gettysburg-scanner.K2VSLN/worker-image.json`).
+The worker still has no startup caller in this container candidate. Previously
+recorded actual-image browser evidence covers unchanged active runtime/UI;
+exact-head CI must pass and the final release image must be scanned again.
 
 Hosted review found exact OpenSSL package pins could disappear from Alpine's
 moving stable repository. Replace them with minimum fixed versions plus upgrade;
