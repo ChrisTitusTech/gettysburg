@@ -59,6 +59,8 @@ export interface BrowserSession {
 }
 
 export interface HostBinding {
+  readonly activeAfterSequence?: number;
+  inactiveFromSequence?: number;
   readonly gameId: string;
   readonly id: string;
   readonly sessionId: string;
@@ -1058,6 +1060,7 @@ export class InMemoryGameService {
     });
     this.#hostBindings.push({
       gameId,
+      activeAfterSequence: 0,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
@@ -2182,11 +2185,15 @@ export class InMemoryGameService {
     grant.consumedAt = now;
     this.#hostBindings.push({
       gameId: grant.gameId,
+      activeAfterSequence:
+        this.#requireActiveGame(grant.gameId).state.event_sequence + 1,
       id: randomUUID(),
       revokedAt: null,
       sessionId: session.sessionId,
       version: oldBinding.version + 1,
     });
+    oldBinding.inactiveFromSequence =
+      this.#requireActiveGame(grant.gameId).state.event_sequence + 1;
     const event = this.#appendOperatorAudit(
       grant.gameId,
       grant.operatorIdentity,
@@ -2252,8 +2259,20 @@ export class InMemoryGameService {
         state: replay(
           gameId,
           game.actions.slice(0, sequence),
-          this.#seatBindings,
+          this.#seatBindings.filter((binding) => binding.gameId === gameId),
           sequence === latest ? game.state : undefined,
+          {
+            hosts: this.#hostBindings.filter(
+              (binding) => binding.gameId === gameId,
+            ),
+            invitations: [...this.#invitations.values()]
+              .filter((invitation) => invitation.gameId === gameId)
+              .map(({ gameId, lookupId, allowedSeat }) => ({
+                gameId,
+                lookupId,
+                allowedSeat,
+              })),
+          },
         ),
         sequence,
         latest_sequence: latest,

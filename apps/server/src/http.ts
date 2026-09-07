@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type { ActionEvent, AuditEvent } from "@gettysburg/game";
 import { parseCookie, stringifySetCookie } from "cookie";
@@ -74,24 +74,29 @@ interface AttemptBucket {
 }
 
 class AttemptRateLimiter {
-  #global: AttemptBucket = {
-    count: 0,
-    resetAt: Date.now() + CLAIM_LIMIT_WINDOW_MS,
-  };
+  #global: AttemptBucket;
   readonly #sources = new Map<string, AttemptBucket>();
+
+  constructor(
+    private readonly windowMs = CLAIM_LIMIT_WINDOW_MS,
+    private readonly perSource = CLAIM_LIMIT_PER_SOURCE,
+    private readonly globalLimit = CLAIM_LIMIT_GLOBAL,
+  ) {
+    this.#global = { count: 0, resetAt: Date.now() + windowMs };
+  }
 
   allow(source: string, now = Date.now()): boolean {
     if (this.#global.resetAt <= now) {
-      this.#global = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      this.#global = { count: 0, resetAt: now + this.windowMs };
       this.#sources.clear();
     }
-    if (this.#global.count >= CLAIM_LIMIT_GLOBAL) return false;
+    if (this.#global.count >= this.globalLimit) return false;
     let sourceBucket = this.#sources.get(source);
     if (sourceBucket === undefined || sourceBucket.resetAt <= now) {
-      sourceBucket = { count: 0, resetAt: now + CLAIM_LIMIT_WINDOW_MS };
+      sourceBucket = { count: 0, resetAt: now + this.windowMs };
       this.#sources.set(source, sourceBucket);
     }
-    if (sourceBucket.count >= CLAIM_LIMIT_PER_SOURCE) {
+    if (sourceBucket.count >= this.perSource) {
       return false;
     }
     this.#global.count += 1;
@@ -198,6 +203,10 @@ export function configureHttpApplication(
   const { gameService, readiness, staticDirectory } = options;
   const creationRateLimiter = new CreationRateLimiter();
   const claimRateLimiter = new AttemptRateLimiter();
+  // Process-local limits precede database reads and synchronous reconstruction.
+  // Both maps are bounded by the global attempt budget and expire each minute.
+  const replaySourceLimiter = new AttemptRateLimiter(60_000, 60, 300);
+  const replaySessionLimiter = new AttemptRateLimiter(60_000, 30, 300);
   const allowBearerClaim = (request: Request, response: Response) => {
     if (claimRateLimiter.allow(request.ip ?? "unknown")) return true;
     response.setHeader(
@@ -526,6 +535,18 @@ export function configureHttpApplication(
     "/api/games/:gameId/replay",
     async (request, response, next) => {
       try {
+        const credential = readSessionCredential(request);
+        const sessionKey = createHash("sha256")
+          .update(credential ?? "anonymous")
+          .digest("hex");
+        if (
+          !replaySourceLimiter.allow(request.ip ?? "unknown") ||
+          !replaySessionLimiter.allow(sessionKey)
+        ) {
+          response.setHeader("Retry-After", "60");
+          response.status(429).json({ error: "replay_rate_limited" });
+          return;
+        }
         const cursor = request.query.sequence;
         if (
           Object.keys(request.query).some((key) => key !== "sequence") ||
@@ -541,7 +562,7 @@ export function configureHttpApplication(
           .status(200)
           .json(
             await gameService.getReplay(
-              readSessionCredential(request),
+              credential,
               request.params.gameId ?? "",
               cursor === undefined ? undefined : Number(cursor),
             ),
