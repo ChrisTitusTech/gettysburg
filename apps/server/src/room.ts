@@ -1,4 +1,9 @@
-import { Room, type AuthContext, type Client } from "@colyseus/core";
+import {
+  Room,
+  ClientState,
+  type AuthContext,
+  type Client,
+} from "@colyseus/core";
 import {
   commandPayloadSchemas,
   type CommandFailure,
@@ -66,6 +71,32 @@ function failure(error: ServiceError): CommandFailure {
     message: error.message,
     ok: false,
   };
+}
+
+function waitForJoined(client: Client, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const cleanup = () => {
+      client.ref.removeListener("message", onMessage);
+      signal.removeEventListener("abort", onAbort);
+    };
+    const check = () => {
+      if (signal.aborted) return onAbort();
+      if (client.state === ClientState.JOINED) {
+        cleanup();
+        resolve();
+      }
+    };
+    // Colyseus processes the acknowledgement in its own message listener.
+    // Check after every listener has run, without decoding private wire data.
+    const onMessage = () => queueMicrotask(check);
+    const onAbort = () => {
+      cleanup();
+      reject(new Error("Room handshake was cancelled."));
+    };
+    client.ref.on("message", onMessage);
+    signal.addEventListener("abort", onAbort, { once: true });
+    check();
+  });
 }
 
 export function createGettysburgRoom(
@@ -389,7 +420,7 @@ export function createGettysburgRoom(
           this.#joining.get(existing)?.abort();
         }
       }
-      try {
+      const deliver = async () => {
         await this.#enqueueDelivery(async () => {
           if (cancelled.signal.aborted || !this.#canReceive(client)) return;
           await withinDeliveryDeadline(
@@ -407,9 +438,31 @@ export function createGettysburgRoom(
             cancelled.signal,
           );
         });
-      } finally {
+      };
+      const cleanup = () => {
         client.ref.removeListener("close", onClose);
         this.#joining.delete(client);
+      };
+      if (isSpectator(authorization)) {
+        // onJoin must return before Colyseus accepts the client acknowledgement.
+        // Never enqueue private state in its JOINING transport buffer: authorize
+        // only after JOINED, when send writes immediately under the read lock.
+        void withinDeliveryDeadline(
+          (signal) => waitForJoined(client, signal),
+          cancelled.signal,
+        )
+          .then(deliver)
+          .catch((error: unknown) => {
+            this.#deliveryClosed.add(client);
+            client.leave(error instanceof ServiceError ? 4001 : 4002);
+          })
+          .finally(cleanup);
+        return;
+      }
+      try {
+        await deliver();
+      } finally {
+        cleanup();
       }
     }
   };
