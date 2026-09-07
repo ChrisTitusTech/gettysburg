@@ -1031,6 +1031,12 @@ commit only once.
 - Secrets live outside Git in rootless service environment files with mode 0600.
 - Dependencies, container images, and migrations are reviewed before production
   deployment.
+- The application uses matching digest-pinned Node 24 Alpine build/runtime
+  stages, minimum fixed OpenSSL package versions, and no runtime Node package
+  managers. Alpine security packages come from its moving stable repository;
+  rebuilds are not bit-for-bit reproducible and need a fresh image scan.
+  Scan the final immutable application image, including OS and Node packages,
+  before release; a clean workspace dependency audit alone is insufficient.
 - Browser push dispatch pins a validated public provider address while retaining
   TLS hostname verification, rejects redirects, and bounds DNS/TLS/response
   headers by a total deadline no longer than its durable lease. Provider bodies,
@@ -1045,6 +1051,13 @@ release requires confirmed rights or a clean-room set of original board,
 counter, and explanatory assets.
 
 ## Performance and compatibility
+
+The VPS backup contract encrypts a persistent push signing key separately from
+the database and credential pepper, records whether it was present, and verifies
+its matching P-256 pair during isolated/off-host restore checks. No plaintext
+signing key survives off-host backup acceptance. Only the canonical application
+volume key path is supported by these scripts; missing configured keys must
+fail backup rather than silently producing an incomplete recovery set.
 
 The notification-only service worker never intercepts requests or caches game
 or session responses. It accepts bounded, schema-validated opaque game/event IDs,

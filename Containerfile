@@ -1,4 +1,8 @@
-FROM docker.io/library/node@sha256:85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e AS build
+# Node 24.18.0 on Alpine 3.24; security floors tolerate repository revisions.
+FROM docker.io/library/node@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS base
+RUN apk add --no-cache --upgrade 'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
+
+FROM base AS build
 
 WORKDIR /workspace
 RUN npm install --global pnpm@11.21.0
@@ -6,14 +10,17 @@ RUN npm install --global pnpm@11.21.0
 COPY --chown=node:node . .
 RUN pnpm install --frozen-lockfile && pnpm build
 
-FROM docker.io/library/node@sha256:85a395c77b811fa7f5b5e4aa69cd6eb4c3b80c7f1a8e34704dc0ce061e5b404e AS runtime
+FROM base AS runtime
 
 ENV GETTYSBURG_SERVER_HOST=0.0.0.0 \
     GETTYSBURG_SERVER_PORT=3000 \
     GETTYSBURG_TRUSTED_ORIGIN=http://127.0.0.1:3000 \
     NODE_ENV=production
 WORKDIR /workspace
-RUN mkdir -p /var/lib/gettysburg && chown node:node /var/lib/gettysburg
+# Build tools are not needed by the server and contain their own dependency trees.
+# These removals affect only this new image layer, never the host filesystem.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v1.22.22 \
+    && mkdir -p /var/lib/gettysburg && chown node:node /var/lib/gettysburg
 
 COPY --from=build --chown=node:node /workspace/node_modules ./node_modules
 COPY --from=build --chown=node:node /workspace/apps/server ./apps/server
