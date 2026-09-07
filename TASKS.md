@@ -12,7 +12,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, bounded encrypted provider transport, and serial worker are merged through PR #47 | Optional startup PR #48, browser opt-in/service worker, and real provider/device acceptance |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49 | Browser consent UI, key backup/restore, Home Screen installability, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -41,6 +41,8 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
 | #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
 | #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
+| #48 optional startup | `d7c0d4c` | `34117338015` / `34117337993` | `2afd7ef` |
+| #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1883,6 +1885,23 @@ validation remain separate gates.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
 ### Container vulnerability closeout (release gate open)
+
+Integrated startup and notification-worker code from merged PRs #48/#49 passes
+739 workspace/13 harness tests, build, smoke, lint, typecheck, and formatting.
+Markdown initially rejected two long rollup lines; both were wrapped and the
+complete Markdown check then passed. Fresh independent review found no defects.
+Image `e111ed6d767d1a82148706083a59118bb7ea2f87655a1080ba83cedc8b8869d0`
+passes the exact-image scanner with zero HIGH/CRITICAL findings across 18 OS/359
+Node packages (`/tmp/gettysburg-scanner.K2VSLN/startup-worker-image.json`). Its
+actual-image browser run passes notification display/tag coalescing, both
+24-turn games, pending-result reload, exact replay, and spectator workflows in
+`test-results/alpine-startup-worker-image`. Desktop covers all three combat
+choices and tablet loss/advance. A separate container-smoke rebuild of the same
+application source (`a8001345b15d17740f23523f2ff880e10b810edbf8a3604d013807cdf2615adf`)
+passes non-root execution, PostgreSQL restart/resume, fail-closed readiness, and
+clean shutdown. These are distinct image IDs, not a claim of one identical
+artifact for both runs. Final exact-head CI and a newly built release-image scan
+remain required; no VPS deployment or production push enablement occurred.
 
 Hosted review identified that a later VPS rebuild was not covered by a local
 candidate scan. The deployment now scans its exact newly built image ID before
