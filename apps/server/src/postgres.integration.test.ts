@@ -67,6 +67,52 @@ postgres("PostgreSQL durability", () => {
     await administration.end();
   });
 
+  it("reuses healthy room validation connections and discards failed rollbacks", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const connections = new Set<PgClient>();
+    let rollbackCount = 0;
+    let failRollback = false;
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      const original = PgClient.prototype.query;
+      query = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          if (args[0] === "BEGIN") connections.add(this);
+          if (args[0] === "ROLLBACK") {
+            rollbackCount++;
+            if (failRollback)
+              return Promise.reject(new Error("Injected rollback failure"));
+          }
+          return Reflect.apply(original, this, args);
+        } as PgClient["query"]);
+      for (let attempt = 0; attempt < 3; attempt++) {
+        await expect(
+          service.verifyRoomGame(randomUUID(), new AbortController().signal),
+        ).rejects.toMatchObject({ code: "game_not_found" });
+      }
+      expect(rollbackCount).toBe(3);
+      expect(connections.size).toBe(1);
+      await service.verifyRoomGame(host.gameId, new AbortController().signal);
+      expect(connections.size).toBe(1);
+      failRollback = true;
+      await expect(
+        service.verifyRoomGame(randomUUID(), new AbortController().signal),
+      ).rejects.toMatchObject({ code: "game_not_found" });
+      failRollback = false;
+      await service.verifyRoomGame(host.gameId, new AbortController().signal);
+      expect(connections.size).toBe(2);
+    } finally {
+      query?.mockRestore();
+      await service.close();
+    }
+  });
+
   it("bounds queued delivery checkouts without consuming the ordinary pool", async () => {
     const service = new PostgresGameService({
       connectionString: connectionString!,

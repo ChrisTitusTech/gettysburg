@@ -1717,6 +1717,23 @@ validation remain separate gates.
     evidence retained. The production dependency audit reports no known
     vulnerabilities. Publish and recheck exact-head CI/final threads.
 
+  - Final hosted review then identified healthy-connection churn on expected
+    room validation failures (`PRRT_kwDOT4urvs6f3r_r`). Roll back and reuse the
+    delivery connection for ServiceError validation failures; cancellation,
+    query/connection errors, and rollback failure still discard it. A real
+    PostgreSQL regression repeats invalid game IDs on one connection, verifies
+    a valid request reuses it, and forces rollback failure to prove replacement.
+    Repeat full local/database gates and fresh independent review before push;
+    exact-head CI and final thread checks remain required. The browser protocol
+    and rendering are unchanged from the pending-ack desktop/tablet evidence.
+    Full local validation passes 603 workspace/nine harness tests and all 224
+    PostgreSQL tests. Fresh independent review found no actionable defects and
+    passed server typechecking/whitespace checks. The earlier full browser
+    evidence remains applicable to unchanged UI/protocol behavior; new CI must
+    also rerun browser/container checks. Prior head `42ea8e8` passed Application
+    `34109238811` and Documentation `34109238853`, but is not merged because
+    of this final-review finding.
+
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host
