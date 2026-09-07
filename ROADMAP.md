@@ -204,8 +204,12 @@ several movement, stacking,
 combat, and core night rules. Phase 2 operational closeout and owner per-hex
 approval are complete. The newer source candidate enables mandatory rules for
 new games, including weighted movement, reinforcement costs, retreat/advance,
-and night guidance, under its complete pinned version pair. Replay delivery and
-representative full-game/owner gameplay acceptance remain open. This source
+and night guidance, under its complete pinned version pair. Mandatory replay
+and its authorized browser controls are merged. Automated desktop/tablet games
+complete all 24 turns with pending-choice reload and exact replay; representative
+owner adjudication against the physical rules remains open. Legacy tabletop
+saves still resume without interpreted replay, so retained-version replay
+coverage needs implementation or an explicit scope decision. This source
 activation is not a deployment or Phase 3 completion. Optional rules/additional
 scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in

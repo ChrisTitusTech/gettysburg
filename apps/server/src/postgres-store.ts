@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { Pool, type PoolClient } from "pg";
+import { DeliverySlots } from "./delivery-slots.js";
 
 import {
   InMemoryGameService,
@@ -311,6 +312,7 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #deliveryPool: Pool;
+  readonly #deliverySlots = new DeliverySlots();
   readonly #pepper: Uint8Array;
   async verifyRoomGame(gameId: string, signal: AbortSignal) {
     await this.#readForDelivery((service) => {
@@ -711,8 +713,26 @@ export class PostgresGameService implements GameService {
     operation: (service: InMemoryGameService) => void,
     signal: AbortSignal,
   ): Promise<void> {
+    const release = await this.#deliverySlots.acquire(signal);
+    try {
+      await this.#readInDeliverySlot(operation, signal);
+    } finally {
+      release();
+    }
+  }
+
+  async #readInDeliverySlot(
+    operation: (service: InMemoryGameService) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
     if (signal.aborted) throw new Error("Room delivery was cancelled.");
     const client = await this.#deliveryPool.connect();
+    // A connection establishment can outlive cancellation (bounded by the
+    // pool's connect timeout). No query ran, so return it healthy, not destroyed.
+    if (signal.aborted) {
+      client.release();
+      throw new Error("Room delivery was cancelled.");
+    }
     let released = false;
     const discard = () => {
       if (!released) {
