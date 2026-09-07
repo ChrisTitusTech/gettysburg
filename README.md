@@ -33,6 +33,7 @@ of production readiness.
 - `SPEC.md` - required behavior, architecture, security, and acceptance criteria
 - `ROADMAP.md` - ordered implementation phases and exit criteria
 - `TASKS.md` - current reviewable work and validation status
+- `docs/operations/RELEASE_ACCEPTANCE.md` - remaining owner/device/VPS checks
 - `docs/references/SOURCE_ASSETS.md` - local-only source inventory and missing inputs
 - `docs/references/TERRAIN_ADJUSTMENTS.md` - per-hex terrain/modifier owner-review
   worksheet

@@ -18,6 +18,8 @@ and evidence; they do not supersede this current status or close owner gates.
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
 below. No phase is completed merely by passing the automated game script.
+`docs/operations/RELEASE_ACCEPTANCE.md` consolidates the remaining owner,
+device/accessibility, and controlled-VPS checks without changing their scope.
 
 CI evidence correction: hosted review of the alternate-browser workflow found
 that default pull-request checkout uses GitHub's synthetic merge commit. Earlier
@@ -39,12 +41,13 @@ claimed for this documentation update. Fresh independent review found no
 actionable defects. PR #42 head `5461aaa` passed Application `34105452083` and
 Documentation `34105452277`, had no unresolved threads, and merged as `3c61850`.
 
-Subsequent merge closeout (2026-09-07): each exact head passed Application and
-Documentation, independent review was clean, and final unresolved-thread
+Subsequent merge closeout (2026-09-07): each listed PR head had successful
+Application and Documentation checks, subject to the checkout correction above.
+Independent review was clean, and final unresolved-thread
 inspection was empty before a separate merge call. The implementation notes
 below retain earlier evidence and pending steps, superseded by this rollup.
 
-| PR | Exact head | Application / Documentation | Merge |
+| PR | PR head | Application / Documentation | Merge |
 | --- | --- | --- | --- |
 | #40 observer browser | `9ad2f66` | `34113686517` / `34113686564` | `3d10581` |
 | #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
@@ -1977,6 +1980,10 @@ removed, preserving the image and evidence. This is not VPS deployment,
 backup/restore/reboot acceptance, or a public capacity claim. The OCI build's
 ignored embedded HEALTHCHECK warning is addressed by the explicitly configured
 runtime health command, as in the deployed Quadlet.
+Desktop/tablet Fit captures from this exact-image run were visually inspected;
+the board and controls are intact in both views. The new release-acceptance
+worksheet passes Markdown/diff checks and independent review without changing
+owner decisions or closing manual gates.
 
 ### Browser-engine acceptance increment
 
