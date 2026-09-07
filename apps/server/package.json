@@ -19,12 +19,15 @@
     "canonicalize": "4.0.0",
     "cookie": "2.0.1",
     "express": "5.2.1",
-    "pg": "8.23.0"
+    "ipaddr.js": "2.5.0",
+    "pg": "8.23.0",
+    "web-push": "3.6.7"
   },
   "devDependencies": {
     "@colyseus/sdk": "0.17.43",
     "@types/express": "5.0.6",
     "@types/pg": "8.21.0",
+    "@types/web-push": "3.6.4",
     "tsx": "4.23.12"
   }
 }
