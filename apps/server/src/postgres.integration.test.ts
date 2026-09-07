@@ -13,7 +13,10 @@ import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
-import type { GameServiceSnapshot } from "./game-service.js";
+import {
+  InMemoryGameService,
+  type GameServiceSnapshot,
+} from "./game-service.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
@@ -437,6 +440,107 @@ postgres("PostgreSQL durability", () => {
       expect(connections.size).toBe(2);
     } finally {
       query?.mockRestore();
+      await service.close();
+    }
+  });
+
+  it("preserves retired games and other active consent during projected gameplay writes", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await service.migrate();
+      const active = await service.createGame("union");
+      const other = await service.createGame("union");
+      const retired = await service.createGame("union");
+      const retiredAuthorization = await service.authenticate(
+        retired.credential,
+        retired.gameId,
+      );
+      const key = createECDH("prime256v1");
+      key.generateKeys();
+      await service.setPushSubscription(other.credential, other.gameId, {
+        endpoint: "https://fcm.googleapis.com/fcm/send/projected-write-test",
+        expirationTime: null,
+        keys: {
+          p256dh: key.getPublicKey().toString("base64url"),
+          auth: randomBytes(16).toString("base64url"),
+        },
+      });
+      expect(
+        (
+          await service.executeHostCommand(
+            await service.authenticateHost(retired.credential, retired.gameId),
+            {
+              command_id: randomUUID(),
+              command_name: "deleteGame",
+              expected_version: 0,
+              game_id: retired.gameId,
+              payload: { confirm: true },
+              schema: COMMAND_SCHEMA_VERSION,
+            },
+          )
+        ).ok,
+      ).toBe(true);
+      const before = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      const command = {
+        command_id: randomUUID(),
+        command_name: "moveStack",
+        expected_version: 0,
+        game_id: active.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+        payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+      };
+      const authorization = await service.authenticate(
+        active.credential,
+        active.gameId,
+      );
+      const accepted = await service.executeCommand(authorization, command);
+      expect(accepted.ok).toBe(true);
+      expect(await service.executeCommand(authorization, command)).toEqual(
+        accepted,
+      );
+      const after = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      expect(after.games.map(([id]) => id)).toEqual(
+        before.games.map(([id]) => id),
+      );
+      expect(after.games.filter(([id]) => id !== active.gameId)).toEqual(
+        before.games.filter(([id]) => id !== active.gameId),
+      );
+      expect(after.deletionLedger).toEqual(before.deletionLedger);
+      expect(
+        await service.getPushSubscriptionStatus(other.credential, other.gameId),
+      ).toMatchObject({ enabled: true });
+      const retiredCommand = {
+        ...command,
+        command_id: randomUUID(),
+        game_id: retired.gameId,
+      };
+      await expect(
+        service.executeCommand(retiredAuthorization, retiredCommand),
+      ).rejects.toMatchObject({ code: "unauthorized" });
+      expect(() =>
+        new InMemoryGameService({ snapshot: after, pepper }).executeCommand(
+          retiredAuthorization,
+          retiredCommand,
+        ),
+      ).toThrow("Seat binding is no longer active.");
+      const mirrored = (
+        await administration.query("SELECT state FROM games WHERE id = $1", [
+          active.gameId,
+        ])
+      ).rows[0].state;
+      expect(mirrored).toEqual(await service.getGameState(active.gameId));
+    } finally {
       await service.close();
     }
   });

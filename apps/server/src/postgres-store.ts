@@ -759,7 +759,7 @@ export class PostgresGameService implements GameService {
         },
       });
       return { committed, result };
-    });
+    }, authorization.gameId);
     if (execution.committed) options.afterCommit?.();
     return execution.result;
   }
@@ -946,13 +946,26 @@ export class PostgresGameService implements GameService {
     );
   }
 
-  async #mutate<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
+  async #mutate<T>(
+    operation: (service: InMemoryGameService) => T,
+    commandGameId?: string,
+  ): Promise<T> {
+    // Gameplay cannot add or purge games. Keep every undeleted game for global
+    // notification pruning, plus a retired target for stale-command semantics.
+    // PostgreSQL preserves omitted histories under the same canonical row lock.
     const client = await this.#pool.connect();
     let released = false;
     try {
       await client.query("BEGIN");
       const result = await client.query<{ snapshot: GameServiceSnapshot }>(
-        "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
+        commandGameId === undefined
+          ? "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE"
+          : `SELECT jsonb_set(snapshot, '{games}', (
+              SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
+              FROM jsonb_array_elements(snapshot->'games') AS entry
+              WHERE entry->1->>'deletedAt' IS NULL OR entry->>0 = $1
+            )) AS snapshot FROM service_state WHERE singleton = true FOR UPDATE`,
+        commandGameId === undefined ? undefined : [commandGameId],
       );
       const snapshot = result.rows[0]?.snapshot;
       if (snapshot === undefined)
@@ -963,8 +976,23 @@ export class PostgresGameService implements GameService {
       });
       const value = operation(service);
       const nextSnapshot = service.exportSnapshot();
+      if (
+        commandGameId !== undefined &&
+        !isDeepStrictEqual(
+          nextSnapshot.games.map(([id]) => id),
+          snapshot.games.map(([id]) => id),
+        )
+      )
+        throw new Error("Gameplay cannot change the game inventory.");
       await client.query(
-        "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
+        commandGameId === undefined
+          ? "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true"
+          : `UPDATE service_state SET snapshot = jsonb_set($1::jsonb, '{games}', (
+              SELECT coalesce(jsonb_agg(coalesce(updated.entry, retained.entry) ORDER BY retained.position), '[]'::jsonb)
+              FROM jsonb_array_elements(snapshot->'games') WITH ORDINALITY AS retained(entry, position)
+              LEFT JOIN jsonb_array_elements($1::jsonb->'games') AS updated(entry)
+                ON updated.entry->>0 = retained.entry->>0
+            )), updated_at = now() WHERE singleton = true`,
         [JSON.stringify(nextSnapshot)],
       );
       await this.#mirrorSnapshot(client, nextSnapshot, snapshot);

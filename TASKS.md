@@ -8,8 +8,8 @@ The owner authorized repairing and reopening the site for acceptance testing.
 PostgreSQL read paths now project only the requested game's canonical record,
 while preserving the full authorization metadata and existing delivery SHARE
 lock. The two-second deadline, bounded admission, cancellation, and revocation
-checks are unchanged. Mutations and stored snapshots remain unchanged; retained
-games are not deleted, purged, or rewritten by this optimization. Provider
+checks are unchanged. The initial read-only increment left mutations unchanged;
+retained games are not deleted, purged, or rewritten by this optimization. Provider
 receipt authorization retains its full-snapshot path because its target game is
 resolved from the receipt. The consent harness also deletes its owned game on
 failed connection before closing browser contexts.
@@ -120,6 +120,28 @@ initial new assertion incorrectly assumed no earlier active database fixtures;
 the corrected assertion verifies every active fixture and excludes the retired
 record. Fresh independent Codex review found no actionable regression and passed
 server typecheck; the engineer's separate run supplies database evidence.
+
+On a fresh isolated restore, desktop completed turn 24 with retreat/advance,
+pending-result reload, and exact replay. Tablet reached turn 24/completed/v59
+but exceeded eight minutes during its final replay read, so that run did not
+pass. The failed runs and protected logs remain retained; no timing gate is
+waived. Gameplay writes still reconstructed and compared all retired histories.
+The next increment loads all undeleted games plus an explicitly targeted retired
+game, then overlays those records in PostgreSQL under the original canonical
+UPDATE lock, preserving omitted histories and ordering. All active games remain
+available for global notification pruning. A guard forbids inventory changes;
+creation, host management, recovery, and retention use the original full path.
+Regression coverage checks retained/other-active records, other-game push consent,
+idempotent retries, stale retired authorization, and normalized state mirrors.
+Initial fixture failures were an unsupported synthetic provider URL and an
+incorrect returned-error assumption for revoked authorization; correct those
+fixtures and require fresh complete validation/review/CI and VPS full games.
+
+Gameplay-write validation passes format, lint, typecheck, 766 workspace/36
+harness tests, all 338 PostgreSQL tests, build, and smoke. Fresh independent
+Codex review found no actionable regression and passed 309 server tests and
+typecheck; its database cases were skipped, covered by the engineer's full run.
+CodeRabbit 0.7.6 also completed this four-file review with zero findings.
 
 ### VPS rollout and acceptance blocker: 2026-09-07
 

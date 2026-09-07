@@ -791,6 +791,12 @@ before transferring and reconstructing it. Unrelated retained boards and action
 histories must not burden each room read. Authorization metadata remains in the
 same canonical snapshot; delivery retains its SHARE lock and bounded deadline.
 This read optimization does not modify stored records or the retention policy.
+Gameplay transactions reconstruct undeleted games and any explicitly targeted
+retired game, so global notification pruning and stale-authorization behavior
+remain intact. Under the same canonical UPDATE lock, PostgreSQL overlays those
+records and preserves omitted retired histories and their ordering. Gameplay
+cannot change the game inventory. Creation, host management, retention, and
+recovery keep the full-snapshot transaction path; no data migration is required.
 An admission read that reaches its deadline reports transient status 503.
 Player/spectator clients retry only that status, at most four attempts with
 500/1000/2000 ms backoff, and cancel pending backoff on navigation. Denied or
