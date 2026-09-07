@@ -761,7 +761,15 @@ expiry so the host can revoke them. Claimed does not imply a connected or
 currently authorized observer. No bearer secrets, session IDs, or binding IDs
 are returned. This read never renews sessions or changes state.
 
-Live room authorization, immediate socket revocation, host grant-list controls,
+Current hosts can refresh and revoke those grants from a dedicated browser
+panel, including after reload or host-only recovery. Players without a host
+binding do not see it. The panel refreshes claim status before choosing the
+existing audited revocation command and reuses the application's host-command
+authorization/retry flow. Races are rejected by the server and remain retryable
+through visible refresh/revoke controls. Link creation and the observer screen
+remain separate UI delivery gates; this panel never displays bearer secrets.
+
+Live room authorization, immediate socket revocation, link creation,
 and the spectator browser interface remain separate delivery gates. A spectator
 invitation cannot claim a player seat. Do not advertise usable live spectators
 until those gates and desktop/tablet acceptance pass.

@@ -31,6 +31,7 @@ import {
 } from "./api";
 import { Board } from "./Board";
 import { ReplayViewer } from "./ReplayViewer";
+import { SpectatorHostControls } from "./SpectatorHostControls";
 import { invitationUrl, type SecretGrantFragment } from "./invitation";
 import { leaveOpenRoom } from "./room-lifecycle";
 import { TabletopControls } from "./TabletopControls";
@@ -908,6 +909,14 @@ export function App({
           </button>
         )}
       </section>
+
+      {activeGame.is_host ? (
+        <SpectatorHostControls
+          key={activeGame.game_id}
+          gameId={activeGame.game_id}
+          execute={executeHostCommand}
+        />
+      ) : null}
 
       <section className="replay-controls" aria-label="Replay controls">
         <button

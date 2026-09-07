@@ -1341,7 +1341,37 @@ validation remain separate gates.
 
 ### Phase 4
 
-- [ ] Add the host-only spectator grant-list API.
+- [ ] Add browser host controls for spectator refresh and revocation.
+  - Scope: Host-only metadata panel, current-status refresh before revocation,
+    existing audited/idempotent host command flow, reload, safe stale-response
+    handling, and visible retry errors. No bearer secret display. Link creation
+    and the spectator screen remain separate increments.
+  - Validation plan: Component regressions for invited/claimed commands, read
+    failure/retry, already retired grants, and game changes. Real desktop/tablet
+    browser checks create invitation/claim fixtures through the API, then use
+    visible controls to refresh/reload/revoke both grant types, prove observer
+    reads/replay are denied afterward, and preserve both player seats/state.
+    This is not full spectator UI acceptance. Run complete local/database/browser
+    gates, independent review, exact-head CI, and hosted thread checks. Owner:
+    ChrisTitusTech. No deployment or migration.
+  - Initial validation: Full local gate passed 582 workspace/nine harness
+    tests; all 199 PostgreSQL tests passed. Independent review found no
+    actionable regressions and reran 109 web tests. Browser acceptance failed
+    in fixture read-back because the separate request context did not send the
+    secure browser cookie over loopback HTTP. Read-back now uses fetch inside
+    the authenticated browser, and an explicit pre-revocation 200 assertion
+    prevents a false-positive denial check. Fresh gates and review are required.
+  - Final local validation: Frozen install, format, lint, typecheck, 582
+    workspace/nine harness tests, build, smoke, Markdown and whitespace pass.
+    All 199 PostgreSQL tests pass for unchanged server code. Desktop/tablet host
+    refresh/reload/revocation and authenticated pre/post-revocation checks pass;
+    full games exercise all three choices, reload/exact replay, and input
+    fixtures pass in `test-results/spectator-host-controls-cookie` and its
+    `-fixtures` directory. Rendered tablet controls were inspected without
+    clipping. Fresh independent review found no actionable regressions and
+    reran all 109 web tests. Exact-head CI and hosted threads remain before merge.
+
+- [x] Add the host-only spectator grant-list API.
   - Scope: One authorized snapshot read returns outstanding invitation IDs,
     invited/claimed status, and invitation expiry, without secrets or identities.
     Expired unclaimed and revoked grants disappear; claimed grants remain
@@ -1360,6 +1390,9 @@ validation remain separate gates.
     Fresh independent review found no actionable defects and reran 183 server
     tests; its 16 PostgreSQL skips are covered above. Exact-head CI and hosted
     thread checks remain before merge. CodeRabbit is limit-skipped as authorized.
+  - Closeout: PR #36 head `fedf0f0aa607a305396a66569d843b6db436c5da` passed
+    Application `34096055329` and Documentation `34096055298`. A separate final
+    query confirmed no review threads before merge into `faa8586` on 2026-09-07.
 
 - [ ] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
   - Scope: Three late PR #34 findings arrived after its separate merge check

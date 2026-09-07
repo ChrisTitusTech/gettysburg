@@ -215,6 +215,22 @@ export interface HostCommandSuccess {
   readonly ok: true;
 }
 
+export interface SpectatorGrant {
+  readonly lookup_id: string;
+  readonly status: "invited" | "claimed";
+  readonly invitation_expires_at: number;
+}
+
+export function getSpectatorGrants(
+  gameId: string,
+  signal?: AbortSignal,
+): Promise<{ readonly grants: readonly SpectatorGrant[] }> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/spectator-grants`,
+    signal === undefined ? undefined : { signal },
+  );
+}
+
 export type HostCommandResponse = CommandFailure | HostCommandSuccess;
 
 export function sendHostCommand(
