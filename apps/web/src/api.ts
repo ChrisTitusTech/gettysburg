@@ -13,6 +13,7 @@ export class ApiResponseError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "ApiResponseError";
@@ -117,6 +118,11 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
     body = undefined;
   }
   if (!response.ok) {
+    const retryHeader = response.headers.get("Retry-After");
+    const retrySeconds =
+      retryHeader !== null && /^\d+$/.test(retryHeader)
+        ? Number(retryHeader)
+        : undefined;
     throw new ApiResponseError(
       body?.message ??
         body?.error ??
@@ -125,6 +131,11 @@ async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
           : text.trim().slice(0, 200)),
       response.status,
       body?.error,
+      retrySeconds !== undefined &&
+        Number.isSafeInteger(retrySeconds) &&
+        retrySeconds <= 86_400
+        ? retrySeconds
+        : undefined,
     );
   }
   if (

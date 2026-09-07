@@ -9,7 +9,7 @@ import userEvent from "@testing-library/user-event";
 import { createMandatoryInitialState } from "@gettysburg/content";
 import { describe, expect, it, vi } from "vitest";
 import { ReplayViewer } from "./ReplayViewer";
-import type { ReplayResponse } from "./api";
+import { ApiResponseError, type ReplayResponse } from "./api";
 
 const gameId = "11111111-1111-4111-8111-111111111111";
 function snapshot(sequence: number): ReplayResponse {
@@ -25,6 +25,128 @@ function snapshot(sequence: number): ReplayResponse {
 }
 
 describe("read-only replay viewer", () => {
+  it("retains the board, zoom, and selected counter while an adjacent event loads", async () => {
+    const user = userEvent.setup();
+    let finish!: (value: ReplayResponse) => void;
+    const pending = new Promise<ReplayResponse>((resolve) => {
+      finish = resolve;
+    });
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot(0))
+      .mockReturnValueOnce(pending);
+    const view = render(
+      <ReplayViewer gameId={gameId} latestSequence={2} load={load} />,
+    );
+    await screen.findByText(/Viewing event 0 of 2/);
+    await user.click(
+      screen.getByRole("button", { name: /Wadsworth, D3, selectable/ }),
+    );
+    await user.click(screen.getByRole("button", { name: "Zoom in" }));
+    const board = view.container.querySelector(".board-svg");
+    const viewport = board?.getAttribute("viewBox");
+    await user.click(screen.getByRole("button", { name: "Next event" }));
+    expect(screen.getByText(/Still showing event 0/)).toBeVisible();
+    expect(view.container.querySelector(".board-svg")).toBe(board);
+    const next = snapshot(1);
+    await act(async () =>
+      finish({
+        ...next,
+        state: {
+          ...next.state,
+          units: {
+            ...next.state.units,
+            "u-wadsworth": {
+              ...next.state.units["u-wadsworth"]!,
+              location: "E4",
+            },
+          },
+        },
+      }),
+    );
+    await screen.findByText(/Viewing event 1 of 2/);
+    expect(view.container.querySelector(".board-svg")).toBe(board);
+    expect(board?.getAttribute("viewBox")).toBe(viewport);
+    expect(
+      screen.getByRole("button", { name: /Wadsworth, E4, selectable/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it.each([5, undefined])(
+    "pauses navigation for a 429 retry window (%s seconds)",
+    async (seconds) => {
+      vi.useFakeTimers();
+      try {
+        const load = vi
+          .fn()
+          .mockResolvedValueOnce(snapshot(0))
+          .mockRejectedValueOnce(
+            new ApiResponseError(
+              "limited",
+              429,
+              "replay_rate_limited",
+              seconds,
+            ),
+          )
+          .mockResolvedValueOnce(snapshot(1));
+        render(<ReplayViewer gameId={gameId} latestSequence={2} load={load} />);
+        await act(async () => {});
+        await act(async () =>
+          fireEvent.click(screen.getByRole("button", { name: "Next event" })),
+        );
+        expect(screen.getByRole("alert")).toHaveTextContent(
+          `Try again in ${seconds ?? 60} seconds`,
+        );
+        expect(screen.getByText(/Viewing event 0 of 2/)).toBeVisible();
+        expect(
+          screen.getByLabelText(/Read-only replay board/),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Latest event" }),
+        ).toBeDisabled();
+        fireEvent.submit(
+          screen.getByLabelText("Event number").closest("form")!,
+        );
+        expect(load).toHaveBeenCalledTimes(2);
+        await act(async () =>
+          vi.advanceTimersByTimeAsync((seconds ?? 60) * 1_000 - 1),
+        );
+        expect(
+          screen.getByRole("button", { name: "Next event" }),
+        ).toBeDisabled();
+        await act(async () => vi.advanceTimersByTimeAsync(1));
+        expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+        expect(
+          screen.getByRole("button", { name: "Next event" }),
+        ).toBeEnabled();
+        expect(load).toHaveBeenCalledTimes(2);
+        await act(async () =>
+          fireEvent.click(screen.getByRole("button", { name: "Next event" })),
+        );
+        expect(screen.getByText(/Viewing event 1 of 2/)).toBeVisible();
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("does not retain another game's board while its first read is pending", async () => {
+    const load = vi
+      .fn()
+      .mockResolvedValueOnce(snapshot(0))
+      .mockReturnValueOnce(new Promise(() => {}));
+    const view = render(
+      <ReplayViewer gameId={gameId} latestSequence={2} load={load} />,
+    );
+    await screen.findByText(/Viewing event 0 of 2/);
+    view.rerender(
+      <ReplayViewer gameId="another-game" latestSequence={0} load={load} />,
+    );
+    expect(
+      screen.queryByLabelText(/Read-only replay board/),
+    ).not.toBeInTheDocument();
+  });
+
   it("navigates opening, next, previous, explicit cursor, and latest", async () => {
     const user = userEvent.setup();
     const load = vi.fn(async (_gameId: string, sequence?: number) =>

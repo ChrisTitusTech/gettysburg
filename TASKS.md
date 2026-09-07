@@ -495,6 +495,30 @@ validation remain separate gates.
   - Gate: ChrisTitusTech owns focused component/API regressions and real
     desktop/tablet rendered checks, including the entire replay container.
     Independent review and exact-head CI remain required before repair merge.
+  - Implementation: Keep the same read-only board during pending and successful
+    adjacent-event loads; clear it on authorization/history failure or a game
+    change. A 429 preserves the verified view and pauses navigation until the
+    bounded numeric Retry-After interval expires, without auto-retrying.
+    Management/audit callbacks share accepted-cursor updates separate from
+    gameplay state. Replay controls have their own single-column layout.
+  - Validation: Nine new component/API cases pass (105 client tests), including
+    selection/zoom continuity, other-game isolation, throttled form submission,
+    timer expiry, and header parsing. The first focused typecheck caught a
+    readonly test-fixture assignment; the fixture now constructs a new state
+    and typecheck passes. Desktop/tablet real-browser checks pass in
+    `test-results/replay-viewer-context`: pan/selection continuity, full-width
+    layout with a normal-height return button, and host-only invitation
+    issue/revoke updates reaching a seated replay viewer at unchanged gameplay
+    version. Both entire replay-control renders were inspected. Full local,
+    database, extended-game/fixture, and fresh review gates now pass: 549
+    workspace plus six harness tests, all 167 PostgreSQL server tests, and
+    `test-results/replay-viewer-context-final` plus
+    `test-results/replay-viewer-context-final-fixtures`. Both extended games
+    reached turn 24 and covered loss, retreat, and advance choices. An initial
+    format check flagged the new API test; formatting was corrected and the
+    complete gate rerun passed. Fresh independent review found no actionable
+    regressions and reran 105 client tests; it did not rerun the browser suites
+    covered above. Exact-head CI and thread resolution remain before merge.
 - [ ] Strengthen the full-game browser acceptance beyond no-contact turns.
   - Scope: Use two actual browser sessions and visible keyboard/touch controls
     to play the pinned opening into two independent live combats, reload both

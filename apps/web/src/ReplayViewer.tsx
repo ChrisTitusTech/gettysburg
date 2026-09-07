@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getReplay, type ReplayResponse } from "./api";
+import { ApiResponseError, getReplay, type ReplayResponse } from "./api";
 import { Board } from "./Board";
 
 export function ReplayViewer({
@@ -15,14 +15,20 @@ export function ReplayViewer({
     sequence: number | undefined;
     revision: number;
   }>({ sequence: 0, revision: 0 });
-  const [snapshot, setSnapshot] = useState<ReplayResponse | null>(null);
+  const [loaded, setSnapshot] = useState<ReplayResponse | null>(null);
+  const snapshot = loaded?.state.game_id === gameId ? loaded : null;
   const [draft, setDraft] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [retrySeconds, setRetrySeconds] = useState<number | null>(null);
+  useEffect(() => {
+    if (retrySeconds === null) return;
+    const timer = setTimeout(() => setRetrySeconds(null), retrySeconds * 1_000);
+    return () => clearTimeout(timer);
+  }, [retrySeconds]);
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setSnapshot(null);
     setError(null);
     void load(gameId, request.sequence, controller.signal)
       .then((result) => {
@@ -37,11 +43,16 @@ export function ReplayViewer({
         setSnapshot(result);
         setDraft(String(result.sequence));
       })
-      .catch(() => {
-        if (!controller.signal.aborted)
+      .catch((failure: unknown) => {
+        if (controller.signal.aborted) return;
+        if (failure instanceof ApiResponseError && failure.status === 429) {
+          setRetrySeconds(failure.retryAfterSeconds ?? 60);
+        } else {
+          setSnapshot(null);
           setError(
             "Replay is unavailable. Your access may have changed, or this history could not be verified.",
           );
+        }
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -49,8 +60,11 @@ export function ReplayViewer({
     return () => controller.abort();
   }, [gameId, request, load]);
   const latest = Math.max(latestSequence, snapshot?.latest_sequence ?? 0);
-  const seek = (sequence: number | undefined) =>
-    setRequest((current) => ({ sequence, revision: current.revision + 1 }));
+  const blocked = loading || retrySeconds !== null;
+  const seek = (sequence: number | undefined) => {
+    if (!blocked)
+      setRequest((current) => ({ sequence, revision: current.revision + 1 }));
+  };
   return (
     <section className="replay-viewer" aria-label="Read-only game replay">
       <h2>Replay (read-only)</h2>
@@ -60,30 +74,31 @@ export function ReplayViewer({
       </p>
       <div className="zoom-controls" aria-label="Replay navigation">
         <button
-          disabled={loading || snapshot?.sequence === 0}
+          disabled={blocked || snapshot?.sequence === 0}
           onClick={() => seek(0)}
         >
           Opening
         </button>
         <button
-          disabled={loading || !snapshot || snapshot.sequence === 0}
+          disabled={blocked || !snapshot || snapshot.sequence === 0}
           onClick={() => seek(snapshot!.sequence - 1)}
         >
           Previous event
         </button>
         <button
-          disabled={loading || !snapshot || snapshot.sequence >= latest}
+          disabled={blocked || !snapshot || snapshot.sequence >= latest}
           onClick={() => seek(snapshot!.sequence + 1)}
         >
           Next event
         </button>
-        <button disabled={loading} onClick={() => seek(undefined)}>
+        <button disabled={blocked} onClick={() => seek(undefined)}>
           Latest event
         </button>
       </div>
       <form
         onSubmit={(event) => {
           event.preventDefault();
+          if (blocked) return;
           const sequence = Number(draft);
           if (
             !/^(0|[1-9][0-9]*)$/.test(draft) ||
@@ -100,6 +115,7 @@ export function ReplayViewer({
           Event number{" "}
           <input
             type="number"
+            disabled={blocked}
             min="0"
             max={latest}
             step="1"
@@ -107,18 +123,24 @@ export function ReplayViewer({
             onChange={(event) => setDraft(event.target.value)}
           />
         </label>
-        <button disabled={loading} type="submit">
+        <button disabled={blocked} type="submit">
           Go to event
         </button>
       </form>
       <p role="status">
         {loading
-          ? "Loading verified replay..."
+          ? `Loading verified replay...${snapshot ? ` Still showing event ${snapshot.sequence}.` : ""}`
           : snapshot
             ? `Viewing event ${snapshot.sequence} of ${latest}. Turn ${snapshot.state.turn}, ${snapshot.state.phase}, state v${snapshot.state.version}.`
             : "No replay snapshot displayed."}
       </p>
       {error ? <p role="alert">{error}</p> : null}
+      {retrySeconds === null ? null : (
+        <p role="alert">
+          Replay navigation is rate-limited. Try again in {retrySeconds}{" "}
+          seconds.
+        </p>
+      )}
       {snapshot ? (
         <>
           <p>
@@ -127,7 +149,7 @@ export function ReplayViewer({
             {snapshot.state.victory.status}.
           </p>
           <Board
-            key={`${gameId}:${snapshot.sequence}`}
+            key={gameId}
             readOnly
             seat="union"
             state={snapshot.state}
