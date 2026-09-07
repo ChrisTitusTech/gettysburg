@@ -2010,6 +2010,27 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+Explicit browser consent UI is the next increment: active mandatory-game seats
+can inspect settings, enable notifications with a direct user gesture, refresh,
+or remove only their seat's consent. No automatic permission prompt, service
+worker registration, or native subscription occurs on page load. A matching
+origin subscription is reused across games; opt-out does not unsubscribe other
+games, and a changed VAPID key requires explicit browser-settings reset. Pending
+native work is abandoned on disconnect/unmount, and raw endpoint errors are
+not displayed. Eleven new focused tests plus all 157 web tests, lint, and
+typecheck pass after correcting exact-optional signal typing. The desktop/tablet
+fixture controls native provider APIs but uses real protected consent routes,
+opposing sessions, reload, opt-out, and surrender. Full gates, rendered review,
+independent review, and exact-head CI follow. Real provider/device acceptance,
+iOS Home Screen installability, key backup/restore, and release approval remain.
+The first browser consent read-back used the API request jar, which did not
+send the loopback Secure session cookie; perform the independent read-back
+through each actual browser's same-origin fetch instead. The surrender fixture
+also now waits for the application's real return-to-lobby URL. Full local gates
+pass 750 workspace/nine harness tests; independent review is clean (157 web
+tests). The build reports a 502.81 kB initial chunk (149.02 kB gzip); record this
+performance follow-up rather than raising the warning threshold.
+
 The next browser increment supplies a notification-only service worker without
 registering it in the product yet. Generic messages, strict payload validation,
 same-origin click destinations, serial processing, and stable notification tags
