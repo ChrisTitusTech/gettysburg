@@ -19,6 +19,17 @@ Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
 below. No phase is completed merely by passing the automated game script.
 
+CI evidence correction: hosted review of the alternate-browser workflow found
+that default pull-request checkout uses GitHub's synthetic merge commit. Earlier
+Application results were associated with the listed PR head, but did not prove
+that exact checkout. Pin Application checkout to the PR head SHA (or push SHA),
+as Documentation already does, and rerun before merging the accessibility
+increment. The browser workflow receives the same correction separately.
+Historical evidence is retained, not reclassified as an exact-head execution.
+No Phase 3/4 or new VPS/release completion is inferred from those earlier runs.
+The workflow-only repair passes the full local gate (753 workspace/22 harness
+tests) and fresh independent review; application/browser code is unchanged.
+
 Status-reconciliation validation: documentation and one stale code comment only;
 no rule, runtime, schema, terrain, or deployment changes. Frozen installation,
 format, lint, typecheck, 584 workspace/nine harness tests, build, smoke, and
