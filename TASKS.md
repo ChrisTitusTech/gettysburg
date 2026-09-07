@@ -2010,6 +2010,19 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+PR #50 review follow-up isolates failed lazy notification imports behind a
+small error boundary so optional controls cannot unmount gameplay. The
+synthetic consent fixture now skips before browser mutation when provider
+delivery is enabled, while unavailable/malformed configuration fails closed.
+Two boundary tests and three harness regression tests cover these cases.
+Full local gates pass 752 workspace/12 harness tests; independent review is
+clean and reran 159 web/three focused harness tests. Both desktop/tablet consent,
+24-turn games, reload, replay, spectator, and input workflows pass in
+`test-results/push-consent-review` and its `-fixtures` directory. Tablet covers
+all three combat choices and desktop loss/advance. The remaining initial-chunk
+warning is 500.78 kB (148.56 kB gzip), not suppressed. Exact-head CI and actual
+provider/device acceptance remain required; no real subscription was enrolled.
+
 Explicit browser consent UI is the next increment: active mandatory-game seats
 can inspect settings, enable notifications with a direct user gesture, refresh,
 or remove only their seat's consent. No automatic permission prompt, service

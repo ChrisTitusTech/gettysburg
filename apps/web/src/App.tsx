@@ -37,6 +37,7 @@ import {
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
+import { NotificationBoundary } from "./NotificationBoundary";
 import { ReplayViewer } from "./ReplayViewer";
 import { SpectatorHostControls } from "./SpectatorHostControls";
 import { createSerialOperations } from "./serial-operations";
@@ -837,14 +838,16 @@ export function App({
       connectionStatus === "connected" &&
       activeGame.state.ruleset_version === MANDATORY_RULESET_VERSION &&
       activeGame.state.phase !== "completed" ? (
-        <Suspense
-          fallback={<p role="status">Loading notification controls...</p>}
-        >
-          <PushControls
-            key={`${activeGame.game_id}:${activeGame.seat}`}
-            gameId={activeGame.game_id}
-          />
-        </Suspense>
+        <NotificationBoundary>
+          <Suspense
+            fallback={<p role="status">Loading notification controls...</p>}
+          >
+            <PushControls
+              key={`${activeGame.game_id}:${activeGame.seat}`}
+              gameId={activeGame.game_id}
+            />
+          </Suspense>
+        </NotificationBoundary>
       ) : null}
 
       {activeGame.invitationUrl === undefined &&

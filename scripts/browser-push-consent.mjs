@@ -6,9 +6,17 @@ import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 // Browser permission/provider APIs are controlled; consent routes and seat
 // authorization are real. Run only with delivery disabled, never real providers.
 export async function checkPushConsent(browser, origin, evidence, options) {
-  const config = await fetch(`${origin}/api/push-config`).then((response) =>
-    response.json(),
-  );
+  const response = await fetch(`${origin}/api/push-config`, {
+    signal: AbortSignal.timeout(15_000),
+  });
+  assert.equal(response.status, 200, "Push configuration must be available");
+  const config = await response.json();
+  if (config.enabled === true) {
+    console.log(
+      "Synthetic push consent skipped: provider delivery is enabled; real provider/device acceptance remains required",
+    );
+    return;
+  }
   assert.equal(
     config.enabled,
     false,
