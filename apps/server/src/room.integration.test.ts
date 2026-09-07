@@ -3,7 +3,8 @@ import { createServer, type AddressInfo } from "node:net";
 
 import {
   Client as ColyseusClient,
-  type Room as ClientRoom,
+  Room as ClientRoom,
+  Protocol,
 } from "@colyseus/sdk";
 import { matchMaker } from "@colyseus/core";
 import {
@@ -82,6 +83,93 @@ describe("Colyseus authoritative room", () => {
       server = undefined;
     }
   });
+
+  it.each(["expiry", "revocation", "timeout", "disconnect"])(
+    "does not buffer observer state across delayed acknowledgement and %s",
+    async (cause) => {
+      let now = Date.now();
+      const memory = new InMemoryGameService({ now: () => now });
+      const host = memory.createGame("union");
+      const hostAuth = memory.authenticateHost(host.credential, host.gameId);
+      const command = {
+        command_id: randomUUID(),
+        command_name: "issueSpectatorInvitation",
+        payload: {},
+        expected_version: 0,
+        game_id: host.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+      };
+      const issued = memory.executeHostCommand(hostAuth, command);
+      if (!issued.ok || !issued.invitation)
+        throw new Error("Missing invitation");
+      const observer = memory.claimSpectatorInvitation({
+        lookupId: issued.invitation.lookup_id,
+        secret: issued.invitation.secret,
+        claimId: randomUUID(),
+      });
+      const service = new InMemoryAsyncGameService(memory);
+      const read = vi.spyOn(service, "deliverAuthorizedState");
+      const port = await reservePort();
+      const origin = `http://127.0.0.1:${port}`;
+      server = createGettysburgServer({
+        gameService: service,
+        readiness: { isReady: () => true },
+        trustedWebSocketOrigin: origin,
+      });
+      await server.listen(port, "127.0.0.1");
+      let acknowledge: (() => void) | undefined;
+      const connect = ClientRoom.prototype.connect;
+      vi.spyOn(ClientRoom.prototype, "connect").mockImplementationOnce(
+        function (this: ClientRoom, ...args) {
+          connect.apply(this, args);
+          const send = this.connection.send.bind(this.connection);
+          vi.spyOn(this.connection, "send").mockImplementation((data) => {
+            if (data.length === 1 && data[0] === Protocol.JOIN_ROOM) {
+              const copy = data.slice();
+              acknowledge = () => send(copy);
+            } else send(data);
+          });
+        },
+      );
+      const room = await new ColyseusClient(origin, {
+        headers: {
+          origin,
+          cookie: `__Host-gettysburg-session=${observer.credential}`,
+        },
+      }).joinOrCreate("game", { gameId: host.gameId, spectator: true });
+      room.reconnection.enabled = false;
+      rooms.push(room);
+      const received = vi.fn();
+      room.onMessage("snapshot", received);
+      const closed = new Promise<number>((resolve) => room.onLeave(resolve));
+      expect(acknowledge).toBeDefined();
+      expect(read).not.toHaveBeenCalled();
+      if (cause === "timeout" || cause === "disconnect") {
+        if (cause === "disconnect") await room.leave(true);
+        const code = await closed;
+        if (cause === "timeout") expect(code).toBe(4002);
+        rooms.splice(rooms.indexOf(room), 1);
+        expect(read).not.toHaveBeenCalled();
+        expect(received).not.toHaveBeenCalled();
+        return;
+      }
+      if (cause === "expiry") now += 31 * 24 * 60 * 60 * 1_000;
+      else
+        expect(
+          memory.executeHostCommand(hostAuth, {
+            ...command,
+            command_id: randomUUID(),
+            command_name: "revokeSpectatorAccess",
+            payload: { lookup_id: issued.invitation.lookup_id },
+          }).ok,
+        ).toBe(true); // Deliberately omit the event-bus revocation notification.
+      acknowledge!();
+      expect(await closed).toBe(4001);
+      rooms.splice(rooms.indexOf(room), 1);
+      expect(read).toHaveBeenCalledOnce();
+      expect(received).not.toHaveBeenCalled();
+    },
+  );
 
   it("cancels an abandoned initial read before Colyseus invokes onLeave", async () => {
     const service = new InMemoryAsyncGameService();
@@ -267,8 +355,9 @@ describe("Colyseus authoritative room", () => {
     });
     const port = await reservePort();
     const origin = `http://127.0.0.1:${port}`;
+    const asyncService = new InMemoryAsyncGameService(service);
     server = createGettysburgServer({
-      gameService: new InMemoryAsyncGameService(service),
+      gameService: asyncService,
       readiness: { isReady: () => true },
       trustedWebSocketOrigin: origin,
     });
@@ -346,8 +435,41 @@ describe("Colyseus authoritative room", () => {
       nextMessage<GameState>(room, "snapshot", (state) => state.version === 1),
     );
     const firstCommand = nextMessage<CommandResult>(hostRoom, "commandResult");
-    hostRoom.send("endPhase", hostCommand("endPhase"));
-    expect(await firstCommand).toMatchObject({ ok: true });
+    const order: string[] = [];
+    const stopSnapshot = hostRoom.onMessage<GameState>("snapshot", (state) => {
+      if (state.version === 1) order.push("snapshot");
+    });
+    const stopResult = hostRoom.onMessage<CommandResult>(
+      "commandResult",
+      (result) => {
+        if (result.ok) order.push("result");
+      },
+    );
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const authorize =
+      asyncService.deliverAuthorizedSpectators.bind(asyncService);
+    const held = vi
+      .spyOn(asyncService, "deliverAuthorizedSpectators")
+      .mockImplementationOnce(async (...args) => {
+        await barrier;
+        return authorize(...args);
+      });
+    try {
+      hostRoom.send("endPhase", hostCommand("endPhase"));
+      await vi.waitFor(() => expect(held).toHaveBeenCalledOnce());
+      expect(order).toEqual([]);
+      release();
+      expect(await firstCommand).toMatchObject({ ok: true });
+      expect(order).toEqual(["snapshot", "result"]);
+    } finally {
+      release();
+      held.mockRestore();
+      stopSnapshot();
+      stopResult();
+    }
     const synchronized = await Promise.all(snapshots);
     for (const state of synchronized)
       expect(state).toEqual(service.getGameState(host.gameId));

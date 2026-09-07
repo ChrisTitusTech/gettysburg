@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
-import { Client as PgClient, Pool } from "pg";
+import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
@@ -64,6 +64,59 @@ postgres("PostgreSQL durability", () => {
 
   afterAll(async () => {
     await administration.end();
+  });
+
+  it("bounds queued delivery checkouts without consuming the ordinary pool", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const pools = new Set<Pool>();
+    const original = Pool.prototype.connect;
+    const capture = vi
+      .spyOn(Pool.prototype, "connect")
+      .mockImplementation(function (this: Pool, ...args: unknown[]) {
+        pools.add(this);
+        return Reflect.apply(original, this, args);
+      } as Pool["connect"]);
+    const clients: PoolClient[] = [];
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      await service.verifyRoomGame(host.gameId, new AbortController().signal);
+      capture.mockRestore();
+      const deliveryPool = [...pools].find((pool) => pool.options.max === 2);
+      const ordinaryPool = [...pools].find((pool) => pool.options.max === 10);
+      expect(deliveryPool).toBeDefined();
+      expect(ordinaryPool?.options.connectionTimeoutMillis).toBeUndefined();
+      clients.push(
+        await deliveryPool!.connect(),
+        await deliveryPool!.connect(),
+      );
+      const controllers = Array.from(
+        { length: 3 },
+        () => new AbortController(),
+      );
+      const pending = controllers.map((controller) =>
+        service
+          .verifyRoomGame(host.gameId, controller.signal)
+          .catch((error: unknown) => error),
+      );
+      expect(deliveryPool!.waitingCount).toBe(3);
+      controllers.forEach((controller) => controller.abort());
+      // Ordinary reads and writes remain available even with every delivery
+      // connection held and cancelled callers awaiting checkout expiry.
+      expect((await service.getGameState(host.gameId)).version).toBe(0);
+      await service.createGame("confederate");
+      for (const result of await Promise.all(pending))
+        expect(result).toBeInstanceOf(Error);
+      expect(deliveryPool!.waitingCount).toBe(0);
+      expect(deliveryPool!.totalCount).toBe(2);
+    } finally {
+      capture.mockRestore();
+      for (const client of clients) client.release();
+      await service.close();
+    }
   });
 
   it.each([

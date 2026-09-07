@@ -1600,6 +1600,48 @@ validation remain separate gates.
     `test-results/spectator-room-create-cancellation` and its `-fixtures`
     directory. Publish the repair, resolve both hosted threads, and verify
     exact-head CI before merge.
+  - Transport head `920fcf6` passed Application `34101969268` and Documentation
+    `34101969314`, but the final premerge thread check found queued delivery
+    checkouts could outlive cancellation and command success preceded the
+    delayed snapshot. Merge remains blocked. The repair isolates delivery
+    reads in a two-connection pool with a two-second checkout timeout and sends
+    successful committed results after the broadcast. Regression coverage
+    holds every delivery connection while cancelled queued reads expire and
+    ordinary operations succeed, and holds spectator authorization while
+    checking snapshot-before-success ordering over a real socket. Full local,
+    database, browser, fresh review, and exact-head CI evidence is pending.
+    Repair validation now passes the full local gate (596 workspace/nine
+    harness tests), all 215 PostgreSQL tests, and fresh independent review
+    (195 server tests; its database skips are covered separately). Both desktop
+    and tablet completed 24 turns, all three combat choices, pending-result
+    reload, and exact replay in `test-results/spectator-delivery-isolation`.
+    An initial test typing error used an overloaded connect return type;
+    explicit PoolClient typing fixed it before the passing gates. Input
+    fixtures also pass in `test-results/spectator-delivery-isolation-fixtures`.
+    Publish the repair, resolve the two findings, and verify exact-head CI and
+    final threads before merge.
+  - Fresh integration reviews found Colyseus queues onJoin snapshots until
+    JOIN_ROOM acknowledgement, allowing a delayed handshake to outlive the
+    authorization check. This blocks transport and dependent UI merges even
+    if prior exact-head CI passes. The repair leaves the observer cutoff at
+    Infinity until transport JOINED, waits with cancellation/deadline outside
+    the room queue, then reauthorizes before the actual send under the read
+    lock. Real SDK tests withhold acknowledgements across session expiry and
+    revocation without an event-bus notification and require no snapshot.
+    An existing observer mock needed explicit JOINED state and an asynchronous
+    initial-snapshot wait. Repeat full, database, browser, independent-review,
+    and exact-head CI gates before publishing/merging this repair.
+    The repair passes the complete local gate (600 workspace/nine harness
+    tests), all 219 PostgreSQL tests, and fresh independent review (199 server
+    tests; database skips covered separately). Added real-socket timeout and
+    disconnect coverage also proves no initial read occurs for an abandoned
+    handshake. Desktop/tablet full games cover all three choices at both widths,
+    pending-result reload, exact replay, and input fixtures in
+    `test-results/spectator-handshake-authorization` and its `-fixtures`
+    directory. Prior head `8078ad4` passed Application `34104207637` and
+    Documentation `34104207648`, but is not merge-ready due to this repaired
+    local-review finding. Publish this fix and verify fresh exact-head CI and
+    final hosted threads before merge. CodeRabbit limits remain skipped.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host
