@@ -62,6 +62,97 @@ function fixture() {
 }
 
 describe("deterministic mandatory action replay", () => {
+  it("validates complete management payloads, hashes, and accepted events", () => {
+    const f = fixture();
+    f.act("confederate", "surrenderSeat");
+    const host = f.service.authenticateHost(
+      f.created.credential,
+      f.created.gameId,
+    );
+    const issue = f.service.executeHostCommand(host, {
+      command_id: randomUUID(),
+      command_name: "issueInvitation",
+      payload: { seat: "confederate" },
+      schema: COMMAND_SCHEMA_VERSION,
+      game_id: f.created.gameId,
+      expected_version: f.state().version,
+    });
+    if (!issue.ok || !issue.invitation) throw new Error("Missing invitation");
+    expect(
+      f.service.executeHostCommand(host, {
+        command_id: randomUUID(),
+        command_name: "revokeInvitation",
+        payload: { lookup_id: issue.invitation.lookup_id },
+        schema: COMMAND_SCHEMA_VERSION,
+        game_id: f.created.gameId,
+        expected_version: f.state().version,
+      }).ok,
+    ).toBe(true);
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    for (const patch of [
+      { commandName: "deleteGame" },
+      { payload: null },
+      { canonicalRequestHash: "bad hash" },
+      { result: null },
+      {
+        result: {
+          ok: true,
+          event: { ...issue.event, summary: "Game deleted" },
+        },
+      },
+    ]) {
+      const corrupt = structuredClone(actions);
+      Object.assign(corrupt[1]!, patch);
+      expect(() => f.replay(corrupt)).toThrow(/management/);
+    }
+  });
+
+  it("requires usable fixed-version operator audit attribution", () => {
+    const f = fixture();
+    const grant = f.service.issueSeatRecovery(
+      f.created.gameId,
+      "union",
+      "test operator",
+    );
+    f.service.claimSeatRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    });
+    const action = f.service.getActions(f.created.gameId)[0]!;
+    for (const patch of [
+      { authorizingId: "  " },
+      { authorizingVersion: 2 },
+      { payload: {} },
+      { result: {} },
+    ])
+      expect(() => f.replay([{ ...action, ...patch } as StoredAction])).toThrow(
+        /invalid audit metadata/,
+      );
+  });
+
+  it("fails closed when deletion has deliberately removed historical bindings", () => {
+    const f = fixture();
+    f.act("union", "endPhase");
+    expect(
+      f.service.executeHostCommand(
+        f.service.authenticateHost(f.created.credential, f.created.gameId),
+        {
+          command_id: randomUUID(),
+          command_name: "deleteGame",
+          payload: { confirm: true },
+          schema: COMMAND_SCHEMA_VERSION,
+          game_id: f.created.gameId,
+          expected_version: f.state().version,
+        },
+      ).ok,
+    ).toBe(true);
+    expect(f.service.exportSnapshot().seatBindings).toHaveLength(0);
+    expect(() => f.replay()).toThrow(
+      /missing or ambiguous historical seat binding/,
+    );
+  });
+
   it("enforces persisted activation and retirement boundaries across recovery", () => {
     const f = fixture();
     f.act("union", "moveUnit", { unit_id: "u-devin", destination: "P7" });
@@ -210,6 +301,9 @@ describe("deterministic mandatory action replay", () => {
     const replay = (input: readonly StoredAction[]) =>
       replayMandatoryActions(f.created.gameId, input, bindings);
     expect(replay(actions).event_sequence).toBe(1);
+    expect(() =>
+      replay([{ ...actions[0]!, commandName: "issueInvitation" }]),
+    ).toThrow(/invalid management metadata/);
     expect(() => replay([{ ...actions[0]!, commandId: "invalid" }])).toThrow(
       /invalid management metadata/,
     );
@@ -345,15 +439,9 @@ describe("deterministic mandatory action replay", () => {
     ).toMatchObject({ ok: true });
     f.act("union", "endPhase");
     expect(f.state()).toMatchObject({ event_sequence: 6, version: 4 });
-    const redacted = f.service
-      .getActions(f.created.gameId)
-      .map((action) =>
-        action.kind === "gameplay"
-          ? action
-          : { ...action, payload: null, result: null },
-      );
-    expect(f.replay(redacted)).toEqual(f.state());
-    expect(JSON.stringify(f.replay(redacted))).not.toContain(recovery.secret);
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    expect(JSON.stringify(f.replay(actions))).not.toContain(recovery.secret);
   });
 
   it("matches multiple skirmishes to dice even when jsonb reverses combat keys", () => {

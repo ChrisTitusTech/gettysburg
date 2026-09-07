@@ -493,14 +493,14 @@ validation remain separate gates.
     replacement dice or use recorded resulting states as replay starting points.
     Authorized server/API integration, replay UI, retained-version behavior,
     and the full rules-enforced acceptance game remain open.
-  - Validation: Twenty-three cases cover all 47 no-contact phase transitions across
+  - Validation: Twenty-six cases cover all 47 no-contact phase transitions across
     24 turns, paid continuation and prefixes, recorded dice, two independent
     skirmishes with reordered keys, input isolation, recovered historical seats,
-    surrendered seats, redacted management/audit records, corrupted state,
+    surrendered seats, private management/audit records, corrupted state,
     malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
     The no-contact test is not a representative owner-adjudicated acceptance game.
-    Frozen install, format, lint, typecheck, 503 default tests plus six harness
-    tests, build, smoke, Markdown lint, and all 138 PostgreSQL tests pass.
+    Frozen install, format, lint, typecheck, 506 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 141 PostgreSQL tests pass.
     Two-session desktop/tablet and 24-turn regression pass
     (`test-results/mandatory-replay-chronology`); mandatory browser fixtures pass
     (`test-results/mandatory-replay-chronology-fixtures`). Independent built-in
@@ -528,6 +528,17 @@ validation remain separate gates.
     and missing-metadata cases cover the repairs. Combined local, database, and
     browser gates pass. Fresh independent built-in repair review found no
     actionable defects; exact-head CI remains pre-merge.
+    A fourth hosted pass led to full host-command schema/hash/event validation
+    and fixed-version, nonblank operator attribution checks. Redacted host
+    records are now rejected rather than certified; validation never executes or
+    exposes their contents. The request to preserve deleted-game seat bindings
+    was declined against the deletion policy: deleted games are inaccessible,
+    the API denies them, and this helper must fail closed without its required
+    historical inputs. A regression proves that intentional missing-input
+    failure; no deletion/retention behavior was weakened. The full local and
+    database gates pass again. Browser evidence above is unchanged by these
+    verifier-only repairs. Fresh independent built-in review found no actionable
+    defects; exact-head CI remains pre-merge.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,
