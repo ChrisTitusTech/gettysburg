@@ -95,6 +95,9 @@ export interface Invitation {
 }
 
 export interface RecoveryGrant {
+  auditSequence?: number;
+  operatorRequestId?: string;
+  newBindingId?: string;
   claimId?: string;
   consumedAt: number | null;
   readonly expiresAt: number;
@@ -2044,6 +2047,9 @@ export class InMemoryGameService {
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#seatBindings.at(-1)!.id;
     options.afterCommit?.(event);
 
     return {
@@ -2187,6 +2193,9 @@ export class InMemoryGameService {
       grant.gameId,
       grant.operatorIdentity,
     );
+    grant.auditSequence = event.event_sequence;
+    grant.operatorRequestId = event.command_id;
+    grant.newBindingId = this.#hostBindings.at(-1)!.id;
     options.afterCommit?.(event);
     return { ...session, gameId: grant.gameId };
   }

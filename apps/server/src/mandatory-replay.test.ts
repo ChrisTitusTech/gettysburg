@@ -64,6 +64,9 @@ function fixture() {
       undefined,
       {
         hosts: service.exportSnapshot().hostBindings,
+        recoveries: service
+          .exportSnapshot()
+          .recoveryGrants.map(([, grant]) => grant),
         invitations: service
           .exportSnapshot()
           .invitations.map(([, invitation]) => invitation),
@@ -107,6 +110,24 @@ describe("deterministic mandatory action replay", () => {
       summary: "union invitation revoked",
     });
     expect(() => f.replay(wrongSide)).toThrow(/invalid management event/);
+    const wrongIssue = structuredClone(actions);
+    const reissued = {
+      command_id: wrongIssue[1]!.commandId!,
+      command_name: "issueInvitation",
+      payload: { seat: "union" },
+      schema: COMMAND_SCHEMA_VERSION,
+      game_id: f.created.gameId,
+      expected_version: f.state().version,
+    } as const;
+    if (!wrongIssue[1]!.result?.ok) throw new Error("Missing issue result");
+    Object.assign(wrongIssue[1]!, {
+      payload: reissued.payload,
+      canonicalRequestHash: canonicalHostManagementCommandHash(reissued),
+    });
+    Object.assign(wrongIssue[1]!.result.event, {
+      summary: "union invitation issued",
+    });
+    expect(() => f.replay(wrongIssue)).toThrow(/issued invitation evidence/);
     const unavailable = structuredClone(actions);
     const retargeted = {
       command_id: unavailable[2]!.commandId!,
@@ -145,7 +166,11 @@ describe("deterministic mandatory action replay", () => {
           undefined,
           { hosts: snapshot.hostBindings, invitations: evidence },
         ),
-      ).toThrow(/invitation was not available/);
+      ).toThrow(
+        "activeAfterSequence" in patch
+          ? /issued invitation evidence/
+          : /invitation was not available/,
+      );
     }
     for (const patch of [
       { commandName: "deleteGame" },
@@ -186,6 +211,64 @@ describe("deterministic mandatory action replay", () => {
       expect(() => f.replay([{ ...action, ...patch } as StoredAction])).toThrow(
         /invalid audit metadata/,
       );
+  });
+
+  it("requires literal gameplay success and exact result envelopes", () => {
+    const f = fixture();
+    f.act("union", "endPhase");
+    for (const ok of ["true", {}, 1, false, null]) {
+      const actions = structuredClone(f.service.getActions(f.created.gameId));
+      Object.assign(actions[0]!.result!, { ok });
+      expect(() => f.replay(actions)).toThrow(/missing accepted result/);
+    }
+    const actions = structuredClone(f.service.getActions(f.created.gameId));
+    Object.assign(actions[0]!.result!, { extra: true });
+    expect(() => f.replay(actions)).toThrow(/invalid accepted result/);
+  });
+
+  it("ties recovery audit records to their consumed grants and binding rotations", () => {
+    const f = fixture();
+    const grant = f.service.issueSeatRecovery(
+      f.created.gameId,
+      "union",
+      "test operator",
+    );
+    f.service.claimSeatRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    });
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    const unrelated = fixture();
+    expect(() => unrelated.replay(actions)).toThrow(/recovery audit evidence/);
+    const snapshot = f.service.exportSnapshot();
+    const recoveries = snapshot.recoveryGrants.map(([, value]) => value);
+    for (const patch of [
+      { auditSequence: 2 },
+      { operatorIdentity: "different operator" },
+      { newBindingId: randomUUID() },
+      { consumedAt: null },
+      { revokedAt: 1 },
+      { expiresAt: 0 },
+      { oldBindingVersion: 9 },
+      { targetBindingType: "host", side: null },
+    ]) {
+      const evidence = structuredClone(recoveries);
+      Object.assign(evidence[0]!, patch);
+      expect(() =>
+        replayMandatoryActions(
+          f.created.gameId,
+          actions,
+          snapshot.seatBindings,
+          undefined,
+          {
+            hosts: snapshot.hostBindings,
+            invitations: [],
+            recoveries: evidence,
+          },
+        ),
+      ).toThrow(/recovery audit/);
+    }
   });
 
   it("resolves host actions against persisted recovery boundaries", () => {
