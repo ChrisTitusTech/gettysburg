@@ -1914,6 +1914,15 @@ loss/advance. There are no remaining CSP or image-decoding errors. The no-eval
 bundle reports 500.10 kB (148.59 kB gzip); the size warning remains visible.
 The 147 web tests, typecheck, and lint pass; final full gates, Chromium/input
 revalidation, independent review, and both alternate-engine CI jobs follow.
+Final local gates pass 740 workspace/18 harness tests after key-backup
+integration. Chromium's two full 24-turn games, real tablet touch, reload,
+exact replay, spectators, and input fixtures pass in
+`test-results/chromium-csp-safe` and its `-fixtures` directory; tablet covers all
+three combat choices and desktop loss/advance. Fresh independent review found
+no defects and reran 147 web tests. Firefox evidence above covers unchanged
+browser code. Exact-head Application, Documentation, Firefox, and WebKit CI
+must all pass before merge. No native Safari/iPad or live provider result is
+claimed; WebKit's local missing-library failure remains recorded.
 
 ### Container vulnerability closeout (release gate open)
 
