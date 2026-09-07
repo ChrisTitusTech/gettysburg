@@ -7,6 +7,7 @@ import { DeliverySlots } from "./delivery-slots.js";
 
 import {
   InMemoryGameService,
+  ServiceError,
   type ClaimResult,
   type CreateGameResult,
   type DeletionReceipt,
@@ -808,7 +809,17 @@ export class PostgresGameService implements GameService {
       operation(new InMemoryGameService({ pepper: this.#pepper, snapshot }));
       await client.query("COMMIT");
     } catch (error) {
-      discard(); // Closing the connection also rolls back any held read lock.
+      if (error instanceof ServiceError && !released && !signal.aborted) {
+        // Authorization/not-found validation does not damage a connection.
+        // Keep cancellation active while rolling back the held read lock.
+        try {
+          await client.query("ROLLBACK");
+        } catch {
+          discard();
+        }
+      } else {
+        discard(); // Closing also rolls back query failures and cancelled reads.
+      }
       throw error;
     } finally {
       signal.removeEventListener("abort", discard);
