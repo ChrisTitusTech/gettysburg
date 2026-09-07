@@ -295,15 +295,19 @@ export function createGettysburgRoom(
               message,
               { afterCommit: () => (committed = true) },
             );
-            client.send("commandResult", result);
             if (result.ok && committed) {
               await this.#broadcastAuthorized([
                 ["gameplayEvent", result.event],
                 ["snapshot", result.state],
               ]);
-              if (result.event.command_name === "surrenderSeat") {
-                client.leave(4001);
-              }
+            }
+            client.send("commandResult", result);
+            if (
+              result.ok &&
+              committed &&
+              result.event.command_name === "surrenderSeat"
+            ) {
+              client.leave(4001);
             }
           } catch (error) {
             if (error instanceof ServiceError) {

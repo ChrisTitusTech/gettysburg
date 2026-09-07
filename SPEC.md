@@ -771,6 +771,12 @@ Returning a permission result and sending later is insufficient. Initial
 snapshot delivery and room-creation existence checks use the same cancellable
 read contract. The room deadline does not impose a connection checkout timeout
 on unrelated authentication, HTTP reads, or state-changing transactions.
+Delivery reads use a separate pool of at most two connections with a two-second
+checkout timeout, so abandoned queued reads expire without consuming the
+ordinary ten-connection pool. Both pools close during service shutdown; the
+additional connections are not a measured capacity claim. Successful committed
+commands acknowledge completion only after their snapshot broadcast, keeping
+the sender's pending controls aligned with the authoritative state.
 Failed reads never fall back to
 cached spectator access and close affected observer sockets with retryable code
 4002, so a fresh join must reauthorize and load current state. These checks
