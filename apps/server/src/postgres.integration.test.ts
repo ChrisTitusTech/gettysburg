@@ -1,4 +1,4 @@
-import { randomBytes, randomUUID } from "node:crypto";
+import { createECDH, randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
@@ -65,6 +65,78 @@ postgres("PostgreSQL durability", () => {
 
   afterAll(async () => {
     await administration.end();
+  });
+
+  it("persists encrypted push consent across restart and rolls back failed opt-out", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await first.migrate();
+      const host = await first.createGame("union");
+      const key = createECDH("prime256v1");
+      key.generateKeys();
+      const subscription = {
+        endpoint:
+          "https://updates.push.services.mozilla.com/wpush/v2/private-test-token",
+        expirationTime: null,
+        keys: {
+          auth: randomBytes(16).toString("base64url"),
+          p256dh: key.getPublicKey().toString("base64url"),
+        },
+      };
+      const status = await first.setPushSubscription(
+        host.credential,
+        host.gameId,
+        subscription,
+      );
+      expect(
+        await restarted.getPushSubscriptionStatus(host.credential, host.gameId),
+      ).toEqual(status);
+      const stored = JSON.stringify(
+        (
+          await administration.query(
+            "SELECT snapshot FROM service_state WHERE singleton = true",
+          )
+        ).rows,
+      );
+      expect(stored).not.toContain(subscription.endpoint);
+      expect(stored).not.toContain(subscription.keys.auth);
+      const original = PgClient.prototype.query;
+      let failCommit = true;
+      const failure = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          if (failCommit && args[0] === "COMMIT") {
+            failCommit = false;
+            return Promise.reject(new Error("Injected consent commit failure"));
+          }
+          return Reflect.apply(original, this, args);
+        } as PgClient["query"]);
+      try {
+        await expect(
+          first.removePushSubscription(host.credential, host.gameId),
+        ).rejects.toThrow(/Injected/);
+      } finally {
+        failure.mockRestore();
+      }
+      expect(
+        await restarted.getPushSubscriptionStatus(host.credential, host.gameId),
+      ).toEqual(status);
+      expect(await restarted.getGameState(host.gameId)).toEqual(host.state);
+      expect(await restarted.getActions(host.gameId)).toEqual([]);
+      await restarted.removePushSubscription(host.credential, host.gameId);
+      expect(
+        await first.getPushSubscriptionStatus(host.credential, host.gameId),
+      ).toEqual({ enabled: false });
+    } finally {
+      await Promise.all([first.close(), restarted.close()]);
+    }
   });
 
   it("reuses healthy room validation connections and discards failed rollbacks", async () => {

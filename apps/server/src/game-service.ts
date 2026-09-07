@@ -42,6 +42,11 @@ import { hasPinnedMandatoryContent } from "./mandatory-content.js";
 import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
 import { publicActionLog } from "./public-action-log.js";
 import {
+  openPushSubscription,
+  parsePushSubscription,
+  sealPushSubscription,
+} from "./push-subscription.js";
+import {
   SPECTATOR_INVITATION_LIMIT,
   SPECTATOR_INVITATION_LIFETIME_MS,
 } from "./spectator-policy.js";
@@ -144,6 +149,18 @@ export interface SpectatorGrantSummary {
   readonly status: "invited" | "claimed";
   readonly invitation_expires_at: number;
 }
+
+export interface StoredPushSubscription {
+  readonly bindingId: string;
+  readonly expiresAt: number;
+  readonly sealed: string;
+}
+export type PushSubscriptionStatus =
+  | { readonly enabled: false }
+  | {
+      readonly enabled: true;
+      readonly expires_at: number;
+    };
 
 export interface StoredAction {
   readonly authorizingId: string;
@@ -259,6 +276,7 @@ export interface GameServiceSnapshot {
   readonly invitations: readonly [string, Invitation][];
   readonly spectatorInvitations?: readonly [string, SpectatorInvitation][];
   readonly spectatorBindings?: readonly SpectatorBinding[];
+  readonly pushSubscriptions?: readonly StoredPushSubscription[];
   readonly recoveryGrants: readonly [string, RecoveryGrant][];
   readonly seatBindings: readonly SeatBinding[];
   readonly sessions: readonly BrowserSession[];
@@ -360,6 +378,8 @@ export type ServiceErrorCode =
   | "game_purged"
   | "invitation_mismatch"
   | "invitation_unavailable"
+  | "push_subscription_invalid"
+  | "push_unavailable"
   | "recovery_unavailable"
   | "replay_cursor_invalid"
   | "replay_unavailable"
@@ -719,6 +739,7 @@ export class InMemoryGameService {
   readonly #invitations = new Map<string, Invitation>();
   readonly #spectatorInvitations = new Map<string, SpectatorInvitation>();
   readonly #spectatorBindings: SpectatorBinding[] = [];
+  readonly #pushSubscriptions = new Map<string, StoredPushSubscription>();
   readonly #pepper: Uint8Array;
   readonly #recoveryGrants = new Map<string, RecoveryGrant>();
   readonly #seatBindings: SeatBinding[] = [];
@@ -820,10 +841,42 @@ export class InMemoryGameService {
         this.#sessionsByHash.set(session.credentialHash, session);
         this.#sessionsById.set(session.id, session);
       }
+      const pushSubscriptions = Array.isArray(
+        options.snapshot.pushSubscriptions,
+      )
+        ? options.snapshot.pushSubscriptions
+        : [];
+      for (const record of pushSubscriptions) {
+        if (
+          typeof record?.bindingId !== "string" ||
+          !Number.isSafeInteger(record.expiresAt) ||
+          typeof record.sealed !== "string"
+        )
+          continue;
+        try {
+          const subscription = openPushSubscription(
+            this.#pepper,
+            record.bindingId,
+            record.sealed,
+          );
+          this.#pushSubscriptions.set(record.bindingId, {
+            ...structuredClone(record),
+            expiresAt: Math.min(
+              record.expiresAt,
+              subscription.expirationTime ?? Infinity,
+            ),
+          });
+        } catch {
+          // Damaged notification credentials must fail closed without making
+          // an otherwise valid game impossible to resume.
+        }
+      }
+      this.#prunePushSubscriptions();
     }
   }
 
   exportSnapshot(): GameServiceSnapshot {
+    this.#prunePushSubscriptions();
     return structuredClone({
       games: [...this.#games].map(([gameId, game]) => [
         gameId,
@@ -842,10 +895,113 @@ export class InMemoryGameService {
       invitations: [...this.#invitations],
       spectatorInvitations: [...this.#spectatorInvitations],
       spectatorBindings: this.#spectatorBindings,
+      ...(this.#pushSubscriptions.size === 0
+        ? {}
+        : { pushSubscriptions: [...this.#pushSubscriptions.values()] }),
       recoveryGrants: [...this.#recoveryGrants],
       seatBindings: this.#seatBindings,
       sessions: [...this.#sessionsById.values()],
     });
+  }
+
+  setPushSubscription(
+    credential: string | undefined,
+    gameId: string,
+    input: unknown,
+  ): PushSubscriptionStatus {
+    const authorization = this.authenticate(credential, gameId);
+    const game = this.#requireActiveGame(gameId);
+    if (
+      game.state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+      game.state.phase === "completed"
+    ) {
+      throw new ServiceError(
+        "push_unavailable",
+        "Notifications require an active mandatory-rule game.",
+      );
+    }
+    let subscription;
+    try {
+      subscription = parsePushSubscription(input);
+    } catch {
+      throw new ServiceError(
+        "push_subscription_invalid",
+        "Invalid or unsupported push subscription.",
+      );
+    }
+    const expiresAt = Math.min(
+      this.#sessionsById.get(authorization.sessionId)!.expiresAt,
+      subscription.expirationTime ?? Infinity,
+    );
+    if (expiresAt <= this.#now())
+      throw new ServiceError(
+        "push_subscription_invalid",
+        "Push subscription has expired.",
+      );
+    this.#pushSubscriptions.set(authorization.bindingId, {
+      bindingId: authorization.bindingId,
+      expiresAt,
+      sealed: sealPushSubscription(
+        this.#pepper,
+        authorization.bindingId,
+        subscription,
+      ),
+    });
+    return { enabled: true, expires_at: expiresAt };
+  }
+
+  getPushSubscriptionStatus(
+    credential: string | undefined,
+    gameId: string,
+  ): PushSubscriptionStatus {
+    const authorization = this.authenticate(credential, gameId);
+    this.#prunePushSubscriptions();
+    const record = this.#pushSubscriptions.get(authorization.bindingId);
+    return record
+      ? { enabled: true, expires_at: record.expiresAt }
+      : { enabled: false };
+  }
+
+  removePushSubscription(
+    credential: string | undefined,
+    gameId: string,
+  ): PushSubscriptionStatus {
+    const session = this.#findSession(credential);
+    if (!session)
+      throw new ServiceError(
+        "unauthorized",
+        "Current browser session is required.",
+      );
+    // Opt-out stays available to the same browser after seat surrender or
+    // recovery, without granting that browser renewed access to the game.
+    for (const binding of this.#seatBindings) {
+      if (binding.gameId === gameId && binding.sessionId === session.id)
+        this.#pushSubscriptions.delete(binding.id);
+    }
+    return { enabled: false };
+  }
+
+  #prunePushSubscriptions(): void {
+    const now = this.#now();
+    for (const [id, record] of this.#pushSubscriptions) {
+      const binding = this.#seatBindings.find(
+        (candidate) => candidate.id === id && candidate.revokedAt === null,
+      );
+      const session = binding && this.#sessionsById.get(binding.sessionId);
+      const game = binding && this.#games.get(binding.gameId);
+      if (
+        record.expiresAt <= now ||
+        !binding ||
+        !session ||
+        session.revokedAt !== null ||
+        session.expiresAt <= now ||
+        !game ||
+        game.deletedAt !== null ||
+        game.state.phase === "completed" ||
+        game.state.ruleset_version !== MANDATORY_RULESET_VERSION
+      )
+        this.#pushSubscriptions.delete(id);
+    }
   }
 
   isVersionRegistryReady(): boolean {

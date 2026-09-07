@@ -114,6 +114,7 @@ export interface HttpApplicationOptions {
   readonly gameService: GameService;
   readonly readiness: ReadinessState;
   readonly staticDirectory?: string;
+  readonly trustedWebSocketOrigin?: string;
 }
 
 export function readSessionCredentialFromCookieHeader(
@@ -161,6 +162,7 @@ function errorStatus(code: ServiceErrorCode): number {
     case "credential_invalid":
     case "invitation_mismatch":
     case "replay_cursor_invalid":
+    case "push_subscription_invalid":
       return 400;
     case "game_not_found":
       return 404;
@@ -172,6 +174,7 @@ function errorStatus(code: ServiceErrorCode): number {
     case "invitation_unavailable":
     case "recovery_unavailable":
     case "replay_unavailable":
+    case "push_unavailable":
     case "seat_unavailable":
     case "version_unavailable":
       return 409;
@@ -191,6 +194,8 @@ export function configureHttpApplication(
   // Both maps are bounded by the global attempt budget and expire each minute.
   const replaySourceLimiter = new AttemptRateLimiter(60_000, 60, 300);
   const replaySessionLimiter = new AttemptRateLimiter(60_000, 30, 300);
+  const pushSourceLimiter = new AttemptRateLimiter(60_000, 60, 300);
+  const pushSessionLimiter = new AttemptRateLimiter(60_000, 30, 300);
   const allowBearerClaim = (request: Request, response: Response) => {
     if (claimRateLimiter.allow(request.ip ?? "unknown")) return true;
     response.setHeader(
@@ -231,6 +236,32 @@ export function configureHttpApplication(
     }
     next();
   });
+  application.use(
+    "/api/games/:gameId/push-subscription",
+    (request, response, next) => {
+      const sessionKey = createHash("sha256")
+        .update(readSessionCredential(request) ?? "anonymous")
+        .digest("hex");
+      if (
+        !pushSourceLimiter.allow(request.ip ?? "unknown") ||
+        !pushSessionLimiter.allow(sessionKey)
+      ) {
+        response.setHeader("Retry-After", "60");
+        response.status(429).json({ error: "push_rate_limited" });
+        return;
+      }
+      if (request.method === "PUT" || request.method === "DELETE") {
+        const origin =
+          options.trustedWebSocketOrigin ??
+          `${request.protocol}://${request.get("host")}`;
+        if (request.get("origin") !== origin) {
+          response.status(403).json({ error: "untrusted_origin" });
+          return;
+        }
+      }
+      next();
+    },
+  );
   application.use(express.json({ limit: "16kb", strict: true }));
 
   application.get("/healthz", (_request, response) => {
@@ -293,6 +324,46 @@ export function configureHttpApplication(
       response.status(500).json({ error: "internal_error" });
     }
   });
+
+  application
+    .route("/api/games/:gameId/push-subscription")
+    .get(async (request, response, next) => {
+      try {
+        response.json(
+          await gameService.getPushSubscriptionStatus(
+            readSessionCredential(request),
+            request.params.gameId,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    })
+    .put(async (request, response, next) => {
+      try {
+        response.json(
+          await gameService.setPushSubscription(
+            readSessionCredential(request),
+            request.params.gameId,
+            request.body,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    })
+    .delete(async (request, response, next) => {
+      try {
+        response.json(
+          await gameService.removePushSubscription(
+            readSessionCredential(request),
+            request.params.gameId,
+          ),
+        );
+      } catch (error) {
+        next(error);
+      }
+    });
 
   application.post("/api/games", async (request, response, next) => {
     try {

@@ -1929,6 +1929,49 @@ validation remain separate gates.
     `test-results/alpine-host-input-fixtures`. Exact-head CI and final release
     image scanning remain open; this does not complete the release gate.
 
+### Protected browser push subscriptions
+
+Integrated validation: full local gates pass 637 workspace/nine harness tests,
+all 259 PostgreSQL tests pass, and fresh independent review passes 236 server
+tests without actionable findings. Desktop/tablet full games cover all three
+choices, reload/replay, and input fixtures in
+`test-results/push-subscription-pending-ack` and its `-fixtures` directory.
+The later connection-reuse integration preserves those UI/protocol paths and
+adds a separately verified database regression. Exact-head CI and final review
+threads are required before merge; this foundation still sends no notifications.
+
+- [ ] Store per-seat browser push consent and encrypted subscription credentials.
+  - Scope: Canonical HTTPS endpoints for the Chrome/Firefox/Safari production
+    push providers, valid P-256/auth keys, one subscription per current seat
+    binding, session/subscription expiry, metadata-only status, and same-browser
+    opt-out even after seat surrender. Encrypt endpoint/keys with a separate
+    pepper-derived key and binding-authenticated ciphertext. Keep credentials
+    out of game state, actions, replay, and recovery exports.
+  - Persistence/retention: Add an optional canonical-snapshot collection with
+    no destructive schema migration. Retired, expired, deleted, completed, or
+    damaged subscriptions fail closed and are removed on snapshot persistence.
+    Prove PostgreSQL restart/rollback and no cross-session consent changes.
+  - Validation plan: Parser/encryption tests, service authorization and retained
+    snapshot tests, same-origin HTTP tests, isolated PostgreSQL durability,
+    full supported local gates, independent review, and exact-head CI. Owner:
+    ChrisTitusTech. Existing desktop/tablet workflows must remain unchanged.
+  - Boundary: This increment does not send notifications or expose an Enable
+    button. VAPID configuration, durable outbox/retries, provider delivery,
+    service-worker UI, browser permission, and actual-device acceptance remain.
+    No VPS change or new external subscription is authorized by test fixtures.
+  - Validation: Full local gates pass 636 workspace/nine harness tests. The
+    PostgreSQL run passes all 256 tests (before the additional observer and
+    malformed-collection regression, which passes locally). Fresh independent
+    review found no actionable defects and passed all 26 focused cases plus
+    server typechecking. Desktop/tablet full 24-turn games, pending-result reload,
+    exact replay, and input fixtures pass in
+    `test-results/push-subscription-storage` and its `-fixtures` directory.
+    Both games exercised loss/advance; prior transport evidence covers retreat.
+    The first deletion fixture failed because it omitted required confirmation;
+    correcting its payload made the authorization/retention suite pass.
+    Transport's newly identified pending-ack broadcast exclusion must integrate
+    before publication, followed by exact-head CI and final review threads.
+
 ### Browser push foundation
 
 Integration evidence: PR #41 head `19ba6e8` passed Application `34102616922`
