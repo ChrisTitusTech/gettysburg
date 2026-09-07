@@ -4,7 +4,7 @@ import {
   COMMAND_SCHEMA_VERSION,
   combatSkirmishes,
   gameplayCommandSchema,
-  moveUnitCommandSchema,
+  hostManagementCommandSchema,
   reduceGameplayCommand,
   type GameState,
   type GameplayCommand,
@@ -26,8 +26,21 @@ const sameIds = (a: readonly string[], b: readonly string[]) =>
   equal([...a].sort(), [...b].sort());
 const generatedId =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-// Host and gameplay envelopes use the same command-id schema.
-const storedCommandId = moveUnitCommandSchema.shape.command_id;
+function commandHash(command: {
+  command_name: string;
+  payload: unknown;
+  schema: string;
+}): string {
+  return createHash("sha256")
+    .update(
+      canonicalize({
+        command_name: command.command_name,
+        payload: command.payload,
+        schema: command.schema,
+      })!,
+    )
+    .digest("hex");
+}
 
 function randomInputs(
   state: GameState,
@@ -139,9 +152,59 @@ export function replayMandatoryActions(
               ) &&
               action.canonicalizationVersion === COMMAND_SCHEMA_VERSION &&
               typeof action.commandId === "string" &&
-              storedCommandId.safeParse(action.commandId).success &&
+              typeof action.authorizingId === "string" &&
+              generatedId.test(action.authorizingId) &&
               action.operatorRequestId === null,
             "invalid management metadata",
+          );
+          const parsedHost = hostManagementCommandSchema.safeParse({
+            command_id: action.commandId,
+            command_name: action.commandName,
+            expected_version: action.expectedVersion,
+            game_id: gameId,
+            payload: action.payload,
+            schema: action.canonicalizationVersion,
+          });
+          assertReplay(parsedHost.success, "invalid management metadata");
+          if (!parsedHost.success)
+            throw new ReplayError(sequence, "invalid management metadata");
+          const host = parsedHost.data;
+          assertReplay(
+            commandHash(host) === action.canonicalRequestHash,
+            "management hash mismatch",
+          );
+          const hostResult = action.result;
+          assertReplay(
+            hostResult?.ok === true &&
+              equal(Object.keys(hostResult ?? {}).sort(), ["event", "ok"]),
+            "invalid management result",
+          );
+          if (!hostResult?.ok)
+            throw new ReplayError(sequence, "invalid management result");
+          const summary =
+            host.command_name === "deleteGame"
+              ? "Game deleted"
+              : host.command_name === "issueInvitation"
+                ? `${host.payload.seat} invitation issued`
+                : hostResult.event.summary;
+          if (host.command_name === "revokeInvitation")
+            assertReplay(
+              [
+                "union invitation revoked",
+                "confederate invitation revoked",
+              ].includes(summary),
+              "invalid management summary",
+            );
+          assertReplay(
+            equal(hostResult.event, {
+              command_id: host.command_id,
+              command_name: host.command_name,
+              event_sequence: sequence,
+              kind: "host_management",
+              state_version: state.version,
+              summary,
+            }),
+            "invalid management event",
           );
           assertReplay(
             !commandIds.has(action.commandId!),
@@ -152,12 +215,17 @@ export function replayMandatoryActions(
         } else {
           assertReplay(
             action.authorizingType === "operator" &&
+              typeof action.authorizingId === "string" &&
+              action.authorizingId.trim().length > 0 &&
+              action.authorizingVersion === 1 &&
               action.commandName === null &&
               action.commandId === null &&
               typeof action.operatorRequestId === "string" &&
               generatedId.test(action.operatorRequestId) &&
               action.canonicalizationVersion === null &&
-              action.canonicalRequestHash === null,
+              action.canonicalRequestHash === null &&
+              action.payload === null &&
+              action.result === null,
             "invalid audit metadata",
           );
           assertReplay(
@@ -166,8 +234,8 @@ export function replayMandatoryActions(
           );
           operatorRequestIds.add(action.operatorRequestId!);
         }
-        // Private host/operator payloads are not replayed or exposed. Their only
-        // gameplay-state effect is consuming a sequence number, not a version.
+        // Validate management records without executing or exposing them. Their
+        // only gameplay-state effect is consuming a sequence, not a version.
         state = { ...state, event_sequence: sequence };
         continue;
       }
@@ -231,15 +299,7 @@ export function replayMandatoryActions(
         "duplicate command identifier",
       );
       commandIds.add(command.command_id);
-      const hash = createHash("sha256")
-        .update(
-          canonicalize({
-            command_name: command.command_name,
-            payload: command.payload,
-            schema: command.schema,
-          })!,
-        )
-        .digest("hex");
+      const hash = commandHash(command);
       assertReplay(
         hash === action.canonicalRequestHash,
         "command hash mismatch",
