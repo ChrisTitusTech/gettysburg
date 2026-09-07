@@ -1063,6 +1063,13 @@ or navigation cancels pending setup and removes the controls. Unsupported,
 insecure, denied-permission, disabled-server, and network failure states provide
 plain-language guidance without exposing endpoints or encryption keys.
 
+The VPS backup contract encrypts a persistent push signing key separately from
+the database and credential pepper, records whether it was present, and verifies
+its matching P-256 pair during isolated/off-host restore checks. No plaintext
+signing key survives off-host backup acceptance. Only the canonical application
+volume key path is supported by these scripts; missing configured keys must
+fail backup rather than silently producing an incomplete recovery set.
+
 The notification-only service worker never intercepts requests or caches game
 or session responses. It accepts bounded, schema-validated opaque game/event IDs,
 displays generic text, and opens only a constructed same-origin game route;

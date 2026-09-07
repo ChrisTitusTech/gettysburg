@@ -2222,6 +2222,29 @@ desktop loss/advance. Both rendered consent panels were inspected for wrapping
 and readable controls. Backend code is covered by startup's 329 PostgreSQL
 tests. Exact-head CI and actual provider/device acceptance remain open.
 
+Encrypted push-key backup is the next operations increment. Back up the canonical
+volume key with age plus a checksum-covered presence marker, fail if a configured
+key is absent/noncanonical/unsafe, and validate its protected matching P-256
+configuration in isolated and off-host restore checks. Keep plaintext only in
+protected temporary storage and remove it before accepting an off-host copy.
+Five local tests exercise the actual backup script with controlled container/UID
+boundaries and real age encryption/decryption, unchanged-byte recovery, malformed
+keys, disabled push, missing keys, symlinks, and partial-backup cleanup. Shell
+syntax/ShellCheck/shfmt and lint pass after replacing an errexit-bypassing `!`
+check with explicit failure. CI installs age for these tests. Full local gates
+pass after integrating startup, worker, and scanner changes: 739 workspace and
+18 harness tests, frozen installation, format, lint, typecheck, build, smoke,
+Markdown, and diff checks. The unchanged runtime retains the integrated
+desktop/tablet browser and 329-test PostgreSQL evidence; this scripts-only
+increment does not claim a new browser or database run. Initial independent
+review found no defects and reran five backup tests plus shell checks. The
+post-integration review found variable-length generated private scalars in test
+fixtures; left-padding to 32 bytes removes that intermittent test failure.
+Focused revalidation and fresh independent review pass with all five backup
+tests; exact-head CI follows.
+Actual VPS/on-off-host recovery and
+push enablement remain unattempted owner gates; no remote data or keys changed.
+
 The next browser increment supplies a notification-only service worker without
 registering it in the product yet. Generic messages, strict payload validation,
 same-origin click destinations, serial processing, and stable notification tags
