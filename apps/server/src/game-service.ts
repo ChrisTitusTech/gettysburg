@@ -10,11 +10,9 @@ import {
 } from "node:crypto";
 
 import {
-  BOARD_TERRAIN,
+  createMandatoryInitialState,
   MANDATORY_CONTENT_REVISION,
   SCENARIO_CONTENT_REVISION,
-  SCENARIO_HEXES,
-  SCENARIO_UNITS,
 } from "@gettysburg/content";
 import {
   COMMAND_SCHEMA_VERSION,
@@ -1015,54 +1013,7 @@ export class InMemoryGameService {
       creationCredential,
     );
     const gameId = randomUUID();
-    const state: GameState = {
-      active_side: "union",
-      combats: {},
-      content_revision: SCENARIO_CONTENT_REVISION,
-      terrain: BOARD_TERRAIN,
-      event_sequence: 0,
-      game_id: gameId,
-      night: false,
-      objectives: Object.fromEntries(
-        SCENARIO_HEXES.filter((hex) => hex.objective_value !== null).map(
-          (hex) => [
-            hex.coordinate,
-            { controlled_by: "union" as const, value: hex.objective_value! },
-          ],
-        ),
-      ),
-      phase: "movement",
-      ruleset_version: RULESET_VERSION,
-      turn: 1,
-      units: Object.fromEntries(
-        SCENARIO_UNITS.map((unit) => [
-          unit.id,
-          {
-            combat: unit.combat,
-            entry_hexes: unit.entry_hexes,
-            entry_turn: unit.entry_turn,
-            id: unit.id,
-            kind: unit.kind,
-            label: unit.label,
-            location: unit.setup_hex,
-            movement: unit.movement,
-            organization: unit.organization,
-            reduced_combat: unit.reduced_combat,
-            side: unit.side,
-            status: unit.setup_hex === null ? "reinforcement" : "deployed",
-            steps_remaining:
-              unit.kind === "general" || unit.combat === 1 ? 1 : 2,
-            strength: "full",
-          },
-        ]),
-      ),
-      version: 0,
-      victory: {
-        confederate: 0,
-        status: "in-progress",
-        union: 16,
-      },
-    };
+    const state = createMandatoryInitialState(gameId);
 
     const invitation = this.#createInvitation(gameId, otherSide(side));
     this.#games.set(gameId, {

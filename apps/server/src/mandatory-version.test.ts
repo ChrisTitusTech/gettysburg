@@ -38,10 +38,9 @@ function restoredGame(
 }
 
 describe("mandatory saved-version handler", () => {
-  it("does not enable mandatory rules for newly created games yet", () => {
-    expect(
-      new InMemoryGameService().createGame("union").state.content_revision,
-    ).toBe(SCENARIO_CONTENT_REVISION);
+  it("creates new games from the complete mandatory pinned opening", () => {
+    const game = new InMemoryGameService().createGame("union");
+    expect(game.state).toEqual(createMandatoryInitialState(game.gameId));
   });
 
   it("restores the exact state without legacy opening or combat-choice repairs", () => {

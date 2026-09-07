@@ -37,6 +37,12 @@ authorized merge, deployment, and backed-up retirement of five old development
 games; those delivery actions completed on 2026-09-06.
 Current evidence and remaining gates are in `TASKS.md`.
 
+The newer source candidate enables mandatory Scenario Five for new games with
+the complete pinned terrain/edge bundle and shared rule previews. It does not
+change the last verified VPS revision above or reinterpret existing saves.
+Replay delivery, representative owner adjudication/full-game acceptance, and
+Phase 4 features and operational/release gates remain open.
+
 Phases 0 and 1 are complete: the owner selected mandatory Scenario Five scope
 and approved the original presentation for public release on 2026-09-06.
 Phase 2 implementation and its

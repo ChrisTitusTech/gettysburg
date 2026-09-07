@@ -11,7 +11,7 @@ import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
-  process.env.GETTYSBURG_EVIDENCE_DIR ?? "test-results/phase-2",
+  process.env.GETTYSBURG_EVIDENCE_DIR ?? "test-results/browser-acceptance",
 );
 
 async function reservePort() {
@@ -134,39 +134,69 @@ async function selectAndMove(page, counterName, destination, inputMode) {
   await target.click();
 }
 
-async function dragWithinMovement(page, prefix) {
+async function dragWithinMovement(page, prefix, inputMode) {
   const counter = page.getByRole("button", {
-    name: /Wadsworth, F3, selectable/,
+    name: /Wadsworth, F4, selectable/,
   });
-  const target = page.locator('[data-coordinate="F8"]');
+  const target = page.locator('[data-coordinate="W11"]');
+  await counter.scrollIntoViewIfNeeded();
   const startBox = await counter.boundingBox();
   const targetBox = await target.boundingBox();
   assert(startBox !== null);
   assert(targetBox !== null);
-  await page.mouse.move(
-    startBox.x + startBox.width / 2,
-    startBox.y + startBox.height / 2,
-  );
-  await page.mouse.down();
-  await page.mouse.move(
-    targetBox.x + targetBox.width / 2,
-    targetBox.y + targetBox.height / 2,
-    { steps: 10 },
-  );
-  await page.locator(".movement-route").getByText("3 / 3").waitFor();
-  await page.locator(".board-workspace").screenshot({
+  const from = {
+    x: startBox.x + startBox.width / 2,
+    y: startBox.y + startBox.height / 2,
+  };
+  const to = {
+    x: targetBox.x + targetBox.width / 2,
+    y: targetBox.y + targetBox.height / 2,
+  };
+  const touch =
+    inputMode === "touch" ? await page.context().newCDPSession(page) : null;
+  if (touch) {
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchStart",
+      touchPoints: [from],
+    });
+    for (let step = 1; step <= 10; step++)
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchMove",
+        touchPoints: [
+          {
+            x: from.x + ((to.x - from.x) * step) / 10,
+            y: from.y + ((to.y - from.y) * step) / 10,
+          },
+        ],
+      });
+  } else {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    await page.mouse.move(to.x, to.y, { steps: 10 });
+  }
+  await page.locator(".movement-route").getByText("5 / 5").waitFor();
+  // Do not auto-scroll an element while its pointer capture is active.
+  await page.screenshot({
+    fullPage: true,
+    mask: [page.getByLabel("One-time invitation URL")],
     path: resolve(evidenceDirectory, `${prefix}-movement-route.png`),
   });
-  await page.mouse.up();
+  if (touch) {
+    await touch.send("Input.dispatchTouchEvent", {
+      type: "touchEnd",
+      touchPoints: [],
+    });
+    await touch.detach();
+  } else await page.mouse.up();
 }
 
 async function ctrlSelectSingleCounter(page) {
   const counter = page.getByRole("button", {
-    name: /Reynolds, F6, selectable/,
+    name: /Gamble, O5, selectable/,
   });
   await counter.focus();
   await page.keyboard.press("Control+Enter");
-  await page.locator('[data-coordinate="G6"]').click();
+  await page.locator('[data-coordinate="P5"]').click();
 }
 
 async function runScenario(browser, origin, options) {
@@ -222,24 +252,24 @@ async function runScenario(browser, origin, options) {
     await selectAndMove(
       unionPage,
       /Wadsworth, D3, selectable/,
-      "E3",
+      "E4",
       options.inputMode,
     );
     await waitForVersion(unionPage, 1);
     await waitForVersion(confederatePage, 1);
     await confederatePage
       .getByRole("button", {
-        name: /Wadsworth, E3/,
+        name: /Wadsworth, E4/,
       })
       .waitFor();
 
     await unionPage
       .getByRole("button", {
-        name: /Wadsworth, E3, selectable/,
+        name: /Wadsworth, E4, selectable/,
       })
       .click();
     await unionPage.locator('[data-coordinate="U11"]').click();
-    await unionPage.getByText(/has 4 movement remaining/i).waitFor();
+    await unionPage.getByText(/this group has 5.5 remaining/i).waitFor();
     await waitForVersion(unionPage, 1);
 
     const unionGameUrl = unionPage.url();
@@ -261,28 +291,30 @@ async function runScenario(browser, origin, options) {
     await unionPage.goto(unionGameUrl);
     await unionPage.getByText("connected", { exact: true }).waitFor();
     await waitForVersion(unionPage, 1);
-    await unionPage.getByText(/2 stacked counters moved to E3/).waitFor();
+    await unionPage
+      .getByText(/2 counters moved to E4 \(0.5 movement\)/)
+      .waitFor();
 
     await selectAndMove(
       unionPage,
-      /Wadsworth, E3, selectable/,
-      "F3",
+      /Wadsworth, E4, selectable/,
+      "F4",
       options.inputMode,
     );
     await waitForVersion(unionPage, 2);
     await waitForVersion(confederatePage, 2);
     await confederatePage
       .getByRole("button", {
-        name: /Wadsworth, F3/,
+        name: /Wadsworth, F4/,
       })
       .waitFor();
 
-    await dragWithinMovement(unionPage, options.label);
+    await dragWithinMovement(unionPage, options.label, options.inputMode);
     await waitForVersion(unionPage, 3);
     await waitForVersion(confederatePage, 3);
     await confederatePage
       .getByRole("button", {
-        name: /Wadsworth, F6/,
+        name: /Wadsworth, P7/,
       })
       .waitFor();
 
@@ -292,10 +324,13 @@ async function runScenario(browser, origin, options) {
       await waitForVersion(unionPage, 4);
       await waitForVersion(confederatePage, 4);
       await confederatePage
-        .getByRole("button", { name: /Wadsworth, F6/ })
+        .getByRole("button", { name: /Wadsworth, P7/ })
         .waitFor();
       await confederatePage
-        .getByRole("button", { name: /Reynolds, G6/ })
+        .getByRole("button", { name: /Gamble, P5/ })
+        .waitFor();
+      await confederatePage
+        .getByRole("button", { name: /Buford, O5/ })
         .waitFor();
     }
     const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;

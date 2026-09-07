@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { SCENARIO_CONTENT_REVISION } from "@gettysburg/content";
 
 import {
   COMMAND_SCHEMA_VERSION,
@@ -7,6 +8,7 @@ import {
   type HostManagementCommand,
   type MoveUnitCommand,
   LEGACY_RULESET_VERSION,
+  RULESET_VERSION,
   type UnitState,
 } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
@@ -122,6 +124,45 @@ describe("canonical command input", () => {
 });
 
 describe("in-memory game lifecycle", () => {
+  it.each([LEGACY_RULESET_VERSION, RULESET_VERSION])(
+    "keeps saved %s movement interpretation after the new-game default changes",
+    (ruleset) => {
+      const pepper = new Uint8Array(32).fill(6);
+      const original = new InMemoryGameService({ pepper });
+      const created = original.createGame("union");
+      const snapshot = original.exportSnapshot();
+      const service = new InMemoryGameService({
+        pepper,
+        snapshot: {
+          ...snapshot,
+          games: snapshot.games.map(([id, record]) => [
+            id,
+            {
+              ...record,
+              state: {
+                ...record.state,
+                ruleset_version: ruleset,
+                content_revision: SCENARIO_CONTENT_REVISION,
+              },
+            },
+          ]),
+        },
+      });
+      expect(
+        service.executeCommand(
+          service.authenticate(created.credential, created.gameId),
+          moveCommand(created.gameId, 0, "u-wadsworth", "D4"),
+        ),
+      ).toMatchObject({
+        ok: true,
+        state: {
+          ruleset_version: ruleset,
+          units: { "u-wadsworth": { location: "D4", movement_spent: 1 } },
+        },
+      });
+    },
+  );
+
   it("fails closed when a saved game references an unavailable version pair", () => {
     const original = new InMemoryGameService();
     const game = original.createGame("union");
@@ -167,7 +208,7 @@ describe("in-memory game lifecycle", () => {
     const game = service.createGame("union");
     const state = service.getGameState(game.gameId);
 
-    expect(state.ruleset_version).toBe("gettysburg-terrain-v3");
+    expect(state.ruleset_version).toBe("gettysburg-mandatory-v4");
     expect(Object.keys(state.terrain ?? {})).toHaveLength(253);
     expect(state.terrain?.B2).toMatchObject({ kind: "woods", defense: 2 });
     expect(state.terrain?.F11).toMatchObject({ kind: "woods", defense: 2 });
@@ -201,6 +242,8 @@ describe("in-memory game lifecycle", () => {
                 ...record,
                 state: {
                   ...record.state,
+                  ruleset_version: LEGACY_RULESET_VERSION,
+                  content_revision: SCENARIO_CONTENT_REVISION,
                   active_side: "confederate",
                   event_sequence: 1,
                   phase: "combat",
@@ -241,6 +284,7 @@ describe("in-memory game lifecycle", () => {
                 state: {
                   ...record.state,
                   ruleset_version: LEGACY_RULESET_VERSION,
+                  content_revision: SCENARIO_CONTENT_REVISION,
                   units: {
                     ...record.state.units,
                     "u-wadsworth": legacyWadsworth as UnitState,
@@ -273,6 +317,8 @@ describe("in-memory game lifecycle", () => {
                 ...record,
                 state: {
                   ...record.state,
+                  ruleset_version: LEGACY_RULESET_VERSION,
+                  content_revision: SCENARIO_CONTENT_REVISION,
                   active_side: "confederate",
                   phase: "combat",
                   turn: 4,
@@ -381,6 +427,8 @@ describe("in-memory game lifecycle", () => {
                 actions: [...record.actions, retreatAction],
                 state: {
                   ...record.state,
+                  ruleset_version: LEGACY_RULESET_VERSION,
+                  content_revision: SCENARIO_CONTENT_REVISION,
                   active_side: "confederate",
                   phase: "combat",
                   turn: 4,
@@ -710,7 +758,7 @@ describe("authoritative gameplay commands", () => {
       current_version: 0,
       error: "phase_invalid",
       message:
-        "Night movement must withdraw from and may not enter an enemy zone of control.",
+        "No legal route: check enemy occupancy, zones of control, night movement, and artillery terrain restrictions.",
       ok: false,
     });
     expect(service.getGameState(host.gameId).units["c-nelson"]).toMatchObject({
