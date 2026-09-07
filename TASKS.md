@@ -19,6 +19,17 @@ Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
 below. No phase is completed merely by passing the automated game script.
 
+CI evidence correction: hosted review of the alternate-browser workflow found
+that default pull-request checkout uses GitHub's synthetic merge commit. Earlier
+Application results were associated with the listed PR head, but did not prove
+that exact checkout. Pin Application checkout to the PR head SHA (or push SHA),
+as Documentation already does, and rerun before merging the accessibility
+increment. The browser workflow receives the same correction separately.
+Historical evidence is retained, not reclassified as an exact-head execution.
+No Phase 3/4 or new VPS/release completion is inferred from those earlier runs.
+The workflow-only repair passes the full local gate (753 workspace/22 harness
+tests) and fresh independent review; application/browser code is unchanged.
+
 Status-reconciliation validation: documentation and one stale code comment only;
 no rule, runtime, schema, terrain, or deployment changes. Frozen installation,
 format, lint, typecheck, 584 workspace/nine harness tests, build, smoke, and
@@ -2016,6 +2027,13 @@ consent/replay/observer checks, and input fixtures in
 `test-results/accessibility-home-screen` and its `-fixtures` directory. Fresh
 independent review is clean and reran the baseline assertion and 38 focused web
 tests. PR #52 is merged; real Home Screen installation remains manual.
+Hosted review found live audits could run before lazy notification controls
+appeared. Wait for both named player notification regions before auditing them;
+a regression proves both readiness waits finish first. The full local gate
+passes 753 workspace/23 harness tests, and both layouts pass in
+`test-results/accessibility-lazy-ready`. Fresh independent review is clean and
+reran both focused regressions. Publish the repair before resolving its thread
+and require a new exact-head CI run before merge.
 
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
