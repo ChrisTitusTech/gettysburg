@@ -264,6 +264,10 @@ async function runScenario(browser, origin, options) {
       .getByLabel("One-time invitation URL")
       .inputValue();
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
+    // Do not abort the lazy notification module during deliberate reload.
+    await hostPage
+      .getByRole("region", { name: "Turn notifications" })
+      .waitFor();
     await hostPage.locator(".board-svg image").evaluate(async (element) => {
       const image = new Image();
       image.src = element.href.baseVal;

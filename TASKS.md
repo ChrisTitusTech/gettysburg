@@ -1931,6 +1931,17 @@ Desktop initial/reconnect/both-player observations are 63.5/234.0/120.5 ms;
 tablet observations are 62.0/353.8/238.3 ms. Zoom p95 is 32.0 ms at both widths.
 Fresh independent review found no actionable defects and reran all four
 performance regressions plus changed-script formatting.
+After browser-engine integration, all local gates pass 755 workspace/29 harness
+tests. Both layouts pass in Chromium 151 and WebKit 26.5, including WCAG,
+consent, reload, replay, and observers. Firefox's first run exposed an aborted
+lazy notification module during immediate reload; wait for the notification
+region before the deliberate reload rather than suppressing its warning.
+The corrected Firefox 153 run passes both layouts too. Evidence directories are
+`test-results/performance-chromium`, `test-results/performance-webkit`, and
+`test-results/performance-firefox-loaded`. All 120 zoom samples meet 100 ms;
+desktop/tablet p95 values are 31.7/31.7 ms Chromium, 49.0/35.0 ms WebKit, and
+15.0/15.0 ms Firefox. All six single-flow session observations are within their
+declared targets. This remains local evidence, not physical-device/VPS acceptance.
 
 ### Browser-engine acceptance increment
 
