@@ -123,6 +123,13 @@ export interface RecoveryGrant {
 
 export interface SpectatorInvitation extends Omit<Invitation, "allowedSeat"> {
   readonly issuedAt: number;
+  bindingId?: string;
+}
+export interface SpectatorBinding extends HostBinding {
+  readonly invitationLookupId: string;
+}
+export interface SpectatorAuthorization extends HostAuthorization {
+  readonly kind: "spectator";
 }
 
 export interface StoredAction {
@@ -238,6 +245,7 @@ export interface GameServiceSnapshot {
   readonly hostBindings: readonly HostBinding[];
   readonly invitations: readonly [string, Invitation][];
   readonly spectatorInvitations?: readonly [string, SpectatorInvitation][];
+  readonly spectatorBindings?: readonly SpectatorBinding[];
   readonly recoveryGrants: readonly [string, RecoveryGrant][];
   readonly seatBindings: readonly SeatBinding[];
   readonly sessions: readonly BrowserSession[];
@@ -322,6 +330,11 @@ export interface GameView {
   readonly is_host: boolean;
   readonly seat: Side | null;
   readonly state: GameState;
+}
+export type SpectatorView = Pick<GameView, "game_id" | "state" | "action_log">;
+export interface SpectatorClaimResult extends SessionResult {
+  readonly gameId: string;
+  readonly view: SpectatorView;
 }
 
 export type ServiceErrorCode =
@@ -691,6 +704,7 @@ export class InMemoryGameService {
   readonly #hostBindings: HostBinding[] = [];
   readonly #invitations = new Map<string, Invitation>();
   readonly #spectatorInvitations = new Map<string, SpectatorInvitation>();
+  readonly #spectatorBindings: SpectatorBinding[] = [];
   readonly #pepper: Uint8Array;
   readonly #recoveryGrants = new Map<string, RecoveryGrant>();
   readonly #seatBindings: SeatBinding[] = [];
@@ -769,8 +783,16 @@ export class InMemoryGameService {
       }
       for (const [lookupId, invitation] of options.snapshot
         .spectatorInvitations ?? []) {
+        if (
+          lookupId !== invitation.lookupId ||
+          this.#spectatorInvitations.has(lookupId)
+        )
+          throw new Error("Invalid spectator invitation identifier");
         this.#spectatorInvitations.set(lookupId, structuredClone(invitation));
       }
+      this.#spectatorBindings.push(
+        ...structuredClone(options.snapshot.spectatorBindings ?? []),
+      );
       for (const [lookupId, grant] of options.snapshot.recoveryGrants) {
         this.#recoveryGrants.set(lookupId, {
           ...structuredClone(grant),
@@ -805,6 +827,7 @@ export class InMemoryGameService {
       hostBindings: this.#hostBindings,
       invitations: [...this.#invitations],
       spectatorInvitations: [...this.#spectatorInvitations],
+      spectatorBindings: this.#spectatorBindings,
       recoveryGrants: [...this.#recoveryGrants],
       seatBindings: this.#seatBindings,
       sessions: [...this.#sessionsById.values()],
@@ -936,6 +959,7 @@ export class InMemoryGameService {
       }
     }
     const retainedSessionIds = new Set([
+      ...this.#spectatorBindings.map((binding) => binding.sessionId),
       ...this.#hostBindings.map((binding) => binding.sessionId),
       ...this.#seatBindings.map((binding) => binding.sessionId),
     ]);
@@ -952,8 +976,10 @@ export class InMemoryGameService {
     const purgedAt = this.#now();
     const receipts: DeletionReceipt[] = [];
     for (const invitation of this.#spectatorInvitations.values()) {
-      if (invitation.expiresAt <= purgedAt)
+      if (invitation.expiresAt <= purgedAt) {
+        delete invitation.sealedClaimCredential;
         this.#destroyInvitationSecret(invitation.lookupId);
+      }
     }
 
     for (const invitation of this.#invitations.values()) {
@@ -1120,6 +1146,153 @@ export class InMemoryGameService {
       invitation,
       seat: side,
       state: cloneState(state),
+    };
+  }
+
+  claimSpectatorInvitation(input: {
+    claimId: string;
+    credential?: string;
+    lookupId: string;
+    requestedGameId?: string;
+    secret: string;
+  }): SpectatorClaimResult {
+    const invitation = this.#spectatorInvitations.get(input.lookupId);
+    const now = this.#now();
+    const unavailable = () =>
+      new ServiceError(
+        "invitation_unavailable",
+        "Spectator invitation is invalid, expired, or already used.",
+      );
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        input.claimId,
+      ) ||
+      invitation === undefined ||
+      invitation.revokedAt !== null ||
+      invitation.expiresAt <= now ||
+      !this.#credentialMatches(
+        "spectator-invitation",
+        input.secret,
+        invitation.tokenHash,
+      ) ||
+      (input.requestedGameId !== undefined &&
+        input.requestedGameId !== invitation.gameId)
+    )
+      throw unavailable();
+    const game = this.#requireActiveGame(invitation.gameId);
+    if (invitation.claimedAt !== null) {
+      if (
+        invitation.claimId !== input.claimId ||
+        invitation.sealedClaimCredential === undefined
+      )
+        throw unavailable();
+      let credential: string;
+      try {
+        credential = openInvitationSecret(
+          this.#pepper,
+          invitation.sealedClaimCredential,
+        );
+      } catch {
+        throw unavailable();
+      }
+      const session = this.#findSession(credential);
+      if (
+        session === undefined ||
+        !this.#spectatorBindings.some(
+          (binding) =>
+            binding.id === invitation.bindingId &&
+            binding.invitationLookupId === invitation.lookupId &&
+            binding.sessionId === session.id &&
+            binding.gameId === invitation.gameId &&
+            binding.revokedAt === null,
+        )
+      )
+        throw unavailable();
+      return {
+        credential,
+        sessionId: session.id,
+        gameId: invitation.gameId,
+        view: this.getSpectatorView(credential, invitation.gameId),
+      };
+    }
+    const session = this.#resolveOrCreateSession(input.credential);
+    if (
+      this.#spectatorBindings.some(
+        (binding) =>
+          binding.sessionId === session.sessionId &&
+          binding.gameId === invitation.gameId &&
+          binding.revokedAt === null,
+      )
+    )
+      throw new ServiceError(
+        "invitation_unavailable",
+        "This browser already has spectator access.",
+      );
+    const bindingId = randomUUID();
+    invitation.bindingId = bindingId;
+    invitation.claimId = input.claimId;
+    invitation.claimedAt = now;
+    invitation.claimedAfterSequence = game.state.event_sequence;
+    invitation.sealedClaimCredential = sealInvitationSecret(
+      this.#pepper,
+      session.credential,
+    );
+    this.#destroyInvitationSecret(invitation.lookupId);
+    this.#spectatorBindings.push({
+      id: bindingId,
+      gameId: invitation.gameId,
+      invitationLookupId: invitation.lookupId,
+      sessionId: session.sessionId,
+      version: 1,
+      revokedAt: null,
+      activeAfterSequence: game.state.event_sequence,
+    });
+    return {
+      ...session,
+      gameId: invitation.gameId,
+      view: this.getSpectatorView(session.credential, invitation.gameId),
+    };
+  }
+
+  authenticateSpectator(
+    credential: string | undefined,
+    gameId: string,
+  ): SpectatorAuthorization {
+    this.#requireActiveGame(gameId);
+    const session = this.#findSession(credential);
+    const binding =
+      session === undefined
+        ? undefined
+        : this.#spectatorBindings.find(
+            (candidate) =>
+              candidate.gameId === gameId &&
+              candidate.sessionId === session.id &&
+              candidate.revokedAt === null,
+          );
+    if (binding === undefined || session === undefined)
+      throw new ServiceError(
+        "unauthorized",
+        "Current spectator access is required.",
+      );
+    return {
+      kind: "spectator",
+      bindingId: binding.id,
+      bindingVersion: binding.version,
+      gameId,
+      sessionId: session.id,
+    };
+  }
+
+  getSpectatorView(
+    credential: string | undefined,
+    gameId: string,
+  ): SpectatorView {
+    this.authenticateSpectator(credential, gameId);
+    const game = this.#requireActiveGame(gameId);
+    return {
+      game_id: gameId,
+      state: cloneState(game.state),
+      action_log: publicActionLog(game.actions),
     };
   }
 
@@ -1589,6 +1762,40 @@ export class InMemoryGameService {
         target.revokedAtSequence = game.state.event_sequence + 1;
         this.#destroyInvitationSecret(target.lookupId);
         summary = "Spectator invitation revoked";
+        break;
+      }
+      case "revokeSpectatorAccess": {
+        const target = this.#spectatorInvitations.get(
+          command.payload.lookup_id,
+        );
+        const binding =
+          target === undefined
+            ? undefined
+            : this.#spectatorBindings.find(
+                (candidate) =>
+                  candidate.id === target.bindingId &&
+                  candidate.gameId === authorization.gameId &&
+                  candidate.invitationLookupId === target.lookupId &&
+                  candidate.revokedAt === null,
+              );
+        if (
+          target === undefined ||
+          target.gameId !== authorization.gameId ||
+          target.claimedAt === null ||
+          target.revokedAt !== null ||
+          binding === undefined
+        )
+          throw new ServiceError(
+            "invitation_unavailable",
+            "Spectator access cannot be revoked.",
+          );
+        target.revokedAt = now;
+        target.revokedAtSequence = game.state.event_sequence + 1;
+        delete target.sealedClaimCredential;
+        binding.revokedAt = now;
+        binding.inactiveFromSequence = game.state.event_sequence + 1;
+        this.#destroyInvitationSecret(target.lookupId);
+        summary = "Spectator access revoked";
         break;
       }
       case "issueInvitation":
@@ -2367,7 +2574,11 @@ export class InMemoryGameService {
     const session = this.#findSession(credential);
     if (
       session === undefined ||
-      ![...this.#hostBindings, ...this.#seatBindings].some(
+      ![
+        ...this.#hostBindings,
+        ...this.#seatBindings,
+        ...this.#spectatorBindings,
+      ].some(
         (binding) =>
           binding.gameId === gameId &&
           binding.sessionId === session.id &&
@@ -2437,6 +2648,9 @@ export class InMemoryGameService {
                 issuedAt: invitation.issuedAt,
                 expiresAt: invitation.expiresAt,
                 claimedAt: invitation.claimedAt,
+                ...(invitation.bindingId === undefined
+                  ? {}
+                  : { bindingId: invitation.bindingId }),
                 revokedAt: invitation.revokedAt,
                 ...(invitation.activeAfterSequence === undefined
                   ? {}
@@ -2448,6 +2662,9 @@ export class InMemoryGameService {
                   ? {}
                   : { revokedAtSequence: invitation.revokedAtSequence }),
               })),
+            spectatorBindings: this.#spectatorBindings.filter(
+              (binding) => binding.gameId === gameId,
+            ),
             invitations: [...this.#invitations.values()]
               .filter((invitation) => invitation.gameId === gameId)
               .map((invitation) => ({
@@ -2546,6 +2763,7 @@ export class InMemoryGameService {
         this.#seatBindings.splice(index, 1);
     }
     const retainedSessionIds = new Set([
+      ...this.#spectatorBindings.map((binding) => binding.sessionId),
       ...this.#hostBindings.map((binding) => binding.sessionId),
       ...this.#seatBindings.map((binding) => binding.sessionId),
     ]);
@@ -2557,7 +2775,15 @@ export class InMemoryGameService {
     }
   }
 
+  #dropSpectatorBindings(gameId: string): void {
+    for (let index = this.#spectatorBindings.length - 1; index >= 0; index--) {
+      if (this.#spectatorBindings[index]!.gameId === gameId)
+        this.#spectatorBindings.splice(index, 1);
+    }
+  }
+
   #dropSpectatorInvitations(gameId: string): void {
+    this.#dropSpectatorBindings(gameId);
     for (const [lookupId, invitation] of this.#spectatorInvitations) {
       if (invitation.gameId === gameId) {
         this.#destroyInvitationSecret(lookupId);
@@ -2571,6 +2797,7 @@ export class InMemoryGameService {
     revokedAt: number,
     sequence?: number,
   ): void {
+    this.#dropSpectatorBindings(gameId);
     for (const invitation of this.#spectatorInvitations.values()) {
       if (invitation.gameId !== gameId) continue;
       if (invitation.revokedAt === null) {
@@ -2691,7 +2918,7 @@ export class InMemoryGameService {
   }
 
   #credentialMatches(
-    domain: "invitation" | "recovery-grant",
+    domain: "invitation" | "spectator-invitation" | "recovery-grant",
     credential: string,
     expectedHash: string,
   ): boolean {

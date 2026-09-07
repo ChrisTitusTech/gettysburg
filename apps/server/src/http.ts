@@ -404,6 +404,64 @@ export function configureHttpApplication(
   );
 
   application.post(
+    "/api/spectator-invitations/:lookupId/claim",
+    async (request, response, next) => {
+      try {
+        const {
+          secret,
+          claim_id: claimId,
+          game_id: requestedGameId,
+        } = request.body ?? {};
+        if (
+          typeof secret !== "string" ||
+          typeof claimId !== "string" ||
+          !UUID_PATTERN.test(claimId) ||
+          (requestedGameId !== undefined &&
+            (typeof requestedGameId !== "string" ||
+              !UUID_PATTERN.test(requestedGameId))) ||
+          Object.keys(request.body ?? {}).some(
+            (key) => !["secret", "claim_id", "game_id"].includes(key),
+          )
+        ) {
+          response.status(400).json({ error: "invalid_invitation" });
+          return;
+        }
+        if (!allowBearerClaim(request, response)) return;
+        const credential = readSessionCredential(request);
+        const result = await gameService.claimSpectatorInvitation({
+          secret,
+          claimId,
+          lookupId: request.params.lookupId ?? "",
+          ...(credential === undefined ? {} : { credential }),
+          ...(requestedGameId === undefined ? {} : { requestedGameId }),
+        });
+        setSessionCookie(response, result.credential);
+        response.status(200).json(result.view);
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.get(
+    "/api/games/:gameId/spectator",
+    async (request, response, next) => {
+      try {
+        response
+          .status(200)
+          .json(
+            await gameService.getSpectatorView(
+              readSessionCredential(request),
+              request.params.gameId ?? "",
+            ),
+          );
+      } catch (error) {
+        next(error);
+      }
+    },
+  );
+
+  application.post(
     "/api/recovery/:lookupId/claim",
     async (request, response, next) => {
       try {

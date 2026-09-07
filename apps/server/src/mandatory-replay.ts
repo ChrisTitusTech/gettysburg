@@ -19,14 +19,16 @@ import type {
   Invitation,
   RecoveryGrant,
   SeatBinding,
+  SpectatorBinding,
   StoredAction,
 } from "./game-service.js";
 
 export interface ReplayManagementEvidence {
+  readonly spectatorBindings?: readonly SpectatorBinding[];
   readonly spectatorInvitations?: readonly (Omit<
     ReplayManagementEvidence["invitations"][number],
     "allowedSeat"
-  > & { readonly issuedAt: number })[];
+  > & { readonly issuedAt: number; readonly bindingId?: string })[];
   readonly hosts: readonly HostBinding[];
   readonly invitations: readonly Pick<
     Invitation,
@@ -296,6 +298,21 @@ export function replayMandatoryActions(
     );
     const spectatorBySequence = new Map<number, typeof spectators>();
     const spectatorById = new Map<string, typeof spectators>();
+    const spectatorBindings = (management.spectatorBindings ?? []).filter(
+      (binding) => binding.gameId === gameId,
+    );
+    const spectatorBindingIds = new Set<string>();
+    const spectatorBindingByInvitation = new Map<string, SpectatorBinding>();
+    for (const binding of spectatorBindings) {
+      if (
+        spectatorBindingIds.has(binding.id) ||
+        spectatorBindingByInvitation.has(binding.invitationLookupId) ||
+        binding.version !== 1
+      )
+        throw new ReplayError(0, "ambiguous spectator binding evidence");
+      spectatorBindingIds.add(binding.id);
+      spectatorBindingByInvitation.set(binding.invitationLookupId, binding);
+    }
     const consumedSpectatorIssues = new Set<string>();
     const consumedSpectatorRevocations = new Set<string>();
     for (const invitation of spectators) {
@@ -309,6 +326,29 @@ export function replayMandatoryActions(
             invitation.revokedAtSequence! <= invitation.activeAfterSequence!)
       )
         throw new ReplayError(0, "spectator invitation chronology unavailable");
+      const binding = spectatorBindingByInvitation.get(invitation.lookupId);
+      if (invitation.claimedAt === null) {
+        if (
+          binding !== undefined ||
+          invitation.bindingId !== undefined ||
+          invitation.claimedAfterSequence !== undefined
+        )
+          throw new ReplayError(0, "unclaimed spectator has binding evidence");
+      } else if (
+        binding === undefined ||
+        binding.id !== invitation.bindingId ||
+        !Number.isFinite(invitation.claimedAt) ||
+        invitation.claimedAt < invitation.issuedAt ||
+        invitation.claimedAt >= invitation.expiresAt ||
+        !Number.isSafeInteger(invitation.claimedAfterSequence) ||
+        invitation.claimedAfterSequence! < invitation.activeAfterSequence! ||
+        binding.activeAfterSequence !== invitation.claimedAfterSequence ||
+        binding.revokedAt !== invitation.revokedAt ||
+        binding.inactiveFromSequence !== invitation.revokedAtSequence ||
+        (invitation.revokedAtSequence !== undefined &&
+          invitation.claimedAfterSequence! >= invitation.revokedAtSequence)
+      )
+        throw new ReplayError(0, "invalid spectator claim evidence");
       spectatorById.set(invitation.lookupId, [
         ...(spectatorById.get(invitation.lookupId) ?? []),
         invitation,
@@ -318,6 +358,10 @@ export function replayMandatoryActions(
           ...(spectatorBySequence.get(invitation.activeAfterSequence) ?? []),
           invitation,
         ]);
+    }
+    for (const binding of spectatorBindings) {
+      if (spectatorById.get(binding.invitationLookupId)?.length !== 1)
+        throw new ReplayError(0, "spectator binding has no unique invitation");
     }
     const activeSpectators = new Map<string, (typeof spectators)[number]>();
     const seats = bindingTimeline(seatIndex, "seat", (binding) => binding.side);
@@ -362,6 +406,7 @@ export function replayMandatoryActions(
                 "deleteGame",
                 "issueSpectatorInvitation",
                 "revokeSpectatorInvitation",
+                "revokeSpectatorAccess",
               ].includes(action.commandName ?? "") &&
               action.canonicalizationVersion === COMMAND_SCHEMA_VERSION &&
               typeof action.commandId === "string" &&
@@ -430,6 +475,40 @@ export function replayMandatoryActions(
             activeSpectators.delete(target.lookupId);
             consumedSpectatorRevocations.add(target.lookupId);
           }
+          if (host.command_name === "revokeSpectatorAccess") {
+            const targets = spectatorById.get(host.payload.lookup_id) ?? [];
+            assertReplay(
+              targets.length === 1,
+              "missing or ambiguous spectator access",
+            );
+            const target = targets[0]!;
+            const bindings = (management.spectatorBindings ?? []).filter(
+              (binding) =>
+                binding.gameId === gameId &&
+                binding.id === target.bindingId &&
+                binding.invitationLookupId === target.lookupId,
+            );
+            assertReplay(
+              activeSpectators.has(target.lookupId) &&
+                bindings.length === 1 &&
+                target.claimedAt !== null &&
+                Number.isFinite(target.claimedAt) &&
+                Number.isSafeInteger(target.claimedAfterSequence) &&
+                target.claimedAfterSequence! >= target.activeAfterSequence! &&
+                target.claimedAfterSequence! < sequence &&
+                target.revokedAtSequence === sequence &&
+                target.revokedAt !== null &&
+                Number.isFinite(target.revokedAt) &&
+                bindings[0]!.activeAfterSequence ===
+                  target.claimedAfterSequence &&
+                bindings[0]!.inactiveFromSequence === sequence &&
+                bindings[0]!.revokedAt === target.revokedAt &&
+                bindings[0]!.version === 1,
+              "spectator access was not retired at this sequence",
+            );
+            activeSpectators.delete(target.lookupId);
+            consumedSpectatorRevocations.add(target.lookupId);
+          }
           if (host.command_name === "issueInvitation") {
             const issued = issuedInvitations.get(sequence) ?? [];
             assertReplay(
@@ -482,13 +561,15 @@ export function replayMandatoryActions(
           const summary =
             host.command_name === "issueSpectatorInvitation"
               ? "Spectator invitation issued"
-              : host.command_name === "revokeSpectatorInvitation"
-                ? "Spectator invitation revoked"
-                : host.command_name === "deleteGame"
-                  ? "Game deleted"
-                  : host.command_name === "issueInvitation"
-                    ? `${host.payload.seat} invitation issued`
-                    : `${target[0]!.allowedSeat} invitation revoked`;
+              : host.command_name === "revokeSpectatorAccess"
+                ? "Spectator access revoked"
+                : host.command_name === "revokeSpectatorInvitation"
+                  ? "Spectator invitation revoked"
+                  : host.command_name === "deleteGame"
+                    ? "Game deleted"
+                    : host.command_name === "issueInvitation"
+                      ? `${host.payload.seat} invitation issued`
+                      : `${target[0]!.allowedSeat} invitation revoked`;
           assertReplay(
             equal(hostResult.event, {
               command_id: host.command_id,
@@ -735,6 +816,15 @@ export function replayMandatoryActions(
     // Prefixes may legitimately receive the latest snapshot's future records.
     // Full replay must account for every retained spectator issue/revocation.
     for (const invitation of spectators) {
+      if (
+        expectedFinal !== undefined &&
+        invitation.claimedAfterSequence !== undefined &&
+        invitation.claimedAfterSequence > state.event_sequence
+      )
+        throw new ReplayError(
+          state.event_sequence,
+          "spectator claim is outside retained history",
+        );
       if (
         (expectedFinal !== undefined ||
           invitation.activeAfterSequence! <= state.event_sequence) &&

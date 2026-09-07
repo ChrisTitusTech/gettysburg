@@ -34,6 +34,77 @@ postgres("PostgreSQL durability", () => {
     await administration.end();
   });
 
+  it("restores spectator-only sessions and persists revoked access", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let firstClosed = false;
+    try {
+      await first.migrate();
+      const host = await first.createGame("union");
+      const command = {
+        command_id: randomUUID(),
+        command_name: "issueSpectatorInvitation",
+        payload: {},
+        game_id: host.gameId,
+        expected_version: 0,
+        schema: COMMAND_SCHEMA_VERSION,
+      };
+      const issued = await first.executeHostCommand(
+        await first.authenticateHost(host.credential, host.gameId),
+        command,
+      );
+      if (!issued.ok || !issued.invitation)
+        throw new Error("Missing invitation");
+      const input = {
+        claimId: randomUUID(),
+        lookupId: issued.invitation.lookup_id,
+        secret: issued.invitation.secret,
+      };
+      const observer = await first.claimSpectatorInvitation(input);
+      await first.close();
+      firstClosed = true;
+      await restarted.migrate();
+      expect(await restarted.claimSpectatorInvitation(input)).toEqual(observer);
+      expect(
+        await restarted.getSpectatorView(observer.credential, host.gameId),
+      ).toEqual(observer.view);
+      expect(
+        (await restarted.getReplay(observer.credential, host.gameId)).state,
+      ).toEqual(observer.view.state);
+      expect(
+        (
+          await restarted.executeHostCommand(
+            await restarted.authenticateHost(host.credential, host.gameId),
+            {
+              ...command,
+              command_id: randomUUID(),
+              command_name: "revokeSpectatorAccess",
+              payload: { lookup_id: input.lookupId },
+            },
+          )
+        ).ok,
+      ).toBe(true);
+      await expect(
+        restarted.getSpectatorView(observer.credential, host.gameId),
+      ).rejects.toThrow(/Current spectator access/);
+      await expect(
+        restarted.getReplay(observer.credential, host.gameId),
+      ).rejects.toThrow(/Current game access/);
+      expect(
+        (await restarted.getReplay(host.credential, host.gameId)).sequence,
+      ).toBe(2);
+    } finally {
+      if (!firstClosed) await first.close();
+      await restarted.close();
+    }
+  });
+
   it("persists spectator invitation retry and replay evidence across restart", async () => {
     let firstClosed = false;
     const first = new PostgresGameService({

@@ -730,10 +730,24 @@ Mandatory replay verifies spectator issue/revoke metadata, lifetime, capacity,
 host attribution, hashes, and event sequence without exposing private evidence.
 Full replay accounts for every retained issue and revocation record; historical
 prefixes allow evidence belonging to later audited actions.
-This preparatory increment does not yet expose spectator claiming, bindings,
-room authorization, live viewing, or browser controls. A spectator invitation
-cannot claim a player seat. Those separate delivery gates must pass before
-advertising spectator access as usable.
+The read-only access increment adds a private claim endpoint with a required
+UUID claim identifier, optional expected game, secure browser-session cookie,
+and exact-retry recovery. It creates a separate spectator binding without
+changing either player seat or gameplay state. Read responses expose only game
+state and public events; interpreted replay is available with current access,
+but raw recovery exports, player commands, and host commands require their own
+bindings. Existing legitimate host/seat access in the same browser is preserved.
+The host can auditably `revokeSpectatorAccess` even after the original invitation
+expires; subsequent observer reads and replay are denied immediately. Claims
+expire after 24 hours, while an already claimed observer uses the normal browser
+session lifetime. Game deletion removes observer bindings and sealed retries,
+retaining only invitation hashes/metadata through the deletion window. Replay
+verifies unique claim/binding links and chronology as well as host revocation.
+
+Live room authorization, immediate socket revocation, host grant-list controls,
+and the spectator browser interface remain separate delivery gates. A spectator
+invitation cannot claim a player seat. Do not advertise usable live spectators
+until those gates and desktop/tablet acceptance pass.
 
 ### Core records
 
