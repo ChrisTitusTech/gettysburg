@@ -209,8 +209,10 @@ and its authorized browser controls are merged. Automated desktop/tablet games
 complete all 24 turns with pending-choice reload and exact replay; representative
 owner adjudication against the physical rules remains open. Legacy tabletop
 saves still resume without interpreted replay, so retained-version replay
-coverage needs implementation or an explicit scope decision. This source
-activation is not a deployment or Phase 3 completion. Optional rules/additional
+coverage needs implementation or an explicit scope decision. This source was
+deployed as `dc6b73b` on 2026-09-07, then held behind maintenance after browser
+connection failures. The reviewed repair and target-VPS rerun remain required;
+deployment does not establish Phase 3 completion. Optional rules/additional
 scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in
 `docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.

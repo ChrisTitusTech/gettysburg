@@ -23,6 +23,11 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   This is not final public-release or Phase 3/4 acceptance.
   Public traffic is held in maintenance after repeated browser connection
   timeouts. Do not reopen it until a reviewed repair passes the failed checks.
+  Failed-run environment: Codex engineering automation on ChrisTitusTech's
+  Fedora Linux 44 x86_64 workstation, headless Chromium 151.0.7922.34,
+  1440x900 desktop consent-fixture viewport. Neither physical-device acceptance
+  nor the later two-layout checks completed. Protected diagnostic copies are in
+  `/home/titus/.local/state/gettysburg/acceptance/20260907-rollout`.
 
 ## Owner gameplay acceptance
 

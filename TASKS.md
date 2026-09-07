@@ -94,6 +94,15 @@ management pass at both widths; the two full-game checks are still running.
 These checks precede integration of the concurrent main-branch security changes;
 repeat the gate and exact-head CI on that integration before deployment.
 
+The integration preserves main's security hardening. Frozen installation and
+the full local gate pass: 766 workspace/36 harness tests, format, lint,
+typecheck, build, and smoke. A mistyped database environment variable initially
+skipped the PostgreSQL cases; the corrected dedicated run passes all 336 server
+tests. Fresh independent Codex review against main reports no actionable
+regressions; its focused run omitted PostgreSQL, covered by the separate run.
+Markdown and diff checks pass. The protected pre-deployment recovery set
+`20260907T175422Z` passes isolated restore and off-host checksum/decryption.
+
 ### VPS rollout and acceptance blocker: 2026-09-07
 
 The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55
@@ -119,6 +128,16 @@ browser workflows, and full 24-turn games did not complete. Logs are retained at
 `/tmp/gettysburg-rollout.VX9cqa/browser.log` and `browser-retry.log` on the
 maintainer workstation. Report timing mode was selected for diagnostic Internet
 testing; it did not waive this functional failure or the strict hardware gate.
+
+Durable copies of both failed browser logs and the deployment log are retained
+with mode 0600 under the maintainer's
+`/home/titus/.local/state/gettysburg/acceptance/20260907-rollout` directory;
+the copied browser log's checksum matches its original. These protected local
+diagnostics are not public attachments. Tester: Codex engineering automation on
+ChrisTitusTech's Fedora Linux 44 x86_64 workstation, using headless Chromium
+151.0.7922.34. The failed consent fixture used a 1440x900
+desktop viewport; later planned desktop 1440x900 and touch-tablet 1024x768
+workflows were not reached. No physical tablet/device acceptance is claimed.
 
 A read-only VPS probe measured a 22,778,651-byte JSON service snapshot and three
 query/parse plus hydration timings of 631/437, 480/397, and 521/342 ms.
