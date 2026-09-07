@@ -43,6 +43,15 @@ const migrationsDirectory = fileURLToPath(
   new URL("../migrations", import.meta.url),
 );
 
+// Retained games stay durable, but unrelated boards/action histories must not
+// be transferred and reconstructed for each room read. Authorization metadata
+// remains in the same snapshot, protected by the existing delivery SHARE lock.
+const scopedSnapshotQuery = `SELECT jsonb_set(snapshot, '{games}', (
+  SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
+  FROM jsonb_array_elements(snapshot->'games') AS entry
+  WHERE entry->>0 = ANY($1::text[])
+)) AS snapshot FROM service_state WHERE singleton = true`;
+
 export interface GameService {
   claimPushDelivery(signal?: AbortSignal): Promise<PushDelivery | undefined>;
   authorizePushDelivery(
@@ -388,6 +397,7 @@ export class PostgresGameService implements GameService {
     signal: AbortSignal,
   ) {
     await this.#readForDelivery(
+      undefined, // Provider receipts identify their game inside the snapshot.
       (service) => service.authorizePushDelivery(id, leaseToken, begin),
       signal,
     );
@@ -421,7 +431,7 @@ export class PostgresGameService implements GameService {
     credential: string | undefined,
     gameId: string,
   ) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.getPushSubscriptionStatus(credential, gameId),
     );
   }
@@ -435,9 +445,13 @@ export class PostgresGameService implements GameService {
   readonly #deliverySlots = new DeliverySlots();
   readonly #pepper: Uint8Array;
   async verifyRoomGame(gameId: string, signal: AbortSignal) {
-    await this.#readForDelivery((service) => {
-      service.getGameState(gameId);
-    }, signal);
+    await this.#readForDelivery(
+      [gameId],
+      (service) => {
+        service.getGameState(gameId);
+      },
+      signal,
+    );
   }
   async deliverAuthorizedState(
     authorization: GameAuthorization | SpectatorAuthorization,
@@ -445,6 +459,7 @@ export class PostgresGameService implements GameService {
     signal: AbortSignal,
   ) {
     await this.#readForDelivery(
+      [authorization.gameId],
       (service) =>
         deliver(
           "kind" in authorization
@@ -460,22 +475,23 @@ export class PostgresGameService implements GameService {
     signal: AbortSignal,
   ) {
     await this.#readForDelivery(
+      [...new Set(authorizations.map((authorization) => authorization.gameId))],
       (service) => deliver(service.authorizeSpectatorDelivery(authorizations)),
       signal,
     );
   }
   async authenticateSpectator(credential: string | undefined, gameId: string) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.authenticateSpectator(credential, gameId),
     );
   }
   async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
-    return this.#read((service) =>
+    return this.#read([authorization.gameId], (service) =>
       service.getAuthorizedSpectatorState(authorization),
     );
   }
   async getSpectatorGrants(credential: string | undefined, gameId: string) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.getSpectatorGrants(credential, gameId),
     );
   }
@@ -485,7 +501,7 @@ export class PostgresGameService implements GameService {
     return this.#mutate((service) => service.claimSpectatorInvitation(input));
   }
   async getSpectatorView(credential: string | undefined, gameId: string) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.getSpectatorView(credential, gameId),
     );
   }
@@ -622,7 +638,7 @@ export class PostgresGameService implements GameService {
     gameId: string,
     commandId: string,
   ): Promise<boolean> {
-    return await this.#read((service) =>
+    return await this.#read([gameId], (service) =>
       service.canRetryTerminalDelete(credential, gameId, commandId),
     );
   }
@@ -652,14 +668,16 @@ export class PostgresGameService implements GameService {
   }
 
   async authenticate(credential: string | undefined, gameId: string) {
-    return this.#read((service) => service.authenticate(credential, gameId));
+    return this.#read([gameId], (service) =>
+      service.authenticate(credential, gameId),
+    );
   }
   async authenticateHost(
     credential: string | undefined,
     gameId: string,
     options: { terminalCommandId?: string } = {},
   ) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.authenticateHost(credential, gameId, options),
     );
   }
@@ -768,37 +786,43 @@ export class PostgresGameService implements GameService {
   }
 
   async getActions(gameId: string) {
-    return this.#read((service) => service.getActions(gameId));
+    return this.#read([gameId], (service) => service.getActions(gameId));
   }
   async getActiveInvitations(gameId: string) {
-    return this.#read((service) => service.getActiveInvitations(gameId));
+    return this.#read([gameId], (service) =>
+      service.getActiveInvitations(gameId),
+    );
   }
 
   async getDeletionLedger() {
-    return this.#read((service) => service.getDeletionLedger());
+    return this.#read([], (service) => service.getDeletionLedger());
   }
 
   async getAuthorizedState(authorization: GameAuthorization) {
-    return this.#read((service) => service.getAuthorizedState(authorization));
+    return this.#read([authorization.gameId], (service) =>
+      service.getAuthorizedState(authorization),
+    );
   }
 
   async getGameState(gameId: string) {
-    return this.#read((service) => service.getGameState(gameId));
+    return this.#read([gameId], (service) => service.getGameState(gameId));
   }
   async getGameView(credential: string | undefined, gameId: string) {
-    return this.#read((service) => service.getGameView(credential, gameId));
+    return this.#read([gameId], (service) =>
+      service.getGameView(credential, gameId),
+    );
   }
   async getReplay(
     credential: string | undefined,
     gameId: string,
     sequence?: number,
   ) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.getReplay(credential, gameId, sequence),
     );
   }
   async getRecoveryExport(credential: string | undefined, gameId: string) {
-    return this.#read((service) =>
+    return this.#read([gameId], (service) =>
       service.getRecoveryExport(credential, gameId),
     );
   }
@@ -830,18 +854,20 @@ export class PostgresGameService implements GameService {
   }
 
   async #readForDelivery(
+    gameIds: readonly string[] | undefined,
     operation: (service: InMemoryGameService) => void,
     signal: AbortSignal,
   ): Promise<void> {
     const release = await this.#deliverySlots.acquire(signal);
     try {
-      await this.#readInDeliverySlot(operation, signal);
+      await this.#readInDeliverySlot(gameIds, operation, signal);
     } finally {
       release();
     }
   }
 
   async #readInDeliverySlot(
+    gameIds: readonly string[] | undefined,
     operation: (service: InMemoryGameService) => void,
     signal: AbortSignal,
   ): Promise<void> {
@@ -866,7 +892,10 @@ export class PostgresGameService implements GameService {
       await client.query("BEGIN");
       await client.query("SET LOCAL statement_timeout = '2000ms'");
       const result = await client.query<{ snapshot: GameServiceSnapshot }>(
-        "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE",
+        gameIds === undefined
+          ? "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
+          : `${scopedSnapshotQuery} FOR SHARE`,
+        gameIds === undefined ? [] : [gameIds],
       );
       const snapshot = result.rows[0]?.snapshot;
       if (snapshot === undefined || signal.aborted)
@@ -897,9 +926,13 @@ export class PostgresGameService implements GameService {
     }
   }
 
-  async #read<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
+  async #read<T>(
+    gameIds: readonly string[],
+    operation: (service: InMemoryGameService) => T,
+  ): Promise<T> {
     const result = await this.#pool.query<{ snapshot: GameServiceSnapshot }>(
-      "SELECT snapshot FROM service_state WHERE singleton = true",
+      scopedSnapshotQuery,
+      [gameIds],
     );
     const snapshot = result.rows[0]?.snapshot;
     if (snapshot === undefined)

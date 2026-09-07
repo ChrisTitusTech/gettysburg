@@ -1,4 +1,5 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
+import { connectRoom } from "./connect-room";
 import type { ActionEvent, GameState } from "@gettysburg/game";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -149,9 +150,13 @@ export function SpectatorApp({
     const connect = async () => {
       await refresh();
       if (!active) return;
-      room = await new ColyseusClient(window.location.origin).joinOrCreate(
-        "game",
-        { gameId, spectator: true },
+      room = await connectRoom(
+        () =>
+          new ColyseusClient(window.location.origin).joinOrCreate("game", {
+            gameId,
+            spectator: true,
+          }),
+        controller.signal,
       );
       if (!active) {
         void leaveOpenRoom(room);

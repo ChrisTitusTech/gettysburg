@@ -13,6 +13,7 @@ import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
+import type { GameServiceSnapshot } from "./game-service.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
@@ -35,8 +36,8 @@ function holdNextDeliveryRead(count = 1) {
       const result: unknown = Reflect.apply(original, this, args);
       if (
         remaining > 0 &&
-        args[0] ===
-          "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
+        typeof args[0] === "string" &&
+        args[0].endsWith("FROM service_state WHERE singleton = true FOR SHARE")
       ) {
         remaining--;
         return Promise.resolve(result).then(async (value) => {
@@ -436,6 +437,96 @@ postgres("PostgreSQL durability", () => {
       expect(connections.size).toBe(2);
     } finally {
       query?.mockRestore();
+      await service.close();
+    }
+  });
+
+  it("projects only the requested game for reads without changing retained data", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    let poolQuery: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      const other = await service.createGame("confederate");
+      const originalSnapshot = (
+        await administration.query(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0].snapshot;
+      const seen: string[][] = [];
+      const originalPoolQuery = Pool.prototype.query;
+      poolQuery = vi
+        .spyOn(Pool.prototype, "query")
+        .mockImplementation(function (this: Pool, ...args: unknown[]) {
+          const result: unknown = Reflect.apply(originalPoolQuery, this, args);
+          if (
+            typeof args[0] === "string" &&
+            args[0].startsWith("SELECT jsonb_set(snapshot")
+          ) {
+            return Promise.resolve(result).then((value) => {
+              const rows = (
+                value as { rows: { snapshot: GameServiceSnapshot }[] }
+              ).rows;
+              seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+              return value;
+            });
+          }
+          return result;
+        } as Pool["query"]);
+      const original = PgClient.prototype.query;
+      query = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          const result: unknown = Reflect.apply(original, this, args);
+          if (
+            typeof args[0] === "string" &&
+            args[0].startsWith("SELECT jsonb_set(snapshot")
+          ) {
+            return Promise.resolve(result).then((value) => {
+              const rows = (
+                value as { rows: { snapshot: GameServiceSnapshot }[] }
+              ).rows;
+              seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+              return value;
+            });
+          }
+          return result;
+        } as PgClient["query"]);
+      const authorization = await service.authenticate(
+        host.credential,
+        host.gameId,
+      );
+      await service.verifyRoomGame(host.gameId, new AbortController().signal);
+      await service.deliverAuthorizedState(
+        authorization,
+        (state) => {
+          expect(state.game_id).toBe(host.gameId);
+        },
+        new AbortController().signal,
+      );
+      expect(
+        (await service.getGameView(host.credential, host.gameId)).state.game_id,
+      ).toBe(host.gameId);
+      await expect(
+        service.authenticate(other.credential, host.gameId),
+      ).rejects.toMatchObject({ code: "unauthorized" });
+      expect(seen).toHaveLength(5);
+      for (const ids of seen) expect(ids).toEqual([host.gameId]);
+      await service.getDeletionLedger();
+      expect(seen.at(-1)).toEqual([]);
+      const after = (
+        await administration.query(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0].snapshot;
+      expect(after).toEqual(originalSnapshot);
+    } finally {
+      query?.mockRestore();
+      poolQuery?.mockRestore();
       await service.close();
     }
   });
@@ -919,9 +1010,8 @@ postgres("PostgreSQL durability", () => {
           state: created.state,
         });
         expect(query).toHaveBeenCalledTimes(1);
-        expect(query.mock.calls[0]![0]).toBe(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
-        );
+        expect(query.mock.calls[0]![0]).toContain("SELECT jsonb_set(snapshot");
+        expect(query.mock.calls[0]![1]).toEqual([[created.gameId]]);
       } finally {
         query.mockRestore();
       }

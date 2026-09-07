@@ -54,6 +54,7 @@ describe("authorized broadcast ordering", () => {
       );
       await vi.advanceTimersByTimeAsync(ROOM_DELIVERY_TIMEOUT_MS);
       expect(await result).toBeInstanceOf(Error);
+      expect(await result).toMatchObject({ code: 503 });
       expect(signal?.aborted).toBe(true);
       await retry.onCreate!({ gameId: host.gameId });
       expect(retry.setMetadata).toHaveBeenCalledWith({ gameId: host.gameId });

@@ -2,6 +2,65 @@
 
 ## Current source rollup: 2026-09-07
 
+### Room-delivery repair in validation
+
+The owner authorized repairing and reopening the site for acceptance testing.
+PostgreSQL read paths now project only the requested game's canonical record,
+while preserving the full authorization metadata and existing delivery SHARE
+lock. The two-second deadline, bounded admission, cancellation, and revocation
+checks are unchanged. Mutations and stored snapshots remain unchanged; retained
+games are not deleted, purged, or rewritten by this optimization. Provider
+receipt authorization retains its full-snapshot path because its target game is
+resolved from the receipt. The consent harness also deletes its owned game on
+failed connection before closing browser contexts.
+
+The initial 330-test PostgreSQL run found two stale query-observation assertions;
+the corrected suite passes all 330 tests, including canonical-read isolation,
+foreign-credential rejection, unchanged retained data, cancellation, and locked
+revocation coverage. Five consent-harness tests cover failure cleanup and retain
+the original connection error if cleanup also fails. A private restored VPS
+backup supplies retained-data browser evidence;
+the old source passes basic local browser checks on faster workstation hardware
+but takes about 3.3 seconds to reconnect and 1.85 seconds to synchronize a move.
+That does not invalidate the repeated actual-VPS failure. The documentation PR's
+initial WebKit CI also failed on a connected-session wait; it must pass on the
+repaired exact head, not be treated as a documentation-only exception.
+
+The read projection alone still reproduced the connection failure on an isolated
+VPS database copy: a concurrent write can hold the canonical lock past the read
+deadline. Deadline failures now return explicit transient status 503. Player and
+spectator admission retry only that status, at most four attempts with 250/500/
+1000 ms backoff, cancelling on navigation. Denied/revoked access is not retried.
+Four browser-unit regressions cover success after busy, denial, exhaustion, and
+cancelled backoff; the room-creation test confirms the timed-out attempt frees its
+slot before retry. This preserves the original bounded server deadline rather
+than increasing it. Test fixtures use an isolated clone without the live
+off-host acknowledgement file; the deployed service's readiness policy remains
+unchanged and must pass with a freshly verified backup before rollout.
+
+Full local gates, retained-data full games, independent review, exact-head CI,
+exact-image scan, redeployment, and public browser acceptance remain required
+before the maintenance blocker below is closed. Owner: engineering.
+
+Repair validation: frozen installation, format, lint, typecheck, 759 workspace/
+36 harness tests, separate 330-test PostgreSQL run, build, smoke, Markdown, and
+diff checks pass. Fresh independent Codex review found no actionable regression
+and reran 17 focused tests. CodeRabbit's follow-up review found zero issues in
+the tracked repair files; the new retry helper/tests were included in the Codex
+review. Its earlier query-count concern was checked against the passing database
+suite; the expected five observations are three pool reads and two delivery reads.
+The cleanup-error preservation finding was repaired and regression-tested.
+
+Both retained-data local 24-turn games pass with reload/exact replay evidence in
+`test-results/vps-retained-repaired` (the read-projection increment). The complete
+repair passes private-VPS desktop/tablet consent, connection, movement, reconnect,
+and replay checks in `test-results/vps-private-repair-retry`; full-game and
+remaining observer checks are still running. Observed private-VPS reconnects
+are about 5.9 seconds and input-to-both-players about 4.9 seconds, above the
+performance targets. These diagnostic timings are not waived or release-complete.
+Public traffic remains in maintenance until the reviewed exact-head rollout and
+its required checks succeed.
+
 ### VPS rollout and acceptance blocker: 2026-09-07
 
 The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55

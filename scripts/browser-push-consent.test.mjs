@@ -57,3 +57,74 @@ test("disabled delivery still runs the controlled browser fixture", async () => 
     );
   });
 });
+
+for (const failCleanup of [false, true])
+  test(`connection failure cleanup preserves errors (cleanup failure: ${failCleanup})`, async () => {
+    await withConfig(200, { enabled: false }, async (origin) => {
+      const failure = new Error("connection failed");
+      const cleanupFailure = new Error("deletion failed");
+      const gameUrl = `${origin}/game/00000000-0000-4000-8000-000000000001`;
+      let url = origin;
+      const events = [];
+      const page = {
+        goto: async () => {},
+        url: () => url,
+        getByRole: (_role, { name }) => ({
+          click: async () => {
+            if (name === "Host as Confederate") url = gameUrl;
+            if (name === "Delete game") {
+              events.push("delete");
+              url = `${origin}/`;
+            }
+          },
+        }),
+        getByLabel: () => ({ inputValue: async () => origin }),
+        getByText: () => ({
+          waitFor: async () => {
+            throw failure;
+          },
+        }),
+        once: () => {},
+        waitForResponse: async () => {
+          if (failCleanup) throw cleanupFailure;
+          return {
+            status: () => 200,
+            json: async () => ({ ok: true }),
+          };
+        },
+        waitForURL: async () => {},
+        context: () => ({
+          request: {
+            get: async () => ({
+              status: () => 410,
+              json: async () => ({ error: "game_deleted" }),
+            }),
+          },
+        }),
+      };
+      await assert.rejects(
+        checkPushConsent(
+          {
+            newContext: async () => ({
+              route: async () => {},
+              addInitScript: async () => {},
+              newPage: async () => page,
+              close: async () => {
+                events.push("close");
+              },
+            }),
+          },
+          origin,
+          "unused",
+          {},
+        ),
+        (error) =>
+          failCleanup
+            ? error instanceof AggregateError &&
+              error.errors[0] === failure &&
+              error.errors[1] === cleanupFailure
+            : error === failure,
+      );
+      assert.deepEqual(events, ["delete", "close", "close"]);
+    });
+  });
