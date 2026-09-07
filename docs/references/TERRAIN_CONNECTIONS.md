@@ -62,7 +62,13 @@ pairs, 82 counters with unchanged schedules, eight objectives worth 16 points,
 and empty continuous-movement activation. The first active phase is Union
 movement, turn 1. Each constructor call returns an isolated snapshot; a content
 fingerprint guards against silently changing this revision's interpretation.
-The server does not yet register or create this version pair.
+The server registers this exact pair for saved-state interpretation but does
+not yet create it by default. It requires the complete pinned terrain/edge
+bundle, unit metadata/schedules, objective values, and explicit movement/step
+state. Missing or changed data fails readiness and gameplay with
+`version_unavailable`; it is never filled from today's defaults. JSON object
+key ordering does not matter. This handler preserves saved mandatory state
+without running the older opening/retreat/advance repair routines.
 
 Off-board road/rail links were separately estimated from the approved PNG on
 2026-09-06. The explicit inventory is A2, A7, H11, O11, Q11, S1, U1, W7,
