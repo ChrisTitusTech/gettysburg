@@ -21,6 +21,7 @@
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@colyseus/sdk": "0.17.43",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",

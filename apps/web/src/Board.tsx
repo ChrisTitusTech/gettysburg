@@ -866,7 +866,7 @@ export function Board({
           </p>
           <h2 id="board-heading">A-W / 1-11 field</h2>
         </div>
-        <div className="zoom-controls" aria-label="Board controls">
+        <div className="zoom-controls" role="group" aria-label="Board controls">
           <button
             type="button"
             onClick={() => setZoom((value) => Math.max(MIN_ZOOM, value - 0.35))}
@@ -931,6 +931,7 @@ export function Board({
           </g>
           <g
             aria-label="Board destinations"
+            role="group"
             data-grid-presentation="interaction-only"
           >
             {FIXTURE_HEXES.map((hex) => (
@@ -973,7 +974,7 @@ export function Board({
             ))}
           </g>
           {pendingAdvance?.pending_choice?.kind !== "advance" ? null : (
-            <g aria-label="Available advance destinations">
+            <g role="group" aria-label="Available advance destinations">
               {(
                 pendingAdvance.pending_choice.destination_hexes ??
                 pendingAdvance.defender_hexes ??
@@ -1030,7 +1031,11 @@ export function Board({
             </g>
           )}
           {visibleCombats.length === 0 ? null : (
-            <g aria-label="Detected adjacent combats" className="combat-links">
+            <g
+              role="group"
+              aria-label="Detected adjacent combats"
+              className="combat-links"
+            >
               {visibleCombats.flatMap((opportunity) =>
                 opportunity.attacker_hexes.flatMap((attackerHex) =>
                   opportunity.defender_hexes
@@ -1113,7 +1118,7 @@ export function Board({
               })()}
             </g>
           )}
-          <g aria-label="Counters">
+          <g role="group" aria-label="Counters">
             {renderedUnits.map((unit) => {
               if (unit.location === null || unit.status !== "deployed") {
                 return null;

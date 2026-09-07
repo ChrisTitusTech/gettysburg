@@ -1861,6 +1861,30 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Accessibility audit increment
+
+Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
+the lobby, both live player views, and inspected replay at desktop and tablet
+widths. Retain only rule IDs, severity, counts, and help URLs, never raw HTML or
+private invitation/session values. Do not suppress automated violations.
+Initial checks found no violations but required review of ARIA labels and
+contrast. Labels on generic containers were not reliably exposed to assistive
+technology; named host-seat, board, counter, combat, and replay groups now have
+explicit group roles with semantic regression assertions. Corrected two-session
+browser checks pass in `test-results/accessibility-corrected`, leaving only
+gradient/image/SVG contrast as an incomplete automated rule. Full local gates,
+24-turn and input revalidation pass (739 workspace/nine harness tests).
+Both final games cover all three combat choices, reload, exact replay, and
+spectators in `test-results/accessibility-final`; input evidence is in its
+`-fixtures` directory. The rendered desktop board was inspected. Fresh
+independent review found no actionable defects and reran 146 web tests.
+Exact-head CI follows; unchanged backend retains the 329-test PostgreSQL gate.
+
+Owner/manual gate remains open: verify contrast over the painted board and
+gradient surfaces, keyboard focus order and combat choices, actual screen-reader
+announcements, reduced motion, and current Firefox/Safari/iPad behavior. An axe
+pass is not a complete accessibility audit or Phase 4 acceptance.
+
 ### Observer browser implementation
 
 Latest integration review: The reviewed transport handshake fix is integrated.

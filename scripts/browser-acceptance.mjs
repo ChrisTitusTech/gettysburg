@@ -12,6 +12,7 @@ import { runEnforcedGame } from "./browser-enforced-game.mjs";
 import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
 import { checkPushWorker } from "./browser-push-worker.mjs";
+import { auditAccessibility } from "./browser-accessibility.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -219,6 +220,11 @@ async function runScenario(browser, origin, options) {
 
   try {
     await hostPage.goto(origin);
+    await auditAccessibility(
+      hostPage,
+      evidenceDirectory,
+      `${options.label}-lobby`,
+    );
     await hostPage
       .getByRole("button", { name: `Host as ${options.hostName}` })
       .click();
@@ -237,6 +243,16 @@ async function runScenario(browser, origin, options) {
     assert.equal(new URL(opponentPage.url()).hash, "");
     await opponentPage.getByRole("button", { name: "Claim seat" }).click();
     await opponentPage.getByText("connected", { exact: true }).waitFor();
+    await auditAccessibility(
+      hostPage,
+      evidenceDirectory,
+      `${options.label}-host`,
+    );
+    await auditAccessibility(
+      opponentPage,
+      evidenceDirectory,
+      `${options.label}-opponent`,
+    );
     assert.equal(
       await opponentPage.getByRole("definition").first().innerText(),
       options.opponentName,
@@ -365,6 +381,11 @@ async function runScenario(browser, origin, options) {
     await viewer
       .getByText("Read-only history; no commands are sent.")
       .waitFor();
+    await auditAccessibility(
+      unionPage,
+      evidenceDirectory,
+      `${options.label}-replay`,
+    );
     await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
     const replayBoard = viewer.locator(".board-svg");
     const beforePan = await replayBoard.getAttribute("viewBox");
