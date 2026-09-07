@@ -500,8 +500,15 @@ validation remain separate gates.
     desktop/tablet and 24-turn regression pass
     (`test-results/mandatory-content-regression`); mandatory keyboard/touch
     browser fixtures also pass (`test-results/mandatory-content-fixtures`).
-    Fresh independent built-in review found no actionable defects. Exact-head
-    CI and published review checks remain required before merge.
+    Initial independent review and hosted Codex review found no actionable
+    defects. Exact-head CI then timed out capturing a held drag before startup
+    and container smoke could run. The harness now captures the page without
+    locator auto-scroll/actionability while the pointer is held; route assertions
+    and actual input release remain unchanged. The full local gate and repaired
+    desktop/tablet browser fixtures pass; the held-drag image was visually
+    inspected (`test-results/mandatory-content-capture-repair`). Fresh independent
+    review found no actionable regression. Require all repaired-head CI gates
+    and published review checks before merge.
 - [ ] Complete mandatory reinforcement/night guidance and live acceptance.
   - Scope: Select scheduled counters for single or joint entry; preview actual
     costs and nearest legal enemy-free alternatives, and explain friendly
