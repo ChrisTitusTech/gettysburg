@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@colyseus/core": "0.17.42",
-    "@colyseus/ws-transport": "0.17.13",
+    "@colyseus/ws-transport": "0.18.2",
     "@gettysburg/content": "workspace:*",
     "@gettysburg/game": "workspace:*",
     "canonicalize": "4.0.0",
