@@ -1861,6 +1861,110 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Observer browser implementation
+
+Latest integration review: The reviewed transport handshake fix is integrated.
+The full local gate passes 613 workspace/nine harness tests; transport's 219
+PostgreSQL tests cover unchanged backend code. Both widths completed full games,
+reload, exact replay, and input fixtures in `test-results/spectator-joined-integration`
+and its `-fixtures` directory (desktop covered all three choices). Fresh review
+found replay authorization failures retained the surrounding cached live view.
+The repair propagates definitive access/deletion failures to the observer
+disconnect handler, clearing both views and closing the socket. Eight added
+tests distinguish access denial from 409/429/500 and ignore cancelled replay
+failures; all 132 web tests and typecheck pass. The real browser harness now
+injects an idle-socket replay 401, verifies both views clear, and explicitly
+reauthorizes. Full gates, fresh review, browser evidence, and exact-head CI must
+repeat before publication/merge; no release gate is waived.
+The replay-denial repair passes the complete local gate (621 workspace/nine
+harness tests), with the prior 219 PostgreSQL tests covering unchanged backend
+code. Fresh independent review found no actionable defects and reran 132 web
+tests. Desktop/tablet full games, pending-result reload/exact replay, live and
+replay access clearing after an injected 401, explicit reauthorization, and
+input fixtures pass in `test-results/spectator-replay-denial` and its `-fixtures`
+directory (all three choices on tablet). Publish this observer repair; the base
+transport's newly reported queued-checkout cancellation issue and final
+exact-head CI/review checks still prevent the dependent PR merge.
+
+- [ ] Add the separate read-only observer screen.
+  - Scope: Fragment-only private claim links, stable claim retry UUIDs, explicit
+    observer role, reload/bookmark resume, monotonic state/events with gap
+    repair, read-only counter inspection and replay, and fail-closed clearing
+    on disconnect/revocation/deletion. Preserve the player lobby preference.
+    Host link creation remains a separate small increment. No terrain, assets,
+    saved-rule compatibility, or release-approval changes are included.
+  - Validation plan: Unit tests cover route isolation, stripped fragments,
+    exact claim retries, StrictMode cleanup, stale snapshots, missing events,
+    disconnect/reconnect, and absence of gameplay sends. Extend the existing
+    three-session desktop/tablet host-control check with visible observer claim,
+    live player updates, reload, replay, counter inspection, and revocation
+    clearing. Issuance alone remains API fixture setup until its UI ships.
+    Run full local/database/browser gates, fresh independent review, exact-head
+    CI, and final review-thread checks before merge. Owner: ChrisTitusTech.
+  - Initial checks: 117 web tests, typecheck, and lint pass after removing an
+    unused placeholder callback argument in the new test. Real-browser
+    integration waits for the live transport repair; no completion is claimed.
+  - Integration: Combined local gates pass 601 workspace/nine harness tests and
+    all 212 PostgreSQL tests. Independent review found the SDK's recoverable
+    socket-drop path kept the screen connected during automatic retries.
+    Observers now disable SDK automatic reconnection, so every drop clears the
+    board immediately and only the explicit reconnect reauthorizes. Regressions
+    cover abnormal closure and a real browser socket drop/reconnect. Repeat full
+    gates and fresh independent review after this repair before publication.
+    The first socket-drop harness attempt failed before connection when routing
+    the binary socket through Playwright; it is not acceptance evidence. Use
+    browser offline emulation without replacing the actual transport, then
+    revalidate. Visual inspection also found the browser-default blue lobby
+    link unreadable on the dark background; it now has a high-contrast color,
+    a larger hit area, and explicit keyboard focus styling.
+    Offline emulation now passes real disconnect/clear/reconnect at both
+    desktop and tablet widths in `test-results/spectator-offline-check`, along
+    with claim, inspection, live updates, reload, replay, and host revocation.
+    The full local gate passes 602 workspace/nine harness tests. The first
+    pre-drop full games/input fixtures passed in `test-results/spectator-browser`
+    and its `-fixtures` directory; a fresh full run and review follow the repaired
+    harness and lobby-link styling before publication.
+    Full desktop/tablet games, all three choices on tablet, reload/replay,
+    offline/explicit reconnect, revocation clearing, and input fixtures pass in
+    `test-results/spectator-observer-final` and its `-fixtures` directory.
+    A further independent review found older HTTP gap-repair responses could
+    lose missing actions after newer socket state arrived. Recent actions now
+    merge/deduplicate independently of monotonic board state, including late
+    events, and a snapshot without its event triggers repair. The delayed-read
+    regression passes with all 119 web tests, typecheck, and lint; repeat the
+    complete gates/review before publication.
+    A further race involved a later management event advancing chronology ahead
+    of a missing gameplay snapshot. Complete-snapshot freshness is now tracked
+    separately from received event chronology, preserving newer management
+    sequence numbers while accepting the missing authoritative board state.
+    Both HTTP and socket regressions pass with all 121 web tests, typecheck,
+    and lint. Prior full games/input fixtures passed in
+    `test-results/spectator-history-reconciliation` and its `-fixtures`
+    directory; reverify the latest fix before publication.
+  - Final validation: With the reviewed transport repair integrated, the full
+    local gate passes 606 workspace/nine harness tests and all 214 PostgreSQL
+    tests. Fresh independent review found no actionable defects and reran 121
+    web tests. Desktop/tablet full games, all three choices on both widths,
+    pending-result reload/exact replay, offline/explicit reconnect, live state,
+    inspection, host revocation clearing, and input fixtures pass in
+    `test-results/spectator-snapshot-reconciliation` and its `-fixtures`
+    directory. Rendered desktop/tablet layouts were inspected; the lobby-link
+    contrast repair is included. Publish as a bounded PR stacked on transport,
+    then verify exact-head CI and final threads before merge. Host link creation
+    remains a separate PR; CodeRabbit limits are skipped as authorized.
+  - PR #40 head `b3dce87` passed Application `34102581640` and Documentation
+    `34102581605`. Integrating the separately reviewed host-link UI replaces
+    the last issuance API fixture with visible controls; claim, live updates,
+    replay, offline/reconnect, and revocation are now one browser workflow.
+    The combined local gate passes 609 workspace/nine harness tests, with the
+    prior 214 PostgreSQL tests covering unchanged backend code. Fresh review
+    found no actionable defects and reran all 124 web tests. Both widths pass
+    24 turns, all three choices, reload and exact replay in
+    `test-results/spectator-complete-ui`; desktop rendering was inspected.
+    Input fixtures pass in `test-results/spectator-complete-ui-fixtures`.
+    The reviewed delivery-pool/result-ordering repair, final integrated review,
+    and exact-head CI remain before merge.
+
 ### Protected browser push subscriptions
 
 Integrated validation: full local gates pass 637 workspace/nine harness tests,
@@ -2005,6 +2109,19 @@ Documentation `34105754816`; this integration requires new exact-head checks.
   linked in SPEC.md is preparation, not evidence of completed acceptance.
 
 ### Host spectator link creation
+
+Final observer integration: full local gates pass 624 workspace/nine harness
+tests, with the reviewed transport's 223 PostgreSQL tests covering unchanged
+server code. Fresh independent review passes all 132 web tests without findings.
+Desktop/tablet complete 24 turns, reload and exact replay, visible host issuance,
+observer claim/reload/live updates, explicit reconnect, replay denial cleanup,
+and revocation in `test-results/spectator-ui-pending-ack`; input fixtures pass in
+its `-fixtures` directory. Tablet covers all three combat choices; desktop
+loss/advance and earlier runs cover retreat. Tablet observer rendering was
+visually inspected in `test-results/spectator-ui-checkout-integration`.
+Previous head `afe7ba5` passed Application `34106799771` and Documentation
+`34106799747`; this integration needs new exact-head checks and final threads.
+Transport and host-link PRs must merge before the combined observer delivery.
 
 Final transport integration: the full local gate passes 606 workspace/nine
 harness tests; the unchanged server's 223 PostgreSQL tests pass on the reviewed

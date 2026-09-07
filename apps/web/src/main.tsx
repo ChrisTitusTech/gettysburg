@@ -2,6 +2,8 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
+import { SpectatorApp } from "./SpectatorApp";
+import { consumeSpectatorInvitationFragment } from "./spectator-invitation";
 import { consumeSecretGrantFragment } from "./invitation";
 import "./styles.css";
 
@@ -13,8 +15,20 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App
-      initialGrant={consumeSecretGrantFragment(window.location, window.history)}
-    />
+    {window.location.pathname.startsWith("/observe/") ? (
+      <SpectatorApp
+        initialGrant={consumeSpectatorInvitationFragment(
+          window.location,
+          window.history,
+        )}
+      />
+    ) : (
+      <App
+        initialGrant={consumeSecretGrantFragment(
+          window.location,
+          window.history,
+        )}
+      />
+    )}
   </StrictMode>,
 );

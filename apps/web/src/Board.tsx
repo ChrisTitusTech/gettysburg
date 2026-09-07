@@ -39,6 +39,7 @@ import { previewAdvance } from "./advance-preview";
 
 interface BoardProps {
   readonly readOnly?: boolean;
+  readonly readOnlyMode?: "history" | "live";
   readonly onExit?: (unitIds: readonly string[]) => void;
   readonly onAdvance?: (
     combatId: string,
@@ -115,6 +116,7 @@ function unitFactor(combat: number | null, movement: number): string {
 export function Board({
   disabled: inputDisabled = false,
   readOnly = false,
+  readOnlyMode = "history",
   error,
   onAdvance = () => undefined,
   onMove,
@@ -124,6 +126,10 @@ export function Board({
   state,
 }: BoardProps) {
   const disabled = inputDisabled || readOnly;
+  const readOnlyNotice =
+    readOnlyMode === "live"
+      ? "Read-only live board; no commands are sent."
+      : "Read-only history; no commands are sent.";
   const mandatory = state.ruleset_version === MANDATORY_RULESET_VERSION;
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
@@ -393,9 +399,7 @@ export function Board({
     if (selectedUnit === undefined || selectedUnit.location === null) return;
     if (disabled) {
       setMovementNotice(
-        readOnly
-          ? "Read-only history; no commands are sent."
-          : "Waiting for the authoritative server.",
+        readOnly ? readOnlyNotice : "Waiting for the authoritative server.",
       );
       return;
     }
@@ -901,7 +905,7 @@ export function Board({
           ref={svgReference}
           aria-label={
             readOnly
-              ? "Read-only replay board. Pan, zoom, and inspect counters from either side."
+              ? `Read-only ${readOnlyMode === "live" ? "live" : "replay"} board. Pan, zoom, and inspect counters from either side.`
               : `Interactive ${mandatory ? "mandatory-rules" : "rules-light"} hex board. Drag to pan, use the controls to zoom, and select your counter before choosing a destination.`
           }
           className="board-svg"
@@ -1197,7 +1201,11 @@ export function Board({
       >
         <div>
           <p className="inspector-label">
-            {readOnly ? "Viewing history" : "Your seat"}
+            {readOnly
+              ? readOnlyMode === "live"
+                ? "Spectating live game"
+                : "Viewing history"
+              : "Your seat"}
           </p>
           <strong>
             {readOnly
@@ -1253,7 +1261,11 @@ export function Board({
         </div>
         <div className="drag-guidance">
           <strong>
-            {readOnly ? "Read-only replay" : "Board drag controls"}
+            {readOnly
+              ? readOnlyMode === "live"
+                ? "Read-only observation"
+                : "Read-only replay"
+              : "Board drag controls"}
           </strong>
           <span>
             {readOnly
@@ -1269,7 +1281,7 @@ export function Board({
           {error ??
             movementNotice ??
             (readOnly
-              ? "Read-only history; no commands are sent."
+              ? readOnlyNotice
               : disabled
                 ? "Waiting for the authoritative server."
                 : "Drag a stack to move it together. Hold Ctrl or turn on One counter before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
