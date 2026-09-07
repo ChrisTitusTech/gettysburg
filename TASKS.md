@@ -1803,6 +1803,14 @@ validation remain separate gates.
     handshake authorization gap, also reproduced by the combined observer
     review. Keep this local integration unpublished until the base repair,
     fresh review, and exact-head CI clear; no merge readiness is claimed.
+    The handshake repair `d8d7b08` is now integrated. The full local gate passes
+    603 workspace/nine harness tests; the transport's 219 PostgreSQL tests cover
+    the unchanged backend. Fresh review against the repaired transport found
+    no actionable defects and reran 114 web tests. Desktop/tablet full games,
+    pending-result reload, exact replay, and input fixtures pass in
+    `test-results/spectator-link-joined-integration` and its `-fixtures`
+    directory (all three choices on desktop). Publish the integration, verify
+    exact-head CI/final threads, and merge the transport base before this PR.
 
 ## Phase 0 completion gate
 
