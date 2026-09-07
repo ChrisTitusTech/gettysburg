@@ -8,6 +8,7 @@ import {
 } from "@gettysburg/game";
 
 import type { GameEventBus } from "./event-bus.js";
+import { withinDeliveryDeadline } from "./delivery-deadline.js";
 import {
   ServiceError,
   type GameAuthorization,
@@ -77,6 +78,7 @@ export function createGettysburgRoom(
     { count: number; windowStartedAt: number }
   >();
   let lastCommandWindowPruneAt = 0;
+  const activeRooms = new Map<string, object>();
   return class GettysburgRoom extends Room {
     // Keep the room matchable while a reload overlaps the old socket. onJoin
     // replaces the prior connection for the same binding, so stable occupancy
@@ -91,6 +93,7 @@ export function createGettysburgRoom(
     #delivery: Promise<void> = Promise.resolve();
     readonly #deliveredSequence = new WeakMap<Client, number>();
     readonly #deliveryClosed = new WeakSet<Client>();
+    readonly #joining = new WeakMap<Client, AbortController>();
 
     #retireBinding(bindingId: string): void {
       this.#retiredBindings.add(bindingId);
@@ -124,7 +127,6 @@ export function createGettysburgRoom(
     async #deliverAuthorized(
       messages: readonly DeliveryMessage[],
     ): Promise<void> {
-      const sequence = messages[0]?.[1].event_sequence ?? 0;
       const authorizations = [...this.clients].flatMap((client) => {
         const authorization = client.auth as RoomAuthorization | undefined;
         return authorization !== undefined &&
@@ -133,17 +135,23 @@ export function createGettysburgRoom(
           ? [authorization]
           : [];
       });
-      let permitted: ReadonlySet<string> = new Set();
       if (authorizations.length > 0) {
         try {
-          // One fresh snapshot read covers every observer. This also closes the
-          // window between a committed revocation and delayed event delivery.
-          permitted = new Set(
-            await gameService.authorizeSpectatorDelivery(authorizations),
+          await withinDeliveryDeadline((signal) =>
+            gameService.deliverAuthorizedSpectators(
+              authorizations,
+              (allowed) => {
+                if (signal.aborted) return;
+                const permitted = new Set(allowed);
+                for (const authorization of authorizations)
+                  if (!permitted.has(authorization.bindingId))
+                    this.#retireBinding(authorization.bindingId);
+                this.#sendAuthorized(messages, permitted);
+              },
+              signal,
+            ),
           );
-          for (const authorization of authorizations)
-            if (!permitted.has(authorization.bindingId))
-              this.#retireBinding(authorization.bindingId);
+          return;
         } catch {
           // An unavailable authorization read must never fall back to cached
           // spectator access or leave observers silently connected to stale
@@ -158,6 +166,14 @@ export function createGettysburgRoom(
           }
         }
       }
+      this.#sendAuthorized(messages, new Set());
+    }
+
+    #sendAuthorized(
+      messages: readonly DeliveryMessage[],
+      permitted: ReadonlySet<string>,
+    ): void {
+      const sequence = messages[0]?.[1].event_sequence ?? 0;
       for (const client of [...this.clients]) {
         const authorization = client.auth as RoomAuthorization | undefined;
         if (
@@ -175,7 +191,22 @@ export function createGettysburgRoom(
 
     override async onCreate(options: GameRoomOptions): Promise<void> {
       this.#gameId = options.gameId;
-      await gameService.getGameState(this.#gameId);
+      // Matchmaking may try to create another room when overlapping reloads
+      // fill the first. Reject that attempt instead of splitting gameplay.
+      if (activeRooms.has(this.#gameId))
+        throw new Error(
+          "This game already has a room. Retry joining when a slot is available.",
+        );
+      activeRooms.set(this.#gameId, this);
+      try {
+        await withinDeliveryDeadline(() =>
+          gameService.getGameState(this.#gameId),
+        );
+      } catch (error) {
+        if (activeRooms.get(this.#gameId) === this)
+          activeRooms.delete(this.#gameId);
+        throw error;
+      }
       this.setMetadata({ gameId: this.#gameId });
       this.#unsubscribeManagement = eventBus?.subscribeManagement(
         this.#gameId,
@@ -222,11 +253,6 @@ export function createGettysburgRoom(
           try {
             if (!this.#canReceive(client)) return;
             const authorization = client.auth as RoomAuthorization;
-            if (isSpectator(authorization))
-              throw new ServiceError(
-                "unauthorized",
-                "Spectators cannot send gameplay commands.",
-              );
             const now = Date.now();
             if (now - lastCommandWindowPruneAt >= ROOM_COMMAND_WINDOW_MS) {
               pruneExpiredCommandWindows(commandWindows, now);
@@ -249,6 +275,11 @@ export function createGettysburgRoom(
             }
             window.count += 1;
             commandWindows.set(authorization.bindingId, window);
+            if (isSpectator(authorization))
+              throw new ServiceError(
+                "unauthorized",
+                "Spectators cannot send gameplay commands.",
+              );
             if (!(await readiness.isReady())) {
               client.send("commandResult", {
                 current_version: 0,
@@ -292,8 +323,16 @@ export function createGettysburgRoom(
     }
 
     override onDispose(): void {
+      if (activeRooms.get(this.#gameId) === this)
+        activeRooms.delete(this.#gameId);
       this.#unsubscribeAudit?.();
       this.#unsubscribeManagement?.();
+    }
+
+    override onLeave(client: Client): void {
+      this.#deliveryClosed.add(client);
+      this.#joining.get(client)?.abort();
+      this.#joining.delete(client);
     }
 
     override async onAuth(
@@ -325,6 +364,15 @@ export function createGettysburgRoom(
       // them. Later batches wait behind that read, so none can disappear while
       // a captured (potentially older) snapshot is still loading.
       this.#deliveredSequence.set(client, Infinity);
+      const cancelled = new AbortController();
+      this.#joining.set(client, cancelled);
+      // Colyseus defers onLeave until onJoin settles. Observe the socket itself
+      // so an abandoned initial read releases its database lock immediately.
+      const onClose = () => {
+        this.#deliveryClosed.add(client);
+        cancelled.abort();
+      };
+      client.ref.once("close", onClose);
       const authorization = client.auth as RoomAuthorization;
       for (const existing of [...this.clients]) {
         if (
@@ -333,17 +381,32 @@ export function createGettysburgRoom(
             authorization.bindingId
         ) {
           existing.leave(4000);
+          this.#deliveryClosed.add(existing);
+          this.#joining.get(existing)?.abort();
         }
       }
-      await this.#enqueueDelivery(async () => {
-        const state = isSpectator(authorization)
-          ? await gameService.getAuthorizedSpectatorState(authorization)
-          : await gameService.getAuthorizedState(authorization);
-        if (this.#canReceive(client)) {
-          client.send("snapshot", state);
-          this.#deliveredSequence.set(client, state.event_sequence);
-        }
-      });
+      try {
+        await this.#enqueueDelivery(async () => {
+          if (cancelled.signal.aborted || !this.#canReceive(client)) return;
+          await withinDeliveryDeadline(
+            (signal) =>
+              gameService.deliverAuthorizedState(
+                authorization,
+                (state) => {
+                  if (!signal.aborted && this.#canReceive(client)) {
+                    client.send("snapshot", state);
+                    this.#deliveredSequence.set(client, state.event_sequence);
+                  }
+                },
+                signal,
+              ),
+            cancelled.signal,
+          );
+        });
+      } finally {
+        client.ref.removeListener("close", onClose);
+        this.#joining.delete(client);
+      }
     }
   };
 }

@@ -83,6 +83,76 @@ describe("Colyseus authoritative room", () => {
     }
   });
 
+  it("cancels an abandoned initial read before Colyseus invokes onLeave", async () => {
+    const service = new InMemoryAsyncGameService();
+    const host = await service.createGame("union");
+    const guest = await service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    const port = await reservePort();
+    const origin = `http://127.0.0.1:${port}`;
+    server = createGettysburgServer({
+      gameService: service,
+      readiness: { isReady: () => true },
+      trustedWebSocketOrigin: origin,
+    });
+    await server.listen(port, "127.0.0.1");
+    const connect = (credential: string) =>
+      new ColyseusClient(origin, {
+        headers: { origin, cookie: `__Host-gettysburg-session=${credential}` },
+      }).joinOrCreate("game", { gameId: host.gameId });
+    const player = await connect(host.credential);
+    rooms.push(player);
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let signal: AbortSignal | undefined;
+    const deliver = vi.fn();
+    vi.spyOn(service, "deliverAuthorizedState").mockImplementationOnce(
+      async (_authorization, _deliver, cancellation) => {
+        signal = cancellation;
+        await barrier;
+        if (!cancellation.aborted) deliver();
+      },
+    );
+    const joining = connect(guest.credential).then(
+      () => {
+        throw new Error("Abandoned join unexpectedly succeeded");
+      },
+      (error: unknown) => error,
+    );
+    try {
+      await vi.waitFor(() => expect(signal).toBeDefined());
+      const room = matchMaker.getLocalRoomById(player.roomId)!;
+      const pending = room.clients.find(
+        (client) => client.sessionId !== player.sessionId,
+      )!;
+      // Closing the real transport during onJoin exercises Colyseus's deferred
+      // onLeave lifecycle, rather than calling our hook directly.
+      pending.leave(4000);
+      await vi.waitFor(() => expect(signal?.aborted).toBe(true), {
+        timeout: 1_000,
+      });
+      expect(await joining).toBeInstanceOf(Error);
+      release();
+      const result = nextMessage<CommandResult>(player, "commandResult");
+      player.send("endPhase", {
+        command_id: randomUUID(),
+        command_name: "endPhase",
+        payload: {},
+        expected_version: 0,
+        game_id: host.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+      });
+      expect(await result).toMatchObject({ ok: true });
+      expect(deliver).not.toHaveBeenCalled();
+    } finally {
+      release();
+    }
+  });
+
   it("stops delivering live state when an observer session expires", async () => {
     const pepper = randomBytes(32);
     const initial = new InMemoryGameService({ pepper });
@@ -224,6 +294,20 @@ describe("Colyseus authoritative room", () => {
     for (const observer of observers)
       observerRooms.push(await connect(observer.credential, true));
     expect(new Set(rooms.map((room) => room.roomId)).size).toBe(1);
+    const authoritativeRoom = matchMaker.getLocalRoomById(hostRoom.roomId);
+    // Full rooms are excluded from joinOrCreate matching just like a locked
+    // room. A replacement creation must fail instead of splitting this game.
+    await authoritativeRoom.lock();
+    try {
+      await expect(connect(observers[0]!.credential, true)).rejects.toThrow(
+        /already has a room/,
+      );
+      expect(
+        (await matchMaker.query({ name: "game" })).map((room) => room.roomId),
+      ).toEqual([hostRoom.roomId]);
+    } finally {
+      await authoritativeRoom.unlock();
+    }
     await expect(connect(observers[0]!.credential)).rejects.toThrow(
       /seat binding/,
     );
@@ -243,6 +327,18 @@ describe("Colyseus authoritative room", () => {
       await expect(denied).resolves.toMatchObject({
         ok: false,
         error: "unauthorized",
+      });
+    }
+    for (
+      let index = Object.keys(commandPayloadSchemas).length;
+      index <= ROOM_COMMAND_LIMIT;
+      index++
+    ) {
+      const denied = nextMessage<CommandResult>(observerRoom, "commandResult");
+      observerRoom.send("endPhase", hostCommand("endPhase"));
+      await expect(denied).resolves.toMatchObject({
+        ok: false,
+        error: index === ROOM_COMMAND_LIMIT ? "rate_limited" : "unauthorized",
       });
     }
     expect(service.getGameState(host.gameId).version).toBe(0);

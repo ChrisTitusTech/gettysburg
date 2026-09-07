@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { EventEmitter } from "node:events";
 import type { Client } from "@colyseus/core";
 import { COMMAND_SCHEMA_VERSION, type ManagementEvent } from "@gettysburg/game";
 import { describe, expect, it, vi } from "vitest";
@@ -6,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createGettysburgRoom, pruneExpiredCommandWindows } from "./room.js";
 import { GameEventBus } from "./event-bus.js";
 import { InMemoryAsyncGameService } from "./postgres-store.js";
+import { ROOM_DELIVERY_TIMEOUT_MS } from "./delivery-deadline.js";
 
 describe("command-window pruning", () => {
   it("removes expired bindings while preserving active reconnect limits", () => {
@@ -23,9 +25,86 @@ describe("command-window pruning", () => {
 });
 
 describe("authorized broadcast ordering", () => {
+  it.each(["disconnect", "timeout"])(
+    "releases established delivery after a pending join %s",
+    async (cause) => {
+      vi.useFakeTimers();
+      const service = new InMemoryAsyncGameService();
+      const host = await service.createGame("union");
+      const guest = await service.claimInvitation({
+        lookupId: host.invitation.lookup_id,
+        secret: host.invitation.secret,
+      });
+      const bus = new GameEventBus();
+      const Room = createGettysburgRoom(service, { isReady: () => true }, bus);
+      const room = new Room();
+      vi.spyOn(room, "setMetadata").mockResolvedValue(undefined);
+      const player = {
+        auth: await service.authenticate(host.credential, host.gameId),
+        send: vi.fn(),
+        leave: vi.fn(),
+      } as unknown as Client;
+      const joining = {
+        ref: new EventEmitter(),
+        auth: await service.authenticate(guest.credential, host.gameId),
+        send: vi.fn(),
+        leave: vi.fn(),
+      } as unknown as Client;
+      room.clients.push(player, joining);
+      let release!: () => void;
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const initial = await service.getGameState(host.gameId);
+      const read = vi
+        .spyOn(service, "deliverAuthorizedState")
+        .mockImplementationOnce(async (_authorization, deliver, signal) => {
+          await barrier;
+          if (!signal.aborted) deliver(initial);
+        });
+      try {
+        await room.onCreate!({ gameId: host.gameId });
+        const result = Promise.resolve(room.onJoin!(joining, {})).then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        await Promise.resolve();
+        expect(read).toHaveBeenCalledOnce();
+        bus.publishManagement(host.gameId, {
+          command_id: randomUUID(),
+          command_name: "issueSpectatorInvitation",
+          event_sequence: 1,
+          state_version: 0,
+          kind: "host_management",
+          summary: "queued update",
+        });
+        if (cause === "disconnect") joining.ref.emit("close", 1000);
+        else await vi.advanceTimersByTimeAsync(ROOM_DELIVERY_TIMEOUT_MS);
+        expect(await result).toBeInstanceOf(Error);
+        expect(joining.ref.listenerCount("close")).toBe(0);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(player.send).toHaveBeenCalledExactlyOnceWith(
+          "managementEvent",
+          expect.objectContaining({ event_sequence: 1 }),
+        );
+        release();
+        await Promise.resolve();
+        expect(joining.send).not.toHaveBeenCalled();
+      } finally {
+        release();
+        await room.onDispose!();
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+      }
+    },
+  );
   it("serializes slow reads and never substitutes cached observer access after a failed read", async () => {
     const service = new InMemoryAsyncGameService();
     const host = await service.createGame("union");
+    const guest = await service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
     const issued = await service.executeHostCommand(
       await service.authenticateHost(host.credential, host.gameId),
       {
@@ -70,12 +149,12 @@ describe("authorized broadcast ordering", () => {
     const barrier = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const authorize = service.authorizeSpectatorDelivery.bind(service);
+    const authorize = service.deliverAuthorizedSpectators.bind(service);
     const reads = vi
-      .spyOn(service, "authorizeSpectatorDelivery")
-      .mockImplementationOnce(async (authorizations) => {
+      .spyOn(service, "deliverAuthorizedSpectators")
+      .mockImplementationOnce(async (authorizations, deliver, signal) => {
         await barrier;
-        return authorize(authorizations);
+        return authorize(authorizations, deliver, signal);
       });
     const publish = (sequence: number) =>
       bus.publishManagement(host.gameId, {
@@ -96,17 +175,23 @@ describe("authorized broadcast ordering", () => {
       expect(observerEvents).toEqual([]);
       const reconnectEvents: number[] = [];
       const reconnect = {
-        auth: await service.authenticate(host.credential, host.gameId),
+        ref: new EventEmitter(),
+        auth: await service.authenticate(guest.credential, host.gameId),
         send: (_type: string, event: ManagementEvent) =>
           reconnectEvents.push(event.event_sequence),
         leave: vi.fn(),
       } as unknown as Client;
       room.clients.push(reconnect);
-      vi.spyOn(service, "getAuthorizedState").mockResolvedValueOnce({
+      const joinedState = {
         ...(await service.getGameState(host.gameId)),
         event_sequence: 2,
         version: 2,
-      });
+      };
+      vi.spyOn(service, "deliverAuthorizedState").mockImplementationOnce(
+        async (_authorization, deliver) => {
+          deliver(joinedState);
+        },
+      );
       const joining = room.onJoin!(reconnect, {});
       expect(reconnectEvents).toEqual([]);
       release();
@@ -122,16 +207,22 @@ describe("authorized broadcast ordering", () => {
       expect(observerEvents).toEqual([1, 2]);
       const recoveredEvents: number[] = [];
       const recoveredObserver = {
+        ref: new EventEmitter(),
         auth: observerAuthorization,
         send: (_type: string, event: ManagementEvent) =>
           recoveredEvents.push(event.event_sequence),
         leave: vi.fn(),
       } as unknown as Client;
       room.clients.push(recoveredObserver);
-      vi.spyOn(service, "getAuthorizedSpectatorState").mockResolvedValueOnce({
+      const recoveredState = {
         ...(await service.getGameState(host.gameId)),
         event_sequence: 3,
-      });
+      };
+      vi.spyOn(service, "deliverAuthorizedState").mockImplementationOnce(
+        async (_authorization, deliver) => {
+          deliver(recoveredState);
+        },
+      );
       await room.onJoin!(recoveredObserver, {});
       publish(4);
       await vi.waitFor(() => expect(recoveredEvents).toEqual([3, 4]));
@@ -155,6 +246,7 @@ describe("authorized broadcast ordering", () => {
     vi.spyOn(room, "setMetadata").mockResolvedValue(undefined);
     const received: Array<[string, number]> = [];
     const client = {
+      ref: new EventEmitter(),
       auth: await service.authenticate(host.credential, host.gameId),
       send: (type: string, event: ManagementEvent) =>
         received.push([type, event.event_sequence]),
@@ -166,10 +258,10 @@ describe("authorized broadcast ordering", () => {
       release = resolve;
     });
     const read = vi
-      .spyOn(service, "getAuthorizedState")
-      .mockImplementationOnce(async () => {
+      .spyOn(service, "deliverAuthorizedState")
+      .mockImplementationOnce(async (_authorization, deliver, signal) => {
         await barrier;
-        return initial;
+        if (!signal.aborted) deliver(initial);
       });
     try {
       await room.onCreate!({ gameId: host.gameId });

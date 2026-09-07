@@ -1479,6 +1479,44 @@ validation remain separate gates.
     directory. Fresh independent review found no actionable defects and reran
     189 server tests; database skips are covered separately. Exact-head CI and
     final hosted thread checks remain required after publishing this integration.
+  - Hosted review found four additional transport issues: abandoned reads could
+    stall the delivery queue, a read begun before revocation could authorize
+    a later send, observer denials bypassed command accounting, and full-room
+    matchmaking could create a second room. Delivery now holds a PostgreSQL
+    shared canonical-row lock through its synchronous send callback, bounds
+    reads to two seconds, cancels abandoned joins/late callbacks, discards
+    cancelled read connections, counts denied observer commands, and rejects
+    second-room creation for the same game. Regressions hold a real read lock
+    against a concurrent revocation, cancel it to prove lock release, exercise
+    queue recovery, and force locked-room matchmaking. An initial new test
+    typecheck required wrapping Colyseus's void-or-Promise callback return in
+    Promise.resolve. Full local/database/browser gates and fresh independent
+    review remain before publishing and resolving all four hosted threads.
+  - Follow-up validation: The complete local gate passed 588 workspace/nine
+    harness tests and all 211 PostgreSQL tests. Desktop/tablet full games,
+    all three combat choices, reload/exact replay, and input fixtures passed
+    in `test-results/spectator-locked-delivery` and its `-fixtures` directory.
+    Independent review then found Colyseus defers onLeave until onJoin settles;
+    cancellation now observes the transport close event and removes its listener
+    afterward. A real-socket integration regression closes a pending join and
+    proves cancellation before the two-second deadline, with existing gameplay
+    still progressing. The prior direct-onLeave test now emits socket close.
+    Focused room tests (17) and typecheck pass; fresh full gates/review follow.
+    The socket repair passed the complete local gate (589 workspace/nine
+    harness tests), all 212 PostgreSQL tests, and fresh independent review
+    (194 server tests/typecheck; database skips covered separately).
+    Prior exact-head Application `34097525230` failed the same existing
+    nine-command PostgreSQL replay/restart test's five-second timeout as PR #38;
+    other 204 server tests passed and later workflow gates were skipped. Apply
+    PR #38's reviewed bounded 15-second integration-test budget here too, without
+    relaxing any runtime limit or assertion. Reverify before publication.
+    Reverification passes the full local gate (589 workspace/nine harness),
+    all 212 PostgreSQL tests, and fresh independent review (194 server tests;
+    its 18 database skips are covered separately). Desktop/tablet full games
+    with all three choices, pending-result reload, exact replay, and input
+    fixtures pass in `test-results/spectator-socket-cancellation` and its
+    `-fixtures` directory. Exact-head CI and hosted-thread resolution remain
+    before merge; CodeRabbit limits remain explicitly skipped as authorized.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

@@ -755,21 +755,32 @@ unrelated mutations and repairs missing mirror rows on subsequent mutations.
 
 The live transport accepts an explicit spectator room role, authorizes its
 initial snapshot again after joining, and rejects every gameplay command from
-that role. Players and up to eight observers share one room; two extra slots
-allow overlapping reloads, replacing only the same binding. This is an initial
+that role, accounting rejected commands against the same per-binding limit.
+Players and up to eight observers share one room; two extra slots
+allow overlapping reloads, replacing only the same binding. A per-process
+one-room guard rejects overflow creation instead of splitting a game across
+rooms; rejected joins can retry when an overlap slot becomes available. This is
+an initial
 occupancy bound, not a measured VPS capacity claim. Revocation passes private
 binding metadata only after database commit and excludes the closing socket
 before any later delivery. Each subsequent broadcast batch rechecks every
-observer in one fresh authorized snapshot read, including session expiry and
-deletion; failed reads never fall back to cached spectator access. This also
-closes affected observer sockets with retryable code 4002, so a fresh join must
-reauthorize and load current state rather than silently remaining stale. This
-protects against delayed revocation notifications. Retries do not republish a
+observer in one authorized snapshot read, including session expiry and deletion.
+The PostgreSQL read holds a shared canonical-row lock through the synchronous
+send callback, ordering that send before any concurrent revocation commit.
+Returning a permission result and sending later is insufficient. Initial
+snapshot delivery uses the same lock contract. Failed reads never fall back to
+cached spectator access and close affected observer sockets with retryable code
+4002, so a fresh join must reauthorize and load current state. These checks
+protect against delayed revocation notifications. Retries do not republish a
 revocation, and a failed transaction does not disconnect an observer.
 Broadcast batches are serialized per room. Each client starts at its initial
 snapshot sequence, so reconnects cannot receive older queued state afterward.
 Initial snapshot reads share that queue: updates arriving while a captured
 snapshot is loading wait behind it and cannot be silently lost during joining.
+Delivery reads have a two-second deadline; disconnect or replacement cancels
+an abandoned join immediately. Late callbacks cannot send, cancelled PostgreSQL
+connections are discarded to release locks, and obsolete queued joins are
+skipped. Failed observer reads do not stop subsequent player delivery.
 Session expiry is read from current authoritative records, including legitimate
 renewals, rather than cached at socket authentication.
 
