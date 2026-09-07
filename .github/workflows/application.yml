@@ -17,7 +17,8 @@ jobs:
   validate:
     name: Validate workspace
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Two sequential games can each take eight minutes, in addition to all gates.
+    timeout-minutes: 25
     env:
       GETTYSBURG_POSTGRES_TEST_URL: postgresql://gettysburg@127.0.0.1:5432/gettysburg_test
     services:
@@ -71,7 +72,9 @@ jobs:
       - name: Install Chromium for browser acceptance
         run: pnpm exec playwright install --with-deps chromium
 
-      - name: Run two-player browser acceptance
+      - name: Run two-player and full enforced-game browser acceptance
+        env:
+          GETTYSBURG_FULL_GAME: "true"
         run: pnpm browser:acceptance
 
       - name: Verify mandatory movement inputs in browser fixtures

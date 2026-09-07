@@ -84,6 +84,14 @@ The browser acceptance command creates two isolated sessions at desktop and
 tablet widths and writes rights-safe board captures to
 `test-results/browser-acceptance`. `pnpm browser:movement` separately exercises
 mandatory-rule edge cases in clearly labelled development-only browser fixtures.
+Run `GETTYSBURG_FULL_GAME=true pnpm browser:acceptance` for the extended gate
+used in CI: two independent live combat games through turn 24, one using desktop
+keyboard controls and one using tablet touch. Both reload with server dice
+awaiting confirmation, resolve available combat choices, verify final and
+historical replay, and await durable cleanup. The games have an eight-minute
+per-game bound; commands are paced below the room's abuse limit even on fast
+runners. CI allows 25 minutes for these games plus the other required gates.
+These automated checks do not replace owner tabletop adjudication.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl

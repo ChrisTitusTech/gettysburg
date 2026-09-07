@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { chromium } from "@playwright/test";
 
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
+import { runEnforcedGame } from "./browser-enforced-game.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -452,59 +453,6 @@ async function runScenario(browser, origin, options) {
   }
 }
 
-async function runFullGame(browser, origin) {
-  const issues = [];
-  const contextOptions = { viewport: { height: 900, width: 1440 } };
-  const unionContext = await browser.newContext(contextOptions);
-  const confederateContext = await browser.newContext(contextOptions);
-  const unionPage = await unionContext.newPage();
-  const confederatePage = await confederateContext.newPage();
-  watchPage(unionPage, issues);
-  watchPage(confederatePage, issues);
-
-  try {
-    await unionPage.goto(origin);
-    await unionPage.getByRole("button", { name: "Host as Union" }).click();
-    const invitation = await unionPage
-      .getByLabel("One-time invitation URL")
-      .inputValue();
-    await confederatePage.goto(invitation);
-    await confederatePage.getByRole("button", { name: "Claim seat" }).click();
-    await Promise.all(
-      [unionPage, confederatePage].map((page) =>
-        page.getByText("connected", { exact: true }).waitFor(),
-      ),
-    );
-
-    for (let version = 1; version <= 47; version += 1) {
-      const activePage = version % 2 === 1 ? unionPage : confederatePage;
-      await activePage
-        .getByRole("button", { name: /^End (movement|combat) phase$/ })
-        .click();
-      await Promise.all(
-        [unionPage, confederatePage].map((page) =>
-          waitForVersion(page, version),
-        ),
-      );
-    }
-
-    await Promise.all(
-      [unionPage, confederatePage].map((page) =>
-        page.getByRole("heading", { name: /Turn 24 · completed/ }).waitFor(),
-      ),
-    );
-    await unionPage.locator("main").screenshot({
-      mask: [unionPage.getByLabel("One-time invitation URL")],
-      path: resolve(evidenceDirectory, "live-full-game-complete.png"),
-    });
-    await deleteAcceptanceGame(unionPage);
-    assert.deepEqual(issues, []);
-  } finally {
-    await unionContext.close().catch(() => {});
-    await confederateContext.close().catch(() => {});
-  }
-}
-
 await mkdir(evidenceDirectory, { recursive: true });
 const configuredOrigin = process.env.GETTYSBURG_ACCEPTANCE_ORIGIN;
 const port = configuredOrigin === undefined ? await reservePort() : undefined;
@@ -554,7 +502,19 @@ try {
     viewport: { height: 768, width: 1024 },
   });
   if (process.env.GETTYSBURG_FULL_GAME === "true") {
-    await runFullGame(browser, origin);
+    for (const options of [
+      {
+        label: "desktop",
+        inputMode: "keyboard",
+        viewport: { height: 900, width: 1440 },
+      },
+      {
+        label: "tablet",
+        inputMode: "touch",
+        viewport: { height: 768, width: 1024 },
+      },
+    ])
+      await runEnforcedGame(browser, origin, evidenceDirectory, options);
   }
   console.log(
     `Browser acceptance passed at desktop and tablet widths; evidence: ${evidenceDirectory}`,
