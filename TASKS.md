@@ -1861,6 +1861,59 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Host spectator link creation
+
+Final transport integration: the full local gate passes 606 workspace/nine
+harness tests; the unchanged server's 223 PostgreSQL tests pass on the reviewed
+transport. Fresh independent review passes all 114 web tests with no actionable
+findings. Desktop/tablet full games exercise all three combat choices, reload,
+exact replay, visible private-link issuance, and revocation in
+`test-results/spectator-link-pending-ack`; input fixtures pass in its `-fixtures`
+directory. The previous published head `e2725bb` passed Application
+`34106079859` and Documentation `34106079858`. Publish this integration and
+require its exact-head checks/final threads before merge; transport merges first.
+
+- [ ] Add visible host creation, copying, and hiding of private spectator links.
+  - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
+    component memory and URL fragments only; never persist them in browser
+    storage. Show a selectable URL when clipboard access is unavailable.
+    Refresh clears claimed/revoked links; hiding is explicitly not revocation.
+    Retain a successfully created link if only the metadata refresh fails.
+    The separate observer screen/transport must pass before release advertising.
+  - Validation plan: Unit tests cover creation/copy, failed-response retry keys,
+    refresh failures, claimed-link clearing, hide, clipboard denial, and stale
+    game responses. Desktop/tablet checks issue through visible host controls,
+    verify private fragment URLs, and prove reload does not recover the secret.
+    Run full local/database/browser gates, fresh independent review, exact-head
+    CI, and final thread checks. Owner: ChrisTitusTech.
+  - Initial validation: 114 web tests, typecheck, and lint pass. No game rules,
+    terrain, source assets, deployment, or migration changes are included.
+  - Validation: Full local gate passes 587 workspace/nine harness tests; the
+    prior 199 PostgreSQL tests cover unchanged server code. Independent review
+    found no actionable defects and reran 114 web tests. Desktop/tablet full
+    games, pending-result reload, replay, host-issued fragment URLs, secret
+    clearing on reload, revocations, and input fixtures pass in
+    `test-results/spectator-link-create` and its `-fixtures` directory. Desktop
+    covered retreat/loss; tablet loss/advance. Exact-head CI and final thread
+    checks remain before merge. CodeRabbit is limit-skipped as authorized.
+  - Integrating transport head `8078ad4` passes the full local gate (599
+    workspace/nine harness tests), with its 215 PostgreSQL tests covering
+    unchanged backend code. Desktop/tablet full games, pending-result reload,
+    exact replay, and input fixtures pass in
+    `test-results/spectator-link-transport-integration` and its `-fixtures`
+    directory; tablet covers all three choices. Fresh review found a transport
+    handshake authorization gap, also reproduced by the combined observer
+    review. Keep this local integration unpublished until the base repair,
+    fresh review, and exact-head CI clear; no merge readiness is claimed.
+    The handshake repair `d8d7b08` is now integrated. The full local gate passes
+    603 workspace/nine harness tests; the transport's 219 PostgreSQL tests cover
+    the unchanged backend. Fresh review against the repaired transport found
+    no actionable defects and reran 114 web tests. Desktop/tablet full games,
+    pending-result reload, exact replay, and input fixtures pass in
+    `test-results/spectator-link-joined-integration` and its `-fixtures`
+    directory (all three choices on desktop). Publish the integration, verify
+    exact-head CI/final threads, and merge the transport base before this PR.
+
 ## Phase 0 completion gate
 
 - [x] Merge PR #1 to establish the project foundation and implementation

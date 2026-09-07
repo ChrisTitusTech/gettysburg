@@ -822,14 +822,19 @@ panel, including after reload or host-only recovery. Players without a host
 binding do not see it. The panel refreshes claim status before choosing the
 existing audited revocation command and reuses the application's host-command
 authorization/retry flow. Races are rejected by the server and remain retryable
-through visible refresh/revoke controls. Link creation and the observer screen
-remain separate UI delivery gates; this panel never displays bearer secrets.
+through visible refresh/revoke controls. Hosts can create a one-observer link
+through the same serialized, idempotent command flow. Its secret stays in the
+URL fragment and component memory, never browser storage or the grant list.
+Copy has a selectable-URL fallback. Hide, replacement, reload, game change,
+or a refresh showing the grant claimed/revoked removes the displayed secret;
+hiding alone does not revoke access. The observer screen remains a separate
+UI delivery gate until its own acceptance passes.
 All browser host commands share a serial queue through response application,
 so spectator revocation cannot overlap a seat invitation or game deletion and
 apply an older host response afterward. Failed commands do not poison the queue.
 
-Link creation and the spectator browser interface remain separate delivery
-gates. A spectator
+Live transport, host link creation, and the observer interface are separate
+review increments with a combined desktop/tablet acceptance gate. A spectator
 invitation cannot claim a player seat. Do not advertise usable live spectators
 until those gates and desktop/tablet acceptance pass.
 
