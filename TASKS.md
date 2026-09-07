@@ -594,14 +594,14 @@ validation remain separate gates.
     replacement dice or use recorded resulting states as replay starting points.
     Authorized server/API integration, replay UI, retained-version behavior,
     and the full rules-enforced acceptance game remain open.
-  - Validation: Twenty-nine cases cover all 47 no-contact phase transitions across
+  - Validation: Thirty cases cover all 47 no-contact phase transitions across
     24 turns, paid continuation and prefixes, recorded dice, two independent
     skirmishes with reordered keys, input isolation, recovered historical seats,
     surrendered seats, private management/audit records, corrupted state,
     malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
     The no-contact test is not a representative owner-adjudicated acceptance game.
-    Frozen install, format, lint, typecheck, 509 default tests plus six harness
-    tests, build, smoke, Markdown lint, and all 144 PostgreSQL tests pass.
+    Frozen install, format, lint, typecheck, 510 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 145 PostgreSQL tests pass.
     Two-session desktop/tablet and 24-turn regression pass
     (`test-results/mandatory-replay-chronology`); mandatory browser fixtures pass
     (`test-results/mandatory-replay-chronology-fixtures`). Independent built-in
@@ -681,6 +681,18 @@ validation remain separate gates.
     `test-results/mandatory-replay-audit-fixtures`. Fresh independent local
     review found no actionable regressions and reran 132 server tests; its 12
     database skips are covered above. Exact-head CI remains before merge.
+    An eighth hosted pass requires surrender's authoritative seat retirement,
+    not only rejection of later commands from that seat. Replay now requires
+    the surrender boundary at the next sequence and a finite revocation time;
+    retired actor evidence and recovered old-binding activation must also be
+    internally consistent. Regression cases reject an active surrendered seat,
+    a delayed retirement, and recovery of a not-yet-active binding. All 510
+    workspace plus six harness tests and all 145 PostgreSQL tests pass with the
+    complete local gate. Both browser suites pass in
+    `test-results/mandatory-replay-retirement` and
+    `test-results/mandatory-replay-retirement-fixtures`. Fresh independent
+    review found no actionable regressions and reran 133 server tests; its 12
+    database skips are covered above. Exact-head CI remains a merge gate.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,

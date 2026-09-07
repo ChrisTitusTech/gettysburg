@@ -82,7 +82,10 @@ function activeBinding<T extends HostBinding>(
     after! < 0 ||
     (until === undefined
       ? actor.revokedAt !== null
-      : !Number.isSafeInteger(until) || until <= after!)
+      : !Number.isSafeInteger(until) ||
+        until <= after! ||
+        actor.revokedAt === null ||
+        !Number.isFinite(actor.revokedAt))
   )
     throw new ReplayError(action.sequence, "binding chronology unavailable");
   if (
@@ -418,6 +421,9 @@ export function replayMandatoryActions(
             old.length === 1 &&
               replacement.length === 1 &&
               old[0]!.inactiveFromSequence === sequence &&
+              Number.isSafeInteger(old[0]!.activeAfterSequence) &&
+              old[0]!.activeAfterSequence! >= 0 &&
+              old[0]!.activeAfterSequence! < sequence &&
               old[0]!.revokedAt === recovery.consumedAt &&
               replacement[0]!.activeAfterSequence === sequence &&
               replacement[0]!.id !== old[0]!.id &&
@@ -491,6 +497,12 @@ export function replayMandatoryActions(
         "event metadata mismatch",
       );
       if (command.command_name === "surrenderSeat") {
+        assertReplay(
+          actor[0]!.revokedAt !== null &&
+            Number.isFinite(actor[0]!.revokedAt) &&
+            actor[0]!.inactiveFromSequence === sequence + 1,
+          "surrender did not retire its binding",
+        );
         surrenderedBindings.add(bindingKey);
         assertReplay(
           result.event.summary === `${actor[0]!.side} seat surrendered`,
