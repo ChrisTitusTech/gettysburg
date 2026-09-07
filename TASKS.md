@@ -11,8 +11,8 @@ and evidence; they do not supersede this current status or close owner gates.
 | Phases 0-2 | Complete; last verified VPS revision is `40cff572aab183660dfeee188c4b6acddb2b1de5` | New source is not yet a new VPS rollout |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
-| Private spectators | Claims, revocable HTTP/replay access, and host grant management are merged through PR #38 | Live transport, host link creation, and observer browser PRs remain unmerged; integration review gates apply |
-| Opt-in browser push | Owner approved; targeting-policy PR #41 remains unmerged and does not send notifications | Protected subscriptions, durable delivery/retries, opt-out, and real provider/device acceptance |
+| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, and bounded encrypted provider transport are merged through PR #46 | Worker PR #47, optional startup configuration, browser opt-in/service worker, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -27,6 +27,19 @@ PostgreSQL and desktop/tablet evidence; no fresh database or browser run is
 claimed for this documentation update. Fresh independent review found no
 actionable defects. PR #42 head `5461aaa` passed Application `34105452083` and
 Documentation `34105452277`, had no unresolved threads, and merged as `3c61850`.
+
+Subsequent merge closeout (2026-09-07): each exact head passed Application and
+Documentation, independent review was clean, and final unresolved-thread
+inspection was empty before a separate merge call. The implementation notes
+below retain earlier evidence and pending steps, superseded by this rollup.
+
+| PR | Exact head | Application / Documentation | Merge |
+| --- | --- | --- | --- |
+| #40 observer browser | `9ad2f66` | `34113686517` / `34113686564` | `3d10581` |
+| #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
+| #43 protected subscriptions | `e1991d1` | `34112288240` / `34112288184` | `fc70599` |
+| #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
+| #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1870,6 +1883,16 @@ validation remain separate gates.
 
 ### Container vulnerability closeout (release gate open)
 
+After merging provider dependencies, the full local gate passes 715 workspace/
+nine harness tests. Image
+`6385b2b523511a7834f5d256ee2ec254f7b112cd016464238f0915c91649e6a3`
+passes container smoke and the HIGH/CRITICAL scan with zero findings across
+18 OS and 359 Node packages (`/tmp/gettysburg-scanner.K2VSLN/provider-image.json`).
+The provider has no startup caller in this candidate; the actual-image observer
+and full-game browser evidence below covers unchanged UI and active runtime
+flows. New exact-head CI must rerun all integrated gates; the final release
+image still needs its own scan. No VPS changes have been made.
+
 Current combined candidate includes the reviewed observer UI and notification
 outbox/receipts. Full local gates pass 673 workspace/nine harness tests; fresh
 independent review against the observer base found no actionable defects.
@@ -1966,7 +1989,7 @@ directory (all three choices on tablet). Publish this observer repair; the base
 transport's newly reported queued-checkout cancellation issue and final
 exact-head CI/review checks still prevent the dependent PR merge.
 
-- [ ] Add the separate read-only observer screen.
+- [x] Add the separate read-only observer screen.
   - Scope: Fragment-only private claim links, stable claim retry UUIDs, explicit
     observer role, reload/bookmark resume, monotonic state/events with gap
     repair, read-only counter inspection and replay, and fail-closed clearing
@@ -2056,7 +2079,7 @@ The later connection-reuse integration preserves those UI/protocol paths and
 adds a separately verified database regression. Exact-head CI and final review
 threads are required before merge; this foundation still sends no notifications.
 
-- [ ] Store per-seat browser push consent and encrypted subscription credentials.
+- [x] Store per-seat browser push consent and encrypted subscription credentials.
   - Scope: Canonical HTTPS endpoints for the Chrome/Firefox/Safari production
     push providers, valid P-256/auth keys, one subscription per current seat
     binding, session/subscription expiry, metadata-only status, and same-browser
@@ -2134,7 +2157,7 @@ tests. Fresh independent review found no actionable defects and reran 248 server
 tests. Existing desktop/tablet full-game and fixture evidence covers unchanged
 browser and room behavior; new exact-head CI must rerun the integrated gates.
 
-- [ ] Persist notification work atomically with accepted gameplay commands.
+- [x] Persist notification work atomically with accepted gameplay commands.
   - Integrated closeout: full local gates pass 647 workspace/nine harness
     tests, all 270 PostgreSQL tests pass, and fresh independent review passes
     246 server tests without actionable findings. Subscription and transport
@@ -2183,7 +2206,7 @@ paths are covered by full desktop/tablet games and input fixtures in
 The prior policy head `a14fa93` passed Application `34105754831` and
 Documentation `34105754816`; this integration requires new exact-head checks.
 
-- [ ] Add deterministic turn-notification targeting.
+- [x] Add deterministic turn-notification targeting.
   - Scope: Pure server policy for consecutive compatible mandatory-game
     snapshots. Notify the other seat only when a newly required decision
     appears, including combat choices and ending combat after the opponent's
