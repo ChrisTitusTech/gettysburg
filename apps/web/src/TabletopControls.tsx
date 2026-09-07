@@ -8,8 +8,10 @@ import type {
 import {
   automaticCombatResolution,
   currentCombatValue,
+  MANDATORY_RULESET_VERSION,
 } from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
+import { RetreatControls } from "./RetreatControls";
 
 interface TabletopControlsProps {
   readonly disabled: boolean;
@@ -185,13 +187,33 @@ function CombatCard({
         </form>
       ) : null}
       {choice?.kind === "retreat" && choice.side === seat ? (
-        <div className="choice-form retreat-drag-guidance">
-          <strong>Retreat {choice.unit_ids.length} counter(s) on board</strong>
-          <p>
-            Drag any highlighted retreating counter. Counters in the same hex
-            move together and the route stops at the first empty hex.
-          </p>
-        </div>
+        state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+          [...new Set(choice.unit_ids.map((id) => state.units[id]?.location))]
+            .filter((hex) => hex !== null && hex !== undefined)
+            .map((hex) => (
+              <RetreatControls
+                key={`${state.game_id}:${state.version}:${combat.id}:${hex}`}
+                combatId={combat.id}
+                disabled={disabled}
+                onCommand={onCommand}
+                seat={seat}
+                state={state}
+                ids={choice.unit_ids.filter(
+                  (id) => state.units[id]?.location === hex,
+                )}
+              />
+            ))
+        ) : (
+          <div className="choice-form retreat-drag-guidance">
+            <strong>
+              Retreat {choice.unit_ids.length} counter(s) on board
+            </strong>
+            <p>
+              Drag any highlighted retreating counter. Counters in the same hex
+              move together and the route stops at the first empty hex.
+            </p>
+          </div>
+        )
       ) : null}
       {choice?.kind === "advance" && choice.side === seat ? (
         <div className="choice-form advance-drag-guidance">
@@ -253,7 +275,7 @@ export function TabletopControls({
           ? "Confirm each automatic skirmish below"
           : pendingChoice.side === seat
             ? pendingChoice.kind === "retreat"
-              ? "Complete your retreat on the board"
+              ? "Complete your retreat choice"
               : pendingChoice.kind === "advance"
                 ? "Complete your advance decision on the board"
                 : `Complete your ${choiceName} below`

@@ -479,6 +479,29 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Finish mandatory retreat browser controls and full-game acceptance.
+  - Scope: Each original stack has legal next-step buttons, undo, a suggested
+    route, and explicit confirmation. Friendly transit continues to the first
+    empty hex; blocked edge exits are permanent and free. Terrain-trapped stacks
+    can assign exactly one extra combat-counter loss under the owner's approved
+    adaptation. Pending server requests disable choices; accepted state versions
+    reset uncommitted routes. Board clicks/drags reject illegal mandatory paths.
+  - Boundary: Board shortcuts support adjacent legal retreats and the suggested
+    complete route; the step controls expose all other legal routes without
+    typing coordinates. Existing rules retain their board controls. Mandatory-v4
+    activation and full two-player rules-enforced acceptance remain open.
+  - Validation: Eight component cases cover route confirmation, undo, trapped
+    losses, edge exits, disabled requests, stale drafts, authority/missing data,
+    and invalid board clicks. `pnpm browser:movement` now also covers retreat
+    routes, extra loss, and permanent exit at desktop/tablet widths through the
+    real schema and reducer. Evidence is under
+    `test-results/mandatory-retreat-controls`; visual inspection caught and fixed
+    a cramped inherited form grid, and the revised layout was inspected again.
+    Frozen install, format, lint, typecheck, 418 default workspace tests plus six
+    harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
+    tests pass. Two-session desktop/tablet and 24-turn full-game regression also
+    pass (`test-results/mandatory-retreat-controls-review`). Independent
+    review and exact-head CI remain required before merge.
 - [ ] Complete mandatory movement browser previews and acceptance.
   - Scope: Click, keyboard, touch, and drag previews share the authoritative
     movement validator. Drag overshoot stops at an affordable legal endpoint;
