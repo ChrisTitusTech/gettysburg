@@ -210,6 +210,12 @@ h2 {
   color: #ff9f8d;
 }
 
+.push-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .invitation-panel {
   display: grid;
   grid-template-columns: minmax(13rem, 0.7fr) minmax(16rem, 1.5fr) auto;

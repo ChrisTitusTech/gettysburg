@@ -13,6 +13,7 @@ import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
 import { checkPushWorker } from "./browser-push-worker.mjs";
 import { checkHomeScreen } from "./browser-home-screen.mjs";
+import { checkPushConsent } from "./browser-push-consent.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
 const evidenceDirectory = resolve(
@@ -516,6 +517,11 @@ try {
   browser = await chromium.launch({ headless: true });
   await checkHomeScreen(browser, origin);
   await checkPushWorker(origin);
+  for (const options of [
+    { label: "desktop", viewport: { height: 900, width: 1440 } },
+    { label: "tablet", viewport: { height: 768, width: 1024 } },
+  ])
+    await checkPushConsent(browser, origin, evidenceDirectory, options);
   await runScenario(browser, origin, {
     hostName: "Confederate",
     inputMode: "keyboard",
