@@ -1727,6 +1727,36 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Browser push foundation
+
+- [ ] Add deterministic turn-notification targeting.
+  - Scope: Pure server policy for consecutive compatible mandatory-game
+    snapshots. Notify the other seat only when a newly required decision
+    appears, including combat choices and ending combat after the opponent's
+    last choice. Coalesce multiple new decisions to one intent per recipient.
+    Ignore routine moves, duplicates, non-gameplay events, completed games,
+    and incompatible snapshots. No state mutation or outbound delivery.
+  - Validation plan: Table-driven targeting, all three pending choices,
+    duplicate/order independence, end-combat handoff, completed/version guards,
+    and input preservation. Full local/database/browser gates, independent
+    review, exact-head CI, and final thread checks before merge. Owner:
+    ChrisTitusTech. This foundation alone does not enable browser notifications.
+  - Validation: Eight focused cases pass. Full local gates pass 604 workspace
+    tests/nine harness tests; all 222 PostgreSQL tests pass. Fresh independent
+    review found no actionable defects and reran 203 server tests; its 19
+    database skips are covered separately. This helper has no runtime caller
+    yet, and the unchanged browser/runtime paths retain the full desktop/tablet
+    evidence in `test-results/spectator-room-create-cancellation` and its
+    `-fixtures` directory. Exact-head CI must run the complete application
+    workflow before merge. Actual push delivery remains explicitly unverified.
+- [ ] Add protected opt-in subscriptions and browser permission controls.
+- [ ] Persist and dispatch authorized notification intents through a durable
+  outbox, with bounded delivery, safe provider endpoints, retries, opt-out,
+  expiration, and deletion retention.
+- [ ] Verify actual push delivery, opt-out, permission denial, click navigation,
+  and iOS/iPadOS Home Screen setup on supported devices. The platform guidance
+  linked in SPEC.md is preparation, not evidence of completed acceptance.
+
 ## Phase 0 completion gate
 
 - [x] Merge PR #1 to establish the project foundation and implementation
