@@ -2178,6 +2178,11 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+Home Screen integration with merged PRs #45/#51 passes all local gates with
+740 workspace/18 harness tests. Fresh independent review is clean and reran
+147 web tests. The manifest/browser source is unchanged from the recorded
+desktop/tablet run; new exact-head CI follows.
+
 Home Screen metadata is the next small browser increment: stable root identity,
 standalone display, and no credential-bearing launch URL. The manifest introduces
 no new artwork, offline cache, automatic worker registration, or permission
