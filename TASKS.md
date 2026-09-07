@@ -479,6 +479,33 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Verify mandatory replay, then expose authorized replay controls.
+  - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
+    accepted commands, resolving the historical seat binding and recorded dice.
+    Match automatic skirmish rolls by participants rather than JSON key order.
+    Verify command hashes, sequence/state versions, event metadata, every
+    resulting gameplay state, and an optional final snapshot. Historical prefixes
+    supply a replay cursor. Management/operator records consume sequence only;
+    their private payloads are neither executed nor exposed. Surrender retains
+    its separate server-owned state-version behavior.
+  - Boundary: This pure verifier is not a public API, an authorization mechanism,
+    or a cryptographic proof of an untampered database. It does not generate
+    replacement dice or use recorded resulting states as replay starting points.
+    Authorized server/API integration, replay UI, retained-version behavior,
+    and the full rules-enforced acceptance game remain open.
+  - Validation: Sixteen cases cover all 47 no-contact phase transitions across
+    24 turns, paid continuation and prefixes, recorded dice, two independent
+    skirmishes with reordered keys, input isolation, recovered historical seats,
+    surrendered seats, redacted management/audit records, corrupted state,
+    malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
+    The no-contact test is not a representative owner-adjudicated acceptance game.
+    Frozen install, format, lint, typecheck, 496 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 131 PostgreSQL tests pass.
+    Two-session desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-replay-regression`); mandatory browser fixtures pass
+    (`test-results/mandatory-replay-fixtures`). Fresh independent built-in review
+    found no actionable defects. Exact-head CI and published review checks
+    remain required before merge.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,
@@ -503,8 +530,9 @@ validation remain separate gates.
     (`test-results/mandatory-version-regression`); mandatory browser fixtures
     pass (`test-results/mandatory-version-fixtures`), including the parent PR's
     repaired held-drag capture. Fresh independent built-in review found no
-    actionable regressions. Publish only after the parent merges; exact-head CI
-    and published review checks remain required before merge.
+    actionable regressions. PR #24 merged as `5ed70d0` after hosted Codex review
+    and exact-head CI passed. No unresolved threads remained; CodeRabbit was
+    limited and skipped under owner direction.
 - [ ] Pin and activate the complete mandatory content/version pair.
   - Scope: Add an isolated initial-state constructor with all approved terrain,
     existing movement edges, unchanged Scenario Five units/schedules/objectives,
@@ -534,8 +562,11 @@ validation remain separate gates.
     and actual input release remain unchanged. The full local gate and repaired
     desktop/tablet browser fixtures pass; the held-drag image was visually
     inspected (`test-results/mandatory-content-capture-repair`). Fresh independent
-    review found no actionable regression. Require all repaired-head CI gates
-    and published review checks before merge.
+    review found no actionable regression. PR #23 merged as `9365b34` after
+    repaired-head Application/Documentation CI and hosted Codex review passed.
+    No unresolved threads remained. CodeRabbit initially hit its limit and was
+    skipped; its final Free-plan status completed without a comprehensive
+    line-by-line review, so independent built-in review supplies that gate.
 - [ ] Complete mandatory reinforcement/night guidance and live acceptance.
   - Scope: Select scheduled counters for single or joint entry; preview actual
     costs and nearest legal enemy-free alternatives, and explain friendly
