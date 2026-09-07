@@ -4,7 +4,8 @@ export async function connectRoom<T>(
   join: () => Promise<T>,
   signal: AbortSignal,
 ): Promise<T> {
-  const delays = [250, 500, 1_000];
+  // The final attempt must outlast an overlapping two-second server read.
+  const delays = [500, 1_000, 2_000];
   for (let attempt = 0; ; attempt++) {
     signal.throwIfAborted();
     try {

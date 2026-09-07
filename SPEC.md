@@ -793,7 +793,7 @@ same canonical snapshot; delivery retains its SHARE lock and bounded deadline.
 This read optimization does not modify stored records or the retention policy.
 An admission read that reaches its deadline reports transient status 503.
 Player/spectator clients retry only that status, at most four attempts with
-250/500/1000 ms backoff, and cancel pending backoff on navigation. Denied or
+500/1000/2000 ms backoff, and cancel pending backoff on navigation. Denied or
 revoked access is not retried. The server deadline and revocation lock remain
 unchanged; retry is not a promise that unbounded host load can be accepted.
 

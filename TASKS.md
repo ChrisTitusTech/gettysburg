@@ -29,9 +29,10 @@ repaired exact head, not be treated as a documentation-only exception.
 The read projection alone still reproduced the connection failure on an isolated
 VPS database copy: a concurrent write can hold the canonical lock past the read
 deadline. Deadline failures now return explicit transient status 503. Player and
-spectator admission retry only that status, at most four attempts with 250/500/
-1000 ms backoff, cancelling on navigation. Denied/revoked access is not retried.
-Four browser-unit regressions cover success after busy, denial, exhaustion, and
+spectator admission retry only that status, at most four attempts with 500/1000/
+2000 ms backoff, cancelling on navigation. Denied/revoked access is not retried.
+Five browser-unit regressions cover success after busy, denial, exhaustion,
+outlasting an overlapping two-second admission, and
 cancelled backoff; the room-creation test confirms the timed-out attempt frees its
 slot before retry. This preserves the original bounded server deadline rather
 than increasing it. Test fixtures use an isolated clone without the live
@@ -60,6 +61,38 @@ are about 5.9 seconds and input-to-both-players about 4.9 seconds, above the
 performance targets. These diagnostic timings are not waived or release-complete.
 Public traffic remains in maintenance until the reviewed exact-head rollout and
 its required checks succeed.
+
+The private retry run subsequently failed its replay-management console audit:
+the SDK reported a rejected admission, then emitted a duplicate unexpected-close
+warning when that same rejected socket closed. Extend the existing pinned SDK
+patch to remember an explicit pre-join error frame and avoid reporting that
+closure a second time. The original error still rejects admission; unexplained
+closures still warn and reject. Three real-socket regressions cover busy (503),
+denied (401), and a missing error frame (4002 plus warning). The acceptance
+harness's warning/error assertions are unchanged. This increment requires fresh
+gates/review and exact-head CI; the private VPS full-suite rerun is in progress.
+Patch-format validation rejected blank-context trimming and exposed pnpm's
+incorrect placement of zero-context insertions; independent review also caught
+the resulting syntax failure. Neither invalid patch was committed or deployed.
+Regenerated context-bearing hunks now pass frozen installation and exact byte
+comparison of installed CJS, ESM, and TypeScript against the intended package,
+plus both runtime syntax checks. Repeat full gates and independent review after
+this correction. CodeRabbit was limit-skipped on this increment as authorized.
+
+The next private run reached replay management but exposed overlapping room
+creation: the existing no-split guard returned a non-retryable generic error
+while the first creation was still pending. The guard now returns transient 503,
+without permitting a second room. Pending-creation and locked-room regressions
+verify the status and invariant. Focused private-VPS replay/observer/full-game
+checks run next without repeating the already-passing earlier fixtures.
+
+The final admission increment passes the full local gate: 763 workspace and
+36 harness tests, all 333 PostgreSQL tests, formatting, lint, typecheck, build,
+and startup smoke. Fresh independent Codex review found no actionable regression
+and passed all 31 focused server/client tests. Private-VPS replay and spectator
+management pass at both widths; the two full-game checks are still running.
+These checks precede integration of the concurrent main-branch security changes;
+repeat the gate and exact-head CI on that integration before deployment.
 
 ### VPS rollout and acceptance blocker: 2026-09-07
 

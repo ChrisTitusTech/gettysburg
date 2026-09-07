@@ -11,7 +11,7 @@ describe("bounded room admission retries", () => {
         .mockRejectedValueOnce({ code: 503 })
         .mockResolvedValue(room);
       const pending = connectRoom(join, new AbortController().signal);
-      await vi.advanceTimersByTimeAsync(250);
+      await vi.advanceTimersByTimeAsync(500);
       expect(await pending).toBe(room);
       expect(join).toHaveBeenCalledTimes(2);
     } finally {
@@ -35,7 +35,7 @@ describe("bounded room admission retries", () => {
       const failed = expect(
         connectRoom(join, new AbortController().signal),
       ).rejects.toBe(failure);
-      await vi.advanceTimersByTimeAsync(1_750);
+      await vi.advanceTimersByTimeAsync(3_500);
       await failed;
       expect(join).toHaveBeenCalledTimes(4);
     } finally {
@@ -56,6 +56,24 @@ describe("bounded room admission retries", () => {
       await failed;
       await vi.runAllTimersAsync();
       expect(join).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it("outlasts an overlapping two-second admission before its final retry", async () => {
+    vi.useFakeTimers();
+    try {
+      const start = Date.now();
+      const room = {};
+      const join = vi.fn(async () => {
+        if (Date.now() - start < 2_000)
+          throw Object.assign(new Error("busy"), { code: 503 });
+        return room;
+      });
+      const pending = connectRoom(join, new AbortController().signal);
+      await vi.advanceTimersByTimeAsync(3_500);
+      expect(await pending).toBe(room);
+      expect(join).toHaveBeenCalledTimes(4);
     } finally {
       vi.useRealTimers();
     }
