@@ -1565,6 +1565,32 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Host spectator link creation
+
+- [ ] Add visible host creation, copying, and hiding of private spectator links.
+  - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
+    component memory and URL fragments only; never persist them in browser
+    storage. Show a selectable URL when clipboard access is unavailable.
+    Refresh clears claimed/revoked links; hiding is explicitly not revocation.
+    Retain a successfully created link if only the metadata refresh fails.
+    The separate observer screen/transport must pass before release advertising.
+  - Validation plan: Unit tests cover creation/copy, failed-response retry keys,
+    refresh failures, claimed-link clearing, hide, clipboard denial, and stale
+    game responses. Desktop/tablet checks issue through visible host controls,
+    verify private fragment URLs, and prove reload does not recover the secret.
+    Run full local/database/browser gates, fresh independent review, exact-head
+    CI, and final thread checks. Owner: ChrisTitusTech.
+  - Initial validation: 114 web tests, typecheck, and lint pass. No game rules,
+    terrain, source assets, deployment, or migration changes are included.
+  - Validation: Full local gate passes 587 workspace/nine harness tests; the
+    prior 199 PostgreSQL tests cover unchanged server code. Independent review
+    found no actionable defects and reran 114 web tests. Desktop/tablet full
+    games, pending-result reload, replay, host-issued fragment URLs, secret
+    clearing on reload, revocations, and input fixtures pass in
+    `test-results/spectator-link-create` and its `-fixtures` directory. Desktop
+    covered retreat/loss; tablet loss/advance. Exact-head CI and final thread
+    checks remain before merge. CodeRabbit is limit-skipped as authorized.
+
 ## Phase 0 completion gate
 
 - [x] Merge PR #1 to establish the project foundation and implementation
