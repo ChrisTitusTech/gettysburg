@@ -1846,6 +1846,16 @@ validation remain separate gates.
 
 ### Host spectator link creation
 
+Final transport integration: the full local gate passes 606 workspace/nine
+harness tests; the unchanged server's 223 PostgreSQL tests pass on the reviewed
+transport. Fresh independent review passes all 114 web tests with no actionable
+findings. Desktop/tablet full games exercise all three combat choices, reload,
+exact replay, visible private-link issuance, and revocation in
+`test-results/spectator-link-pending-ack`; input fixtures pass in its `-fixtures`
+directory. The previous published head `e2725bb` passed Application
+`34106079859` and Documentation `34106079858`. Publish this integration and
+require its exact-head checks/final threads before merge; transport merges first.
+
 - [ ] Add visible host creation, copying, and hiding of private spectator links.
   - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
     component memory and URL fragments only; never persist them in browser
