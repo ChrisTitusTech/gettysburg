@@ -13,6 +13,7 @@ import {
   type GameView,
   type SpectatorClaimResult,
   type SpectatorView,
+  type SpectatorGrantSummary,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -35,6 +36,10 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  getSpectatorGrants(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<readonly SpectatorGrantSummary[]>;
   claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ): Promise<SpectatorClaimResult>;
@@ -135,6 +140,9 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async getSpectatorGrants(credential: string | undefined, gameId: string) {
+    return this.service.getSpectatorGrants(credential, gameId);
+  }
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ) {
@@ -254,6 +262,11 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #pepper: Uint8Array;
+  async getSpectatorGrants(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.getSpectatorGrants(credential, gameId),
+    );
+  }
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ) {
