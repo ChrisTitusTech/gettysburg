@@ -2027,6 +2027,14 @@ headless shell reports notification permission denied despite a granted
 Permissions API state. A focused probe proves full Chromium grants both;
 the notification fixture now launches that channel separately. The initial
 harness lint also required qualifying the worker-only `self.PushEvent` global.
+The corrected installed-worker fixture passes actual notification display,
+stable-tag coalescing, and unsafe-payload rejection in full Chromium. Both
+desktop/tablet 24-turn games, pending-result reload, exact replay, observer flows,
+and input fixtures pass in `test-results/push-service-worker` and its `-fixtures`
+directory. Desktop covers loss/advance and tablet retreat/advance. Full local
+gates pass 739 workspace/nine harness tests; fresh independent review is clean
+and reran all 14 focused worker tests. Backend code is unchanged from startup's
+329-test PostgreSQL gate. Exact-head CI and real provider/device checks remain.
 
 Optional push startup configuration is the next small increment. An explicit
 `GETTYSBURG_PUSH_VAPID_FILE` enables the worker only after migrations/readiness;
