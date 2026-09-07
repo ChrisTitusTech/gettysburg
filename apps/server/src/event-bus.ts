@@ -1,6 +1,9 @@
 import type { AuditEvent, ManagementEvent, Side } from "@gettysburg/game";
 
-type ManagementEventListener = (event: ManagementEvent) => void;
+type ManagementEventListener = (
+  event: ManagementEvent,
+  revokedSpectatorBindingId?: string,
+) => void;
 export interface AuditNotification {
   readonly event: AuditEvent;
   readonly revokedSeat?: Side;
@@ -24,10 +27,16 @@ export class GameEventBus {
     }
   }
 
-  publishManagement(gameId: string, event: ManagementEvent): void {
+  publishManagement(
+    gameId: string,
+    event: ManagementEvent,
+    revokedSpectatorBindingId?: string,
+  ): void {
     for (const listener of [...(this.#managementListeners.get(gameId) ?? [])]) {
       try {
-        listener(structuredClone(event));
+        if (revokedSpectatorBindingId === undefined)
+          listener(structuredClone(event));
+        else listener(structuredClone(event), revokedSpectatorBindingId);
       } catch (error) {
         console.error("Management event listener failed.", { error, gameId });
       }
