@@ -513,6 +513,22 @@ validation remain separate gates.
     `test-results/authorized-replay-chronology-fixtures`. Fresh independent
     follow-up review found no actionable defects. Exact-head CI remains
     pre-merge; old totals above record the initial API.
+    Hosted review then required throttling before synchronous replay and
+    game-scoped binding indexing. The route now applies minute-long session,
+    source, and global limits before reads/reconstruction; responses use 429,
+    no-store, and Retry-After. The service supplies only this game's actors and
+    invitation metadata to the indexed verifier, including the parent's new
+    host chronology checks. Four regressions cover all limiter dimensions,
+    expiry without reconstruction on denial, and invitation management across
+    recovered-host snapshot restore. The full install/format/lint/typecheck,
+    527 workspace tests plus six harness tests, build, smoke, Markdown, and
+    whitespace gate passes; all 163 server tests pass with PostgreSQL.
+    Desktop/tablet two-session and no-contact full-turn checks pass in
+    `test-results/authorized-replay-limits`; isolated input fixtures pass in
+    `test-results/authorized-replay-limits-fixtures`. Fresh independent local
+    review found no actionable defects and reran 150 server tests; its 13
+    database skips are covered by the separate PostgreSQL gate above.
+    Exact-head CI remains before merge.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,

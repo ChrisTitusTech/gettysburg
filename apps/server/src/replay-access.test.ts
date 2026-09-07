@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import { COMMAND_SCHEMA_VERSION, RULESET_VERSION } from "@gettysburg/game";
 import { SCENARIO_CONTENT_REVISION } from "@gettysburg/content";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   InMemoryGameService,
   type GameServiceSnapshot,
@@ -52,6 +52,45 @@ function fixture() {
 }
 
 describe("authorized replay snapshots", () => {
+  it("replays invitation management and host recovery from the same restored snapshot", () => {
+    const f = fixture();
+    expect(
+      f.service.executeCommand(
+        f.service.authenticate(f.guest.credential, f.host.gameId),
+        f.command("surrenderSeat"),
+      ).ok,
+    ).toBe(true);
+    const invitation = f.service.executeHostCommand(
+      f.service.authenticateHost(f.host.credential, f.host.gameId),
+      f.command("issueInvitation", { seat: "confederate" }),
+    );
+    if (!invitation.ok || !invitation.invitation)
+      throw new Error("Missing invitation");
+    const grant = f.service.issueHostRecovery(f.host.gameId, "test operator");
+    const replacement = f.service.claimHostRecovery({
+      lookupId: grant.lookup_id,
+      secret: grant.secret,
+    });
+    expect(
+      f.service.executeHostCommand(
+        f.service.authenticateHost(replacement.credential, f.host.gameId),
+        f.command("revokeInvitation", {
+          lookup_id: invitation.invitation.lookup_id,
+        }),
+      ).ok,
+    ).toBe(true);
+    f.service.createGame("union");
+    const restored = f.restore((record) => record);
+    const result = restored.getReplay(replacement.credential, f.host.gameId);
+    expect(result).toEqual({
+      state: f.service.getGameState(f.host.gameId),
+      sequence: 4,
+      latest_sequence: 4,
+    });
+    expect(JSON.stringify(result)).not.toContain("authorizingId");
+    expect(JSON.stringify(result)).not.toContain(invitation.invitation.secret);
+  });
+
   it("returns isolated historical prefixes to both seats without changing the game", () => {
     const f = fixture();
     const opening = f.host.state;
@@ -218,6 +257,55 @@ describe("replay work bounds", () => {
 });
 
 describe("replay HTTP boundary", () => {
+  it.each(["session", "source", "global"] as const)(
+    "limits %s attempts before reconstruction and expires the window",
+    async (scope) => {
+      const f = fixture();
+      const service = new InMemoryAsyncGameService(f.service);
+      const replay = vi.spyOn(service, "getReplay").mockResolvedValue({
+        state: f.host.state,
+        sequence: 0,
+        latest_sequence: 0,
+      });
+      let now = Date.now();
+      const clock = vi.spyOn(Date, "now").mockImplementation(() => now);
+      const app = createHttpApplication({ isReady: () => true }, service);
+      const server = app.listen(0, "127.0.0.1");
+      await new Promise<void>((resolve) => server.once("listening", resolve));
+      const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}/api/games/${f.host.gameId}/replay`;
+      const request = (index: number) =>
+        fetch(url, {
+          headers: {
+            cookie: `${SESSION_COOKIE_NAME}=${scope === "session" ? f.host.credential : String(index)}`,
+            "x-forwarded-for":
+              scope === "source"
+                ? "192.0.2.1"
+                : `198.51.${Math.floor(index / 250)}.${(index % 250) + 1}`,
+          },
+        });
+      const limit = scope === "session" ? 30 : scope === "source" ? 60 : 300;
+      try {
+        for (let attempt = 0; attempt < limit; attempt++)
+          expect((await request(attempt)).status).toBe(200);
+        const denied = await request(limit);
+        expect(denied.status).toBe(429);
+        expect(denied.headers.get("retry-after")).toBe("60");
+        expect(denied.headers.get("cache-control")).toBe("no-store");
+        expect(await denied.json()).toEqual({ error: "replay_rate_limited" });
+        expect(replay).toHaveBeenCalledTimes(limit);
+        now += 60_001;
+        expect((await request(limit)).status).toBe(200);
+        expect(replay).toHaveBeenCalledTimes(limit + 1);
+      } finally {
+        clock.mockRestore();
+        replay.mockRestore();
+        await new Promise<void>((resolve, reject) =>
+          server.close((error) => (error ? reject(error) : resolve())),
+        );
+      }
+    },
+  );
+
   it("checks access, strict cursors, no-store responses, and readiness", async () => {
     const f = fixture();
     let ready = true;
