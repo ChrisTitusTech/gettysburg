@@ -932,7 +932,7 @@ export function Board({
             {FIXTURE_HEXES.map((hex) => (
               <polygon
                 aria-label={
-                  selectedUnit === undefined
+                  readOnly || selectedUnit === undefined
                     ? undefined
                     : `Move selected counters to ${hex.coordinate}`
                 }
@@ -947,8 +947,10 @@ export function Board({
                   }
                 }}
                 points={hexPolygonPoints(hex.point)}
-                role={selectedUnit === undefined ? undefined : "button"}
-                tabIndex={selectedUnit === undefined ? -1 : 0}
+                role={
+                  readOnly || selectedUnit === undefined ? undefined : "button"
+                }
+                tabIndex={readOnly || selectedUnit === undefined ? -1 : 0}
               >
                 <title>{`${hex.coordinate}: ${presentationTerrain(hex.coordinate)}; defense +${BOARD_TERRAIN[hex.coordinate].defense} before connected-terrain cancellation`}</title>
               </polygon>

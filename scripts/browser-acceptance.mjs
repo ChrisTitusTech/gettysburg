@@ -350,6 +350,13 @@ async function runScenario(browser, origin, options) {
     await viewer
       .getByRole("button", { name: /Wadsworth, D3, selectable/ })
       .click();
+    assert.equal(
+      await viewer
+        .getByRole("button", { name: /Move selected counters/ })
+        .count(),
+      0,
+    );
+    assert.equal(await viewer.locator('.hex[tabindex="0"]').count(), 0);
     await viewer.locator('[data-coordinate="E4"]').click();
     await viewer
       .getByText("Read-only history; no commands are sent.")

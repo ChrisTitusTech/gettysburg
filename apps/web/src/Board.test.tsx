@@ -73,6 +73,14 @@ it("lets a read-only viewer inspect either side without sending commands", async
   opponent.focus();
   await user.keyboard("{Enter}");
   expect(screen.getByText("Both sides (read-only)")).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: /Move selected counters/ }),
+  ).not.toBeInTheDocument();
+  for (const hex of document.querySelectorAll(".hex")) {
+    expect(hex).not.toHaveAttribute("role");
+    expect(hex).not.toHaveAttribute("aria-label");
+    expect(hex).toHaveAttribute("tabindex", "-1");
+  }
   await user.click(document.querySelector('[data-coordinate="O7"]')!);
   expect(onMove).not.toHaveBeenCalled();
   expect(
