@@ -1382,6 +1382,21 @@ validation remain separate gates.
     code. Desktop/tablet full games exercise all pending choices, reload/exact
     replay, host grant controls, and input fixtures in
     `test-results/spectator-host-serialization` and its `-fixtures` directory.
+  - Exact-head Application `34098943030` failed at head `d334cca`: the existing
+    nine-command PostgreSQL replay/restart test exceeded Vitest's five-second
+    unit-test default on the shared runner. The other 198 database-enabled
+    server tests and all 111 web tests passed; later build/browser/container
+    steps did not run. Full-run inspection found only expected injected errors,
+    isolated test-database trust/locale warnings, and action-runtime deprecations.
+    This multi-transaction integration test now has a bounded 15-second budget;
+    no runtime timeout or assertion is relaxed. Owner: ChrisTitusTech. Rerun
+    local/database gates, independent review, and exact-head CI before merge.
+    Repair validation passes the full local gate (584 workspace/nine harness
+    tests) and all 199 PostgreSQL tests. Fresh independent review found no
+    actionable defects; its database check was not rerun, covered by the
+    isolated result above. Application code is unchanged, so the verified
+    desktop/tablet evidence above remains applicable; exact-head CI must rerun
+    the complete workflow before merge.
     Fresh independent review found no actionable regressions and reran 111 web
     tests. Publish the repair, resolve the hosted thread, and verify exact-head
     CI before merge; no release or deployment gate is waived.

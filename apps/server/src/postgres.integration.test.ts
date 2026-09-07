@@ -518,7 +518,9 @@ postgres("PostgreSQL durability", () => {
       if (restarted) await restarted.close();
       if (!firstClosed) await first.close();
     }
-  });
+    // Multiple durable commands plus restart/reconstruction exceed Vitest's
+    // five-second unit-test default on shared CI runners. Keep a bounded gate.
+  }, 15_000);
 
   it("rolls state, action, and snapshot back together on a persistence failure", async () => {
     const service = new PostgresGameService({
