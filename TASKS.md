@@ -1950,6 +1950,19 @@ exact-head CI/review checks still prevent the dependent PR merge.
 
 ### Host spectator link creation
 
+Final observer integration: full local gates pass 624 workspace/nine harness
+tests, with the reviewed transport's 223 PostgreSQL tests covering unchanged
+server code. Fresh independent review passes all 132 web tests without findings.
+Desktop/tablet complete 24 turns, reload and exact replay, visible host issuance,
+observer claim/reload/live updates, explicit reconnect, replay denial cleanup,
+and revocation in `test-results/spectator-ui-pending-ack`; input fixtures pass in
+its `-fixtures` directory. Tablet covers all three combat choices; desktop
+loss/advance and earlier runs cover retreat. Tablet observer rendering was
+visually inspected in `test-results/spectator-ui-checkout-integration`.
+Previous head `afe7ba5` passed Application `34106799771` and Documentation
+`34106799747`; this integration needs new exact-head checks and final threads.
+Transport and host-link PRs must merge before the combined observer delivery.
+
 - [ ] Add visible host creation, copying, and hiding of private spectator links.
   - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
     component memory and URL fragments only; never persist them in browser
