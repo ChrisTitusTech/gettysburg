@@ -72,7 +72,7 @@ function fixture() {
           .invitations.map(([, invitation]) => invitation),
       },
     );
-  return { service, created, credentials, act, state, replay };
+  return { service, created, credentials, act, state, replay, pepper };
 }
 
 describe("deterministic mandatory action replay", () => {
@@ -256,7 +256,7 @@ describe("deterministic mandatory action replay", () => {
         undefined,
         { hosts: snapshot.hostBindings, invitations: [], recoveries },
       ),
-    ).toThrow(/binding rotation/);
+    ).toThrow(/binding chronology unavailable/);
     for (const patch of [
       { auditSequence: 2 },
       { operatorIdentity: "different operator" },
@@ -489,6 +489,174 @@ describe("deterministic mandatory action replay", () => {
       ).toThrow(/surrender did not retire its binding/);
     }
   });
+
+  it("retires only invitations outstanding at surrender and replays after restore", () => {
+    const f = fixture();
+    const issue = () => {
+      const result = f.service.executeHostCommand(
+        f.service.authenticateHost(f.created.credential, f.created.gameId),
+        {
+          command_id: randomUUID(),
+          command_name: "issueInvitation",
+          payload: { seat: "union" },
+          schema: COMMAND_SCHEMA_VERSION,
+          game_id: f.created.gameId,
+          expected_version: f.state().version,
+        },
+      );
+      if (!result.ok || !result.invitation)
+        throw new Error("Missing invitation");
+      return result.invitation;
+    };
+    f.act("union", "surrenderSeat"); // Event 1.
+    const claimed = issue(); // Event 2.
+    const outstanding = issue(); // Event 3.
+    f.credentials.union = f.service.claimInvitation({
+      lookupId: claimed.lookup_id,
+      secret: claimed.secret,
+    }).credential;
+    f.act("union", "surrenderSeat"); // Event 4.
+    const future = issue(); // Event 5, must not be retired by event 4.
+    expect(f.replay()).toEqual(f.state());
+    // Exercise the credential-free API evidence projection, not only the helper.
+    expect(
+      f.service.getReplay(f.created.credential, f.created.gameId).state,
+    ).toEqual(f.state());
+    const snapshot = f.service.exportSnapshot();
+    const invitations = snapshot.invitations.map(([, value]) => value);
+    const restored = new InMemoryGameService({ pepper: f.pepper, snapshot });
+    expect(
+      restored.getReplay(f.created.credential, f.created.gameId).state,
+    ).toEqual(f.state());
+    expect(
+      invitations.find((value) => value.lookupId === claimed.lookup_id),
+    ).toMatchObject({ claimedAfterSequence: 3 });
+    expect(
+      invitations.find((value) => value.lookupId === outstanding.lookup_id),
+    ).toMatchObject({ revokedAtSequence: 4 });
+    expect(
+      invitations.find((value) => value.lookupId === future.lookup_id),
+    ).toMatchObject({ revokedAt: null });
+    const actions = f.service.getActions(f.created.gameId);
+    expect(
+      replayMandatoryActions(
+        f.created.gameId,
+        actions,
+        snapshot.seatBindings,
+        undefined,
+        {
+          hosts: snapshot.hostBindings,
+          invitations: invitations.map((value) =>
+            value.lookupId === outstanding.lookup_id
+              ? { ...value, expiresAt: 0 }
+              : value,
+          ),
+        },
+      ),
+    ).toEqual(f.state());
+    for (const patch of [
+      { revokedAt: null, revokedAtSequence: undefined },
+      { revokedAtSequence: 5 },
+      { revokedAt: 0 },
+      { claimedAt: Date.now(), claimedAfterSequence: 4 },
+      { claimedAt: Date.now(), claimedAfterSequence: undefined },
+    ]) {
+      expect(() =>
+        replayMandatoryActions(
+          f.created.gameId,
+          actions,
+          snapshot.seatBindings,
+          undefined,
+          {
+            hosts: snapshot.hostBindings,
+            invitations: invitations.map((value) => {
+              const copy = { ...value };
+              if (copy.lookupId === outstanding.lookup_id)
+                Object.assign(copy, patch);
+              return copy;
+            }),
+          },
+        ),
+      ).toThrow(
+        /invitation.*surrender|surrender did not retire its outstanding invitations/,
+      );
+    }
+  });
+
+  it("rejects mutually consistent invitation evidence for an occupied seat", () => {
+    const f = fixture();
+    f.act("confederate", "surrenderSeat");
+    const command = {
+      command_id: randomUUID(),
+      command_name: "issueInvitation",
+      payload: { seat: "confederate" },
+      schema: COMMAND_SCHEMA_VERSION,
+      game_id: f.created.gameId,
+      expected_version: f.state().version,
+    } as const;
+    expect(
+      f.service.executeHostCommand(
+        f.service.authenticateHost(f.created.credential, f.created.gameId),
+        command,
+      ).ok,
+    ).toBe(true);
+    const actions = structuredClone(f.service.getActions(f.created.gameId));
+    const forged = { ...command, payload: { seat: "union" as const } };
+    const action = actions[1]!;
+    Object.assign(action, {
+      payload: forged.payload,
+      canonicalRequestHash: canonicalHostManagementCommandHash(forged),
+    });
+    if (!action.result?.ok) throw new Error("Missing result");
+    Object.assign(action.result.event, { summary: "union invitation issued" });
+    const snapshot = f.service.exportSnapshot();
+    expect(() =>
+      replayMandatoryActions(
+        f.created.gameId,
+        actions,
+        snapshot.seatBindings,
+        undefined,
+        {
+          hosts: snapshot.hostBindings,
+          invitations: snapshot.invitations.map(([, value]) =>
+            value.activeAfterSequence === 2
+              ? { ...value, allowedSeat: "union" as const }
+              : value,
+          ),
+        },
+      ),
+    ).toThrow(/invitation issued to an occupied seat/);
+  });
+
+  it.each(["host", "union", "confederate"] as const)(
+    "rejects overlapping %s bindings even when the selected actor is unique",
+    (role) => {
+      const f = fixture();
+      f.act("union", "endPhase");
+      const snapshot = f.service.exportSnapshot();
+      const hosts = [...snapshot.hostBindings];
+      const seats = [...snapshot.seatBindings];
+      if (role === "host")
+        hosts.push({
+          ...snapshot.hostBindings[0]!,
+          id: randomUUID(),
+        });
+      else
+        seats.push({
+          ...snapshot.seatBindings.find((binding) => binding.side === role)!,
+          id: randomUUID(),
+        });
+      expect(() =>
+        replayMandatoryActions(
+          f.created.gameId,
+          f.service.getActions(f.created.gameId),
+          seats,
+          undefined,
+          { hosts, invitations: [] },
+        ),
+      ).toThrow(/overlapping .* bindings/);
+    },
+  );
 
   it("rejects duplicated operator request IDs across separate recoveries", () => {
     const f = fixture();

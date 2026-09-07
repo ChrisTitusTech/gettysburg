@@ -656,7 +656,15 @@ Host attribution uses those bounds, and revoke summaries use retained invitation
 metadata. Revocation additionally requires a previously activated, unclaimed
 target, its exact revocation sequence, and a timestamp before expiry. Missing
 historical evidence fails closed without rewriting retained saves.
-Issued invitations match retained side/activation evidence. Recovery audit rows
+Issued invitations match retained side/activation evidence and a historically
+vacant seat. Same-game host and same-side seat binding intervals must not overlap;
+zero-action intervals before an immediate recovery remain valid. Invitation claims
+retain the last committed event sequence. Surrender must retire every unclaimed,
+unrevoked same-side invitation then outstanding, including expired invitations,
+at the surrender sequence and binding-retirement timestamp. Earlier claims or
+revocations and invitations issued later are not retired again. Missing claim
+chronology fails interpreted replay closed, without changing ordinary resume or
+rewriting saved data. Recovery audit rows
 match consumed grants, their request/sequence and operator identity, and the
 old/new binding rotation. Gameplay success requires the exact accepted envelope
 and literal boolean `ok: true`. None of this private evidence is returned by

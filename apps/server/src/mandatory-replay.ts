@@ -26,6 +26,7 @@ export interface ReplayManagementEvidence {
     | "lookupId"
     | "allowedSeat"
     | "claimedAt"
+    | "claimedAfterSequence"
     | "expiresAt"
     | "revokedAt"
     | "activeAfterSequence"
@@ -61,6 +62,23 @@ function bindingIndex<T extends HostBinding>(
   return index;
 }
 
+function bindingInterval(actor: HostBinding, sequence: number) {
+  const after = actor.activeAfterSequence;
+  const until = actor.inactiveFromSequence;
+  if (
+    !Number.isSafeInteger(after) ||
+    after! < 0 ||
+    (until === undefined
+      ? actor.revokedAt !== null
+      : !Number.isSafeInteger(until) ||
+        until <= after! ||
+        actor.revokedAt === null ||
+        !Number.isFinite(actor.revokedAt))
+  )
+    throw new ReplayError(sequence, "binding chronology unavailable");
+  return { start: after! + 1, end: until ?? Infinity };
+}
+
 function activeBinding<T extends HostBinding>(
   index: Map<string, T[]>,
   action: StoredAction,
@@ -75,28 +93,58 @@ function activeBinding<T extends HostBinding>(
       `missing or ambiguous historical ${kind} binding`,
     );
   const actor = actors[0]!;
-  const after = actor.activeAfterSequence;
-  const until = actor.inactiveFromSequence;
-  if (
-    !Number.isSafeInteger(after) ||
-    after! < 0 ||
-    (until === undefined
-      ? actor.revokedAt !== null
-      : !Number.isSafeInteger(until) ||
-        until <= after! ||
-        actor.revokedAt === null ||
-        !Number.isFinite(actor.revokedAt))
-  )
-    throw new ReplayError(action.sequence, "binding chronology unavailable");
-  if (
-    action.sequence <= after! ||
-    (until !== undefined && action.sequence >= until)
-  )
+  const interval = bindingInterval(actor, action.sequence);
+  if (action.sequence < interval.start || action.sequence >= interval.end)
     throw new ReplayError(
       action.sequence,
       "binding was not active at this sequence",
     );
   return actor;
+}
+
+type BindingInterval = ReturnType<typeof bindingInterval>;
+function bindingTimeline<T extends HostBinding>(
+  index: Map<string, T[]>,
+  kind: "seat" | "host",
+  role: (binding: T) => string,
+) {
+  const roles = new Map<string, BindingInterval[]>();
+  for (const actors of index.values()) {
+    if (actors.length !== 1)
+      throw new ReplayError(
+        0,
+        `missing or ambiguous historical ${kind} binding`,
+      );
+    const actor = actors[0]!;
+    const interval = bindingInterval(actor, 0);
+    // Recovery can retire a binding before it has any action-bearing interval.
+    if (interval.start === interval.end) continue;
+    const key = role(actor);
+    const intervals = roles.get(key) ?? [];
+    intervals.push(interval);
+    roles.set(key, intervals);
+  }
+  for (const intervals of roles.values()) {
+    intervals.sort((a, b) => a.start - b.start);
+    for (let i = 1; i < intervals.length; i++)
+      if (intervals[i - 1]!.end > intervals[i]!.start)
+        throw new ReplayError(
+          intervals[i]!.start,
+          `overlapping ${kind} bindings`,
+        );
+  }
+  return roles;
+}
+
+function occupiedAt(intervals: readonly BindingInterval[], sequence: number) {
+  let low = 0;
+  let high = intervals.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (intervals[middle]!.start <= sequence) low = middle + 1;
+    else high = middle;
+  }
+  return low > 0 && sequence < intervals[low - 1]!.end;
 }
 
 export class ReplayError extends Error {
@@ -235,6 +283,8 @@ export function replayMandatoryActions(
   let deleted = false;
   let sequence = 0;
   try {
+    const seats = bindingTimeline(seatIndex, "seat", (binding) => binding.side);
+    bindingTimeline(hostIndex, "host", () => "host");
     for (const action of actions) {
       sequence = state.event_sequence + 1;
       const assertReplay = (valid: boolean, reason: string) => {
@@ -298,6 +348,10 @@ export function replayMandatoryActions(
               issued.length === 1 &&
                 issued[0]!.allowedSeat === host.payload.seat,
               "missing or ambiguous issued invitation evidence",
+            );
+            assertReplay(
+              !occupiedAt(seats.get(host.payload.seat) ?? [], sequence),
+              "invitation issued to an occupied seat",
             );
           }
           assertReplay(
@@ -503,6 +557,45 @@ export function replayMandatoryActions(
             actor[0]!.inactiveFromSequence === sequence + 1,
           "surrender did not retire its binding",
         );
+        for (const invitation of management.invitations) {
+          if (
+            invitation.gameId !== gameId ||
+            invitation.allowedSeat !== actor[0]!.side
+          )
+            continue;
+          assertReplay(
+            Number.isSafeInteger(invitation.activeAfterSequence) &&
+              invitation.activeAfterSequence! >= 0,
+            "invitation chronology unavailable at surrender",
+          );
+          // Evidence is the latest retained snapshot, including future issues.
+          if (invitation.activeAfterSequence! >= sequence) continue;
+          if (invitation.claimedAt !== null) {
+            assertReplay(
+              Number.isFinite(invitation.claimedAt) &&
+                Number.isSafeInteger(invitation.claimedAfterSequence) &&
+                invitation.claimedAfterSequence! >=
+                  invitation.activeAfterSequence!,
+              "invitation claim chronology unavailable at surrender",
+            );
+            if (invitation.claimedAfterSequence! < sequence) continue;
+          }
+          if (
+            invitation.claimedAt === null &&
+            invitation.revokedAt !== null &&
+            Number.isFinite(invitation.revokedAt) &&
+            Number.isSafeInteger(invitation.revokedAtSequence) &&
+            invitation.revokedAtSequence! > invitation.activeAfterSequence! &&
+            invitation.revokedAtSequence! < sequence
+          )
+            continue;
+          assertReplay(
+            invitation.claimedAt === null &&
+              invitation.revokedAtSequence === sequence &&
+              invitation.revokedAt === actor[0]!.revokedAt,
+            "surrender did not retire its outstanding invitations",
+          );
+        }
         surrenderedBindings.add(bindingKey);
         assertReplay(
           result.event.summary === `${actor[0]!.side} seat surrendered`,
