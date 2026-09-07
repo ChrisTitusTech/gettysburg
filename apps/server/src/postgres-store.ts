@@ -11,6 +11,8 @@ import {
   type DeletionReceipt,
   type GameAuthorization,
   type GameView,
+  type SpectatorClaimResult,
+  type SpectatorView,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -33,6 +35,13 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  claimSpectatorInvitation(
+    input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
+  ): Promise<SpectatorClaimResult>;
+  getSpectatorView(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<SpectatorView>;
   canRetryTerminalDelete(
     credential: string | undefined,
     gameId: string,
@@ -126,6 +135,14 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async claimSpectatorInvitation(
+    input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
+  ) {
+    return this.service.claimSpectatorInvitation(input);
+  }
+  async getSpectatorView(credential: string | undefined, gameId: string) {
+    return this.service.getSpectatorView(credential, gameId);
+  }
 
   async authenticate(credential: string | undefined, gameId: string) {
     return this.service.authenticate(credential, gameId);
@@ -237,6 +254,16 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #pepper: Uint8Array;
+  async claimSpectatorInvitation(
+    input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
+  ) {
+    return this.#mutate((service) => service.claimSpectatorInvitation(input));
+  }
+  async getSpectatorView(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.getSpectatorView(credential, gameId),
+    );
+  }
 
   constructor(options: { connectionString: string; pepper: Uint8Array }) {
     this.#pool = new Pool({

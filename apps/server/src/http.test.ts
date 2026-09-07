@@ -43,6 +43,93 @@ async function withServer(
 }
 
 describe("service health", () => {
+  it("claims a private spectator cookie, rejects mutations, and revokes reads", async () => {
+    const service = new InMemoryAsyncGameService();
+    const host = await service.createGame("union");
+    const command = {
+      command_id: randomUUID(),
+      command_name: "issueSpectatorInvitation",
+      payload: {},
+      expected_version: 0,
+      game_id: host.gameId,
+      schema: COMMAND_SCHEMA_VERSION,
+    };
+    const issued = await service.executeHostCommand(
+      await service.authenticateHost(host.credential, host.gameId),
+      command,
+    );
+    if (!issued.ok || !issued.invitation) throw new Error("Missing invitation");
+    await withServer(
+      true,
+      async (origin) => {
+        const input = {
+          claim_id: randomUUID(),
+          game_id: host.gameId,
+          secret: issued.invitation!.secret,
+        };
+        const claim = (body: unknown) =>
+          fetch(
+            `${origin}/api/spectator-invitations/${issued.invitation!.lookup_id}/claim`,
+            {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body),
+            },
+          );
+        expect((await claim({ ...input, seat: "union" })).status).toBe(400);
+        const response = await claim(input);
+        expect(response.status).toBe(200);
+        const cookie = response.headers.get("set-cookie")!;
+        expect(cookie).toMatch(/HttpOnly/);
+        expect(cookie).toMatch(/Secure/);
+        const view = (await response.json()) as Record<string, unknown>;
+        expect(Object.keys(view).sort()).toEqual([
+          "action_log",
+          "game_id",
+          "state",
+        ]);
+        expect(JSON.stringify(view)).not.toContain(issued.invitation!.secret);
+        const retry = await claim(input);
+        expect(retry.headers.get("set-cookie")).toBe(cookie);
+        const headers = { cookie: cookie.split(";", 1)[0]! };
+        const read = (path: string) =>
+          fetch(`${origin}/api/games/${host.gameId}${path}`, { headers });
+        expect((await read("/spectator")).status).toBe(200);
+        expect((await read("/replay")).status).toBe(200);
+        expect((await read("")).status).toBe(401);
+        expect((await read("/export")).status).toBe(401);
+        const mutation = await fetch(
+          `${origin}/api/games/${host.gameId}/host-commands`,
+          {
+            method: "POST",
+            headers: { ...headers, "content-type": "application/json" },
+            body: JSON.stringify({ ...command, command_id: randomUUID() }),
+          },
+        );
+        expect(mutation.status).toBe(401);
+        expect(
+          (
+            await service.executeHostCommand(
+              await service.authenticateHost(host.credential, host.gameId),
+              {
+                ...command,
+                command_id: randomUUID(),
+                command_name: "revokeSpectatorAccess",
+                payload: { lookup_id: issued.invitation!.lookup_id },
+              },
+            )
+          ).ok,
+        ).toBe(true);
+        expect((await read("/spectator")).status).toBe(401);
+        expect((await read("/replay")).status).toBe(401);
+        let status = 0;
+        for (let index = 0; index < 21; index++)
+          status = (await claim({ ...input, secret: "invalid" })).status;
+        expect(status).toBe(429);
+      },
+      service,
+    );
+  });
   it("routes spectator invitation management through current host authorization", async () => {
     const service = new InMemoryAsyncGameService();
     const host = await service.createGame("union");

@@ -1341,6 +1341,32 @@ validation remain separate gates.
 
 ### Phase 4
 
+- [ ] Add private read-only spectator claims and revocable HTTP/replay access.
+  - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
+    public-only state/events, current-access replay checks, and audited host
+    revocation. Preserve legitimate host/seat bindings in a shared browser;
+    spectator bindings alone cannot authorize gameplay, host mutations, or raw
+    recovery exports. Persist claims/bindings in canonical snapshots, retain
+    invitation hashes through soft deletion, and remove observer bindings.
+  - Boundary: No live room access or spectator UI yet. Immediate socket
+    revocation, host grant-list controls, and three-session desktop/tablet
+    acceptance follow in separate small increments. Owner: ChrisTitusTech.
+  - Validation plan: Service/HTTP tests cover claim isolation, safe retries,
+    expiry, revocation, deletion/restore, and corrupt claim/replay evidence.
+    PostgreSQL close/reopen must preserve an exact claim retry and enforce
+    revocation. Run the complete local/database/browser gates, independent
+    review, and exact-head CI before merge. An initial focused run used stale
+    compiled shared protocol files; rebuilding that package cleared its three
+    rejection failures. Frozen install, format, lint, typecheck, 572 workspace
+    tests/nine harness tests, build, smoke, Markdown and whitespace all pass.
+    All 193 PostgreSQL server tests pass, including close/reopen claim retry and
+    revoked reads/replay. Desktop/tablet enforced games, pending-result reload,
+    exact replay, and input fixtures pass in `test-results/spectator-access`
+    and its `-fixtures` directory; desktop covered all three pending choices.
+    The existing replay presentation was visually inspected. Independent local
+    review found no actionable regressions and reran 177 server tests; its 16
+    database skips are covered above. Exact-head CI and hosted thread checks
+    remain required before merge; no live spectator UI is claimed yet.
 - [ ] Add audited host-managed spectator invitations.
   - Scope: Separate 24-hour spectator invitations from player invitations;
     cap outstanding grants at eight, preserve command-id retries with sealed
