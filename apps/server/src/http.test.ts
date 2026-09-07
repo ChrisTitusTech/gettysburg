@@ -43,6 +43,65 @@ async function withServer(
 }
 
 describe("service health", () => {
+  it("routes spectator invitation management through current host authorization", async () => {
+    const service = new InMemoryAsyncGameService();
+    const host = await service.createGame("union");
+    const guest = await service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    await withServer(
+      true,
+      async (origin) => {
+        const input = {
+          command_id: randomUUID(),
+          command_name: "issueSpectatorInvitation",
+          payload: {},
+          expected_version: 0,
+          game_id: host.gameId,
+          schema: COMMAND_SCHEMA_VERSION,
+        };
+        const send = (credential: string, body: unknown) =>
+          fetch(`${origin}/api/games/${host.gameId}/host-commands`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              cookie: `__Host-gettysburg-session=${credential}`,
+            },
+            body: JSON.stringify(body),
+          });
+        expect((await send(guest.credential, input)).status).toBe(401);
+        const accepted = await send(host.credential, input);
+        expect(accepted.status).toBe(200);
+        const body = (await accepted.json()) as {
+          invitation: { lookup_id: string; secret: string };
+        };
+        expect(body).toMatchObject({
+          ok: true,
+          event: {
+            command_name: "issueSpectatorInvitation",
+            event_sequence: 1,
+            state_version: 0,
+          },
+        });
+        expect(await (await send(host.credential, input)).json()).toEqual(body);
+        const revoked = await send(host.credential, {
+          ...input,
+          command_id: randomUUID(),
+          command_name: "revokeSpectatorInvitation",
+          payload: { lookup_id: body.invitation.lookup_id },
+        });
+        expect(await revoked.json()).toMatchObject({
+          ok: true,
+          event: { event_sequence: 2, state_version: 0 },
+        });
+        expect(
+          (await service.getReplay(host.credential, host.gameId)).sequence,
+        ).toBe(2);
+      },
+      service,
+    );
+  });
   it("assembles resume through one authorized service read", async () => {
     const service = new InMemoryAsyncGameService();
     const created = await service.createGame("union");
