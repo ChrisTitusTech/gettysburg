@@ -108,6 +108,49 @@ interface ApiErrorBody {
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
+export type PushConfig =
+  { enabled: false } | { enabled: true; applicationServerKey: string };
+export type PushStatus =
+  { enabled: false } | { enabled: true; expires_at: number };
+export function getPushConfig(signal?: AbortSignal): Promise<PushConfig> {
+  return jsonRequest(
+    "/api/push-config",
+    signal === undefined ? undefined : { signal },
+  );
+}
+export function getPushStatus(
+  gameId: string,
+  signal?: AbortSignal,
+): Promise<PushStatus> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/push-subscription`,
+    signal === undefined ? undefined : { signal },
+  );
+}
+export function setPushSubscription(
+  gameId: string,
+  subscription: PushSubscriptionJSON,
+  signal: AbortSignal,
+): Promise<PushStatus> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/push-subscription`,
+    {
+      method: "PUT",
+      body: JSON.stringify(subscription),
+      signal,
+    },
+  );
+}
+export function removePushSubscription(
+  gameId: string,
+  signal: AbortSignal,
+): Promise<PushStatus> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/push-subscription`,
+    { method: "DELETE", signal },
+  );
+}
+
 async function jsonRequest<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(

@@ -1052,6 +1052,27 @@ counter, and explanatory assets.
 
 ## Performance and compatibility
 
+Home Screen metadata uses a stable root identity, credential-free root launch,
+and standalone display. Installation does not register a worker, request push
+permission, cache gameplay, or add offline support. WebKit can use its built-in
+monogram without new artwork; custom install icons require owner asset review.
+Physical iPad installation, permission, delivery, and notification-click checks
+remain acceptance gates; served-manifest tests do not replace them. See
+[WebKit Home Screen behavior](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
+Chromium install-promotion requirements also include suitable icons, so no
+automatic install-prompt guarantee is made without approved icon assets.
+
+Active mandatory-game seats expose explicit browser notification controls only
+while connected. Merely opening a game never prompts for permission or registers
+a subscription. Consent is per seat and the most recently enabled browser
+replaces previous delivery for that seat; the UI does not claim that server
+consent necessarily refers to this device. Opt-out removes only that seat's
+server consent, preserving other games sharing the origin's native subscription.
+Key mismatch does not silently rotate that subscription. Disconnect, seat loss,
+or navigation cancels pending setup and removes the controls. Unsupported,
+insecure, denied-permission, disabled-server, and network failure states provide
+plain-language guidance without exposing endpoints or encryption keys.
+
 The VPS backup contract encrypts a persistent push signing key separately from
 the database and credential pepper, records whether it was present, and verifies
 its matching P-256 pair during isolated/off-host restore checks. No plaintext

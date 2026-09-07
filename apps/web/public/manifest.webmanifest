@@ -1,0 +1,12 @@
+{
+  "id": "/",
+  "name": "Gettysburg",
+  "short_name": "Gettysburg",
+  "description": "A two-player, server-authoritative Gettysburg board game.",
+  "lang": "en",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#182219",
+  "theme_color": "#182219"
+}
