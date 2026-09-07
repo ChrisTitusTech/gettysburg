@@ -1492,7 +1492,14 @@ validation remain separate gates.
     All three late PR #34 threads were resolved; a separate final PR #35 check
     found no review threads before merge `823e41d6cfdc4c1758b6d708ba86c699f68cf3a9`.
     CodeRabbit was limit-skipped as authorized. No VPS rollout occurred.
-- [ ] Add live read-only spectator room authorization and immediate revocation.
+- [x] Add live read-only spectator room authorization and immediate revocation.
+  - Merged PR #37 on 2026-09-07 as `790da61192c3314df2359a334761cea4bb4da5a3`.
+    Exact head `d100b2a` passed Application `34110333243` and Documentation
+    `34110333427`; final read-only thread inspection was empty before merge.
+    Full local gates pass 603 workspace/nine harness tests and 224 PostgreSQL
+    tests. Latest independent review found no actionable defects. Historical
+    validation/fix notes below are retained; their pending merge steps are now
+    superseded by this closeout. The separate observer UI remains PR #40.
   - Scope: Explicit observer role, repeated authorization at join and before
     broadcast batches, one shared room for two players/eight observers plus
     reload overlap, command rejection, expiry, and fail-closed reads. Private
@@ -1911,6 +1918,16 @@ validation remain separate gates.
   - Independent review found no actionable defects. Final documentation checks,
     integration with merged application work, exact-head CI, and a scan of the
     final merged release image remain required. No VPS changes were made.
+  - Integrated candidate includes merged PRs #37/#39. Full local gates now pass
+    606 workspace/nine harness tests. Fresh independent review remains clean.
+    Image `74f59538feb7a804ad176d8a40dda7eae5ade5fde8244dfa11601560a4051579`
+    passes container smoke and the same HIGH/CRITICAL scan with zero findings
+    (`/tmp/gettysburg-scanner.K2VSLN/integrated-candidate.json`). Both actual-image
+    desktop/tablet runs complete 24 turns, loss/advance, reload, and exact replay
+    in `test-results/alpine-integrated-image`; the preceding actual-image run
+    covers retreat on both widths. Host input fixtures pass in
+    `test-results/alpine-host-input-fixtures`. Exact-head CI and final release
+    image scanning remain open; this does not complete the release gate.
 
 ### Host spectator link creation
 
@@ -1924,7 +1941,11 @@ directory. The previous published head `e2725bb` passed Application
 `34106079859` and Documentation `34106079858`. Publish this integration and
 require its exact-head checks/final threads before merge; transport merges first.
 
-- [ ] Add visible host creation, copying, and hiding of private spectator links.
+- [x] Add visible host creation, copying, and hiding of private spectator links.
+  - Merged PR #39 on 2026-09-07 as `c3942ef5acc97eeb6e273a90446d1a79d737b76b`.
+    Exact head `4968920` passed Application `34110530019` and Documentation
+    `34110529936`; final thread inspection was empty before the separate merge.
+    Historical pending integration steps below are superseded by this closeout.
   - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
     component memory and URL fragments only; never persist them in browser
     storage. Show a selectable URL when clipboard access is unavailable.
