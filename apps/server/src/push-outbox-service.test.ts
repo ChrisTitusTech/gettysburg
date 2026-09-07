@@ -40,7 +40,7 @@ function fixture() {
       now: () => 1_000,
       snapshot: service.exportSnapshot(),
     });
-  return { service, host, guest, subscription, command, move, restore };
+  return { service, host, guest, subscription, command, move, restore, pepper };
 }
 
 describe("transaction-owned notification work", () => {
@@ -106,6 +106,35 @@ describe("transaction-owned notification work", () => {
       ).ok,
     ).toBe(true);
     expect(withConsent.service.claimPushDelivery()).toBeUndefined();
+  });
+
+  it("drops a restored reminder when the same seat now has a different decision", () => {
+    const f = fixture();
+    f.service.setPushSubscription(
+      f.guest.credential,
+      f.host.gameId,
+      f.subscription,
+    );
+    expect(f.move().ok).toBe(true);
+    const snapshot = f.service.exportSnapshot();
+    expect(snapshot.pushOutbox).toHaveLength(1);
+    const changed = new InMemoryGameService({
+      pepper: f.pepper,
+      now: () => 1_000,
+      snapshot: {
+        ...snapshot,
+        games: snapshot.games.map(([id, game]) => [
+          id,
+          {
+            ...game,
+            state: { ...game.state, phase: "combat" },
+          },
+        ]),
+      },
+    });
+    expect(changed.getGameState(f.host.gameId).active_side).toBe("confederate");
+    expect(changed.claimPushDelivery()).toBeUndefined();
+    expect(changed.exportSnapshot().pushOutbox).toBeUndefined();
   });
 
   it.each(["opt-out", "replacement", "recovery"])(

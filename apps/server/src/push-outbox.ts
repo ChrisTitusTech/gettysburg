@@ -9,6 +9,7 @@ export interface StoredPushIntent {
   readonly bindingId: string;
   readonly gameId: string;
   readonly consentTag: string;
+  readonly decisionFingerprint: string;
   readonly eventSequence: number;
   readonly createdAt: number;
   readonly expiresAt: number;
@@ -39,6 +40,8 @@ function valid(value: unknown): value is StoredPushIntent {
     item.eventSequence > 0 &&
     typeof item.consentTag === "string" &&
     /^[0-9a-f]{64}$/.test(item.consentTag) &&
+    typeof item.decisionFingerprint === "string" &&
+    /^[0-9a-f]{64}$/.test(item.decisionFingerprint) &&
     item.expiresAt > item.createdAt &&
     item.expiresAt <= item.createdAt + PUSH_LIFETIME_MS &&
     item.attempts <= RETRY_DELAYS_MS.length + 1 &&
@@ -88,7 +91,11 @@ export class PushOutbox {
   enqueue(
     input: Pick<
       StoredPushIntent,
-      "bindingId" | "gameId" | "eventSequence" | "consentTag"
+      | "bindingId"
+      | "gameId"
+      | "eventSequence"
+      | "consentTag"
+      | "decisionFingerprint"
     >,
     now: number,
     consentExpiresAt: number,

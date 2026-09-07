@@ -1897,6 +1897,16 @@ validation remain separate gates.
 
 ### Browser push foundation
 
+PR #44 review follow-up: persisted work now carries a deterministic fingerprint
+of its originating required decisions. Pruning rejects it when the same seat
+advances to a different decision, even if that seat still has an action to take.
+Routine progress within the same decision keeps its reminder. Old optional
+outbox records without fingerprints fail closed; game saves remain resumable.
+Full local gates pass 649 workspace/nine harness tests and all 272 PostgreSQL
+tests. Fresh independent review found no actionable defects and reran 248 server
+tests. Existing desktop/tablet full-game and fixture evidence covers unchanged
+browser and room behavior; new exact-head CI must rerun the integrated gates.
+
 - [ ] Persist notification work atomically with accepted gameplay commands.
   - Integrated closeout: full local gates pass 647 workspace/nine harness
     tests, all 270 PostgreSQL tests pass, and fresh independent review passes

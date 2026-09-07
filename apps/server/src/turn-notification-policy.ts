@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   MANDATORY_RULESET_VERSION,
   type GameState,
@@ -53,8 +54,14 @@ function requiredDecisions(state: GameState): Record<Side, Set<string>> {
   return decisions;
 }
 
-export function hasRequiredTurnDecision(state: GameState, side: Side): boolean {
-  return requiredDecisions(state)[side].size > 0;
+export function turnDecisionFingerprint(
+  state: GameState,
+  side: Side,
+): string | null {
+  const decisions = [...requiredDecisions(state)[side]].sort();
+  return decisions.length === 0
+    ? null
+    : createHash("sha256").update(JSON.stringify(decisions)).digest("hex");
 }
 
 // Called only with the before/after snapshots of a newly committed gameplay

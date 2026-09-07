@@ -7,6 +7,7 @@ function input(eventSequence = 1) {
     bindingId: randomUUID(),
     gameId: randomUUID(),
     consentTag: "a".repeat(64),
+    decisionFingerprint: "b".repeat(64),
     eventSequence,
   };
 }

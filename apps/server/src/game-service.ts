@@ -47,7 +47,7 @@ import {
   type PushDeliveryOutcome,
 } from "./push-outbox.js";
 import {
-  hasRequiredTurnDecision,
+  turnDecisionFingerprint,
   turnNotificationIntents,
 } from "./turn-notification-policy.js";
 import {
@@ -943,7 +943,8 @@ export class InMemoryGameService {
         intent.expiresAt <= consent.expiresAt &&
         intent.consentTag ===
           createHash("sha256").update(consent.sealed).digest("hex") &&
-        hasRequiredTurnDecision(game.state, binding.side)
+        intent.decisionFingerprint ===
+          turnDecisionFingerprint(game.state, binding.side)
       );
     });
   }
@@ -2588,12 +2589,17 @@ export class InMemoryGameService {
           item.revokedAt === null,
       );
       const consent = binding && this.#pushSubscriptions.get(binding.id);
-      if (binding && consent)
+      const decisionFingerprint = turnDecisionFingerprint(
+        game.state,
+        intent.side,
+      );
+      if (binding && consent && decisionFingerprint)
         this.#pushOutbox.enqueue(
           {
             gameId: intent.gameId,
             bindingId: binding.id,
             eventSequence: intent.eventSequence,
+            decisionFingerprint,
             consentTag: createHash("sha256")
               .update(consent.sealed)
               .digest("hex"),
