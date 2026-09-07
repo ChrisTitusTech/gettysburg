@@ -2178,6 +2178,13 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+The Home Screen PR now stacks on consent PR #50. Combined validation passes
+753 workspace/21 harness tests, all local gates, and fresh independent review
+(160 web tests). Both 24-turn games cover loss/retreat/advance, with native worker,
+consent isolation, reload, replay, spectators, and input fixtures passing in
+`test-results/home-screen-consent` and its `-fixtures` directory. No production
+subscription or device installation is claimed. Exact-head CI follows.
+
 Home Screen integration with merged PRs #45/#51 passes all local gates with
 740 workspace/18 harness tests. Fresh independent review is clean and reran
 147 web tests. The manifest/browser source is unchanged from the recorded
