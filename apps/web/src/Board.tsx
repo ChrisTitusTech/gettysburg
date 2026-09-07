@@ -35,6 +35,7 @@ import {
 import { BoardTerrain, presentationTerrain } from "./BoardTerrain";
 import { previewMandatoryMovement } from "./movement-preview";
 import { MovementControls } from "./MovementControls";
+import { previewAdvance } from "./advance-preview";
 
 interface BoardProps {
   readonly onExit?: (unitIds: readonly string[]) => void;
@@ -420,6 +421,19 @@ export function Board({
     }
     const advance = advanceContext(selectedUnit.id, selectedSingle);
     if (advance !== null) {
+      if (mandatory) {
+        const preview = previewAdvance(
+          state,
+          seat,
+          advance.combatId,
+          advance.unitIds,
+          target,
+        );
+        if (!preview.ok) {
+          setMovementNotice(preview.failure.message);
+          return;
+        }
+      }
       if (!advance.destinationHexes.includes(target)) {
         setMovementNotice("Choose a highlighted advance destination.");
         return;
@@ -482,6 +496,11 @@ export function Board({
       setMovementNotice("The selected counter cannot decline this advance.");
       return;
     }
+    if (
+      mandatory &&
+      !previewAdvance(state, seat, advance.combatId, advance.unitIds, null).ok
+    )
+      return;
     setMovementNotice("Submitting declined advance.");
     onAdvance(advance.combatId, advance.unitIds, null);
   }
@@ -575,6 +594,19 @@ export function Board({
     if (disabled) {
       setMovementNotice("Waiting for the authoritative server.");
       return;
+    }
+    if (mandatory && drag.mode === "advance") {
+      const preview = previewAdvance(
+        state,
+        seat,
+        drag.combatId!,
+        drag.unitIds,
+        drag.decline ? null : target,
+      );
+      if (!preview.ok) {
+        setMovementNotice(preview.failure.message);
+        return;
+      }
     }
     if (drag.mode === "advance" && drag.decline) {
       setMovementNotice("Submitting declined advance.");
@@ -703,6 +735,25 @@ export function Board({
       }
       const target = pointToCoordinate(point);
       if (target === null) return;
+      if (mandatory && unitMove.mode === "advance") {
+        const preview = previewAdvance(
+          state,
+          seat,
+          unitMove.combatId!,
+          unitMove.unitIds,
+          target,
+        );
+        const path = preview.ok ? [unit.location, target] : [unit.location];
+        const drag = { ...unitMove, decline: false, path } satisfies UnitDrag;
+        unitDragReference.current = drag;
+        setUnitDrag(drag);
+        setMovementNotice(
+          preview.ok
+            ? `Release to advance to ${target} for no movement cost.`
+            : preview.failure.message,
+        );
+        return;
+      }
       if (mandatory && unitMove.mode === "movement") {
         const preview = previewMandatoryMovement(
           state,

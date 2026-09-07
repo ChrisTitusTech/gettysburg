@@ -12,6 +12,7 @@ import {
 } from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
 import { RetreatControls } from "./RetreatControls";
+import { AdvanceControls } from "./AdvanceControls";
 
 interface TabletopControlsProps {
   readonly disabled: boolean;
@@ -216,14 +217,25 @@ function CombatCard({
         )
       ) : null}
       {choice?.kind === "advance" && choice.side === seat ? (
-        <div className="choice-form advance-drag-guidance">
-          <strong>Advance or decline on the board</strong>
-          <p>
-            Drag a highlighted eligible stack onto a highlighted vacated enemy
-            hex. To decline, drag it into the Decline advance tray. Hold Ctrl
-            before dragging to advance only the grabbed eligible counter.
-          </p>
-        </div>
+        state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+          <AdvanceControls
+            key={`${state.game_id}:${state.version}:${combat.id}`}
+            combatId={combat.id}
+            disabled={disabled}
+            onCommand={onCommand}
+            seat={seat}
+            state={state}
+          />
+        ) : (
+          <div className="choice-form advance-drag-guidance">
+            <strong>Advance or decline on the board</strong>
+            <p>
+              Drag a highlighted eligible stack onto a highlighted vacated enemy
+              hex. To decline, drag it into the Decline advance tray. Hold Ctrl
+              before dragging to advance only the grabbed eligible counter.
+            </p>
+          </div>
+        )
       ) : null}
       {choice !== null && choice.side !== seat ? (
         <p>Waiting for the {choice.side} seat to resolve its choice.</p>
@@ -277,7 +289,7 @@ export function TabletopControls({
             ? pendingChoice.kind === "retreat"
               ? "Complete your retreat choice"
               : pendingChoice.kind === "advance"
-                ? "Complete your advance decision on the board"
+                ? "Complete your advance choice"
                 : `Complete your ${choiceName} below`
             : `Waiting for ${choiceOwner} ${choiceName}`;
   const phaseButtonLabel =
