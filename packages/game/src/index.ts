@@ -12,3 +12,4 @@ export * from "./reinforcements.js";
 export * from "./board-exit.js";
 export * from "./retreat.js";
 export * from "./forced-retreat.js";
+export * from "./night.js";

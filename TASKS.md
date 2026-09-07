@@ -479,6 +479,23 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory night withdrawal and browser guidance.
+  - Scope: End-of-movement enforcement searches affordable legal withdrawals
+    using the same weighted movement calculator and validator as normal moves.
+    It checks every legal group from a threatened stack, general bonuses, active
+    move boundaries, source/destination capacity, friendly transit, artillery,
+    streams, and edge exits. Missing pinned movement data fails closed.
+  - Boundary: This changes only the still-unavailable mandatory-v4 ruleset;
+    existing saved rules keep their prior behavior. Browser guidance, complete
+    activation, and full rules-enforced acceptance remain open.
+  - Acceptance: Ten focused cases cover real terrain costs, group withdrawal,
+    friendly transit, capture, activation, edge cost, missing bundles, and bounded
+    range equivalence with point-to-point routes over all 253 hexes. Frozen
+    install, format, lint, typecheck, 399 default workspace tests plus six harness
+    tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL server
+    tests pass. Desktop/tablet and full-game regression pass with evidence in
+    `test-results/mandatory-night-withdrawal`. Independent review and exact-head
+    CI remain required before merge.
 - [ ] Complete mandatory combat inheritance and advance controls.
   - Scope: Mandatory-v4 uses the approved reduced combat factors and terrain
     calculation, including participating-attacker region cancellation, strongest
@@ -513,8 +530,9 @@ validation remain separate gates.
     terrain, and legacy isolation. Frozen install, format, lint, typecheck, 361
     default workspace tests plus six harness tests, build, smoke, Markdown lint,
     and all 93 isolated PostgreSQL server tests pass. Desktop/tablet and full-game
-    regression pass (`test-results/forced-retreat-choices`). Independent review
-    and exact-head CI remain required before merge.
+    regression pass (`test-results/forced-retreat-choices`). PR #15 merged as
+    `dbb8400` after independent built-in review, hosted Codex review, and exact-head
+    CI passed. CodeRabbit was limited and skipped; no unresolved threads remained.
 - [ ] Complete mandatory retreat geometry, forced choices, and browser controls.
   - Scope: A shared pure calculator prefers viable non-enemy-ZOC steps, permits
     enemy ZOC only when necessary, continues through friendly stacks to the first

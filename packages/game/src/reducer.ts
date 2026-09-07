@@ -8,6 +8,7 @@ import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
 import { prepareBoardExit } from "./board-exit.js";
 import { terrainMovementCost } from "./movement.js";
+import { mandatoryNightWithdrawals } from "./night.js";
 import {
   prepareForcedRetreat,
   prepareTrappedLoss,
@@ -411,8 +412,10 @@ function hasAdjacentEnemy(state: GameState, side: Side): boolean {
 function nightUnitsAbleToWithdraw(
   state: GameState,
   side: Side,
-): readonly UnitState[] {
+): readonly UnitState[] | null {
   if (!state.night) return [];
+  if (state.ruleset_version === MANDATORY_RULESET_VERSION)
+    return mandatoryNightWithdrawals(state, side);
   const enemyZoc = enemyZoneOfControl(state, side);
   return Object.values(state.units).filter((unit) => {
     if (
@@ -422,28 +425,6 @@ function nightUnitsAbleToWithdraw(
       !enemyZoc.has(unit.location)
     ) {
       return false;
-    }
-    if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
-      // An edge exit can require the whole active group, source-stack support,
-      // or the general bonus. Test legal groups, not just individual budgets.
-      let groups: string[][] = [[unit.id]];
-      for (const companion of Object.values(state.units)) {
-        if (
-          companion.id === unit.id ||
-          companion.side !== side ||
-          companion.status !== "deployed" ||
-          companion.location !== unit.location
-        )
-          continue;
-        groups = [
-          ...groups,
-          ...groups
-            .filter((group) => group.length < 3)
-            .map((group) => [...group, companion.id]),
-        ];
-      }
-      if (groups.some((group) => prepareBoardExit(state, side, group).ok))
-        return true;
     }
     if (unit.movement - (unit.movement_spent ?? 0) < 1) return false;
     return adjacentHexes(unit.location).some(
@@ -1501,6 +1482,12 @@ function endPhase(
     hasAdjacentEnemy(state, actorSide);
   if (state.phase === "movement" && state.night) {
     const mustWithdraw = nightUnitsAbleToWithdraw(state, actorSide);
+    if (mustWithdraw === null)
+      return failure(
+        state,
+        "version_unavailable",
+        "The pinned night-movement terrain and edge bundle is unavailable.",
+      );
     if (mustWithdraw.length > 0) {
       const counters = mustWithdraw
         .map((unit) => `${unit.label} (${unit.location})`)
