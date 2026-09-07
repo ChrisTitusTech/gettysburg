@@ -1,0 +1,74 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  measureBoardResponse,
+  summarizeResponseTimes,
+} from "./browser-performance.mjs";
+
+test("response summary uses nearest-rank percentiles without mutating samples", () => {
+  const samples = [110, ...Array.from({ length: 19 }, (_, index) => index + 1)];
+  const original = [...samples];
+  assert.deepEqual(summarizeResponseTimes(samples), {
+    samples: 20,
+    medianMs: 10,
+    p95Ms: 19,
+    maximumMs: 110,
+    budgetMs: 100,
+    overBudget: 1,
+  });
+  assert.deepEqual(samples, original);
+  assert.equal(summarizeResponseTimes([100]).overBudget, 0);
+});
+
+test("response summary rejects missing, negative, or non-finite evidence", () => {
+  for (const samples of [[], [-1], [NaN], [Infinity]])
+    assert.throws(() => summarizeResponseTimes(samples));
+});
+
+test("failed confirmation and input retain bounded evidence before rejecting", async () => {
+  const directory = await mkdtemp(
+    join(tmpdir(), "gettysburg-performance-test-"),
+  );
+  try {
+    for (const inputFailure of [false, true]) {
+      let clicks = 0;
+      let reads = 0;
+      const button = {
+        click: async () => {
+          if (++clicks > 1 && inputFailure)
+            throw new Error("Private value must not reach evidence");
+        },
+        evaluate: async () => {},
+      };
+      const page = {
+        getByRole: () => button,
+        evaluate: async () =>
+          ++reads === 1 ? { durationMs: 2_000, confirmed: false } : undefined,
+        context: () => ({ browser: () => ({ version: () => "fixture" }) }),
+        viewportSize: () => ({ width: 1440, height: 900 }),
+      };
+      await assert.rejects(
+        measureBoardResponse(page, directory, "desktop"),
+        /incomplete board response measurement/,
+      );
+      const evidence = JSON.parse(
+        await readFile(join(directory, "desktop-performance.json"), "utf8"),
+      );
+      assert.equal(evidence.samples, 1);
+      assert.equal(evidence.maximumMs, 2_000);
+      assert.equal(evidence.overBudget, 1);
+      assert.equal(
+        evidence.failure,
+        inputFailure
+          ? "measurement-input-or-page-failed"
+          : "zoom-not-confirmed-before-deadline",
+      );
+      assert.equal(JSON.stringify(evidence).includes("Private value"), false);
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});

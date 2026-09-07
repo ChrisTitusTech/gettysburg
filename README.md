@@ -94,6 +94,11 @@ historical replay, and await durable cleanup. The games have an eight-minute
 per-game bound; commands are paced below the room's abuse limit even on fast
 runners. CI allows 25 minutes for these games plus the other required gates.
 These automated checks do not replace owner tabletop adjudication.
+Browser acceptance also records 20 click-to-confirmed-zoom/paint-opportunity
+samples at each layout in `desktop-performance.json` and
+`tablet-performance.json`, failing the specified 100 ms feedback budget when
+exceeded. These are unthrottled test-machine measurements, not broadband-load,
+physical-device, cross-player-latency, or VPS-capacity claims.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl

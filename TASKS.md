@@ -1884,6 +1884,36 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Browser-response performance increment
+
+Add a bounded, browser-local zoom-response audit to both acceptance layouts.
+Twenty real clicks alternate zoom-in and Fit without changing game state.
+Measure from the browser click handler until the zoom text confirms the update
+and a subsequent animation frame provides a paint opportunity. A two-second
+deadline prevents suspended animation frames from waiting indefinitely.
+Retain only numeric timings, browser version, viewport, and explicit limitations
+in each layout's performance JSON; no resource URLs or private session values.
+Report nearest-rank median/p95/maximum and reject samples above SPEC.md's 100 ms
+feedback budget, preserving evidence before failure. Statistical regressions
+cover percentile boundaries, input immutability, and invalid samples.
+
+This is unthrottled test-machine evidence for zoom controls, not a claim about
+physical touch latency, all movement/combat interactions, broadband initial
+load, cross-player delivery, reconnect time, or supported VPS room capacity.
+Those measurements and owner release/device acceptance remain open. Full local
+gates, both complete games/input fixtures, independent review, and exact-head
+CI follow before this increment can merge.
+The first complete run passes 753 workspace/23 harness tests, both 24-turn
+games with all three choices, reload/replay/observers, and input fixtures in
+`test-results/performance-confirmed` and its `-fixtures` directory. Zoom p95 is
+31.9 ms desktop and 32.1 ms tablet; all 40 samples meet 100 ms locally.
+Independent review identified that a separate zoom confirmation wait could
+outlive the measurement deadline and lose failure evidence. Remove that wait;
+confirmation and input failures now save a sanitized failed sample and terminate
+before another measurement. Three harness regressions and a two-layout rerun
+pass in `test-results/performance-deadline` (32.0 ms p95 at both widths). Fresh
+review and final integration gates remain required.
+
 ### Container vulnerability closeout (release gate open)
 
 Integrated startup and notification-worker code from merged PRs #48/#49 passes

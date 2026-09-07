@@ -13,6 +13,7 @@ import { checkReplayManagement } from "./browser-replay-management.mjs";
 import { checkSpectatorManagement } from "./browser-spectator-management.mjs";
 import { checkPushWorker } from "./browser-push-worker.mjs";
 import { checkHomeScreen } from "./browser-home-screen.mjs";
+import { measureBoardResponse } from "./browser-performance.mjs";
 import { checkPushConsent } from "./browser-push-consent.mjs";
 import { startPostgres } from "./postgres-test-service.mjs";
 
@@ -230,6 +231,7 @@ async function runScenario(browser, origin, options) {
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
     await hostPage.reload();
     await hostPage.getByText("connected", { exact: true }).waitFor();
+    await measureBoardResponse(hostPage, evidenceDirectory, options.label);
     await hostPage
       .getByRole("button", { exact: true, name: "Revoke" })
       .waitFor();
