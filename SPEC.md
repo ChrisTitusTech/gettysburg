@@ -42,10 +42,13 @@ not remain compatible. The owner subsequently authorized retirement of five old
 development games after encrypted backup verification. Normal audited deletion
 retired those games; the database was preserved.
 
-The last verified VPS deployment implements the Phase 2 Scenario Five
-rules-light digital tabletop, durable PostgreSQL state, recovery, and staging.
-That evidence does not claim complete Phase 3 rule enforcement or Phase 4
-production readiness. Phase 2 operational closeout completed on 2026-09-06:
+The 2026-09-07 development VPS rollout deploys `dc6b73b` through PR #55,
+including mandatory Scenario Five for new games, replay, and private spectators.
+Push remains disabled pending signing-key/provider setup. This does not claim
+owner acceptance of Phase 3 or Phase 4 production readiness.
+The candidate is held in maintenance after public-browser room connection
+timeouts; deployment success does not supersede that failed acceptance gate.
+Historical Phase 2 operational closeout completed on 2026-09-06:
 PR #4 passed independent review and exact-head CI, merged with passing post-merge
 CI, and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Public readiness,
 encrypted backup/restore, desktop/tablet two-client workflows, and application

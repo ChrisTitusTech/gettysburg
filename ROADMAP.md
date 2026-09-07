@@ -278,8 +278,11 @@ Private spectator transport and browser workflows are merged through PR #40.
 Push foundations through optional startup and the service worker are merged
 through PR #49, with browser consent merged in PR #50 and encrypted key-recovery
 wiring merged in PR #51. Home Screen and actual device/recovery acceptance remain.
-Container hardening merged in PR #45 with passing severity-bounded
-scan and browser evidence; this is not a new VPS deployment or release approval.
+Container hardening merged in PR #45. The 2026-09-07 development rollout deploys
+`dc6b73b` through PR #55 with exact-image scanning and public readiness/WebSocket
+checks. It is not final release approval; push remains disabled pending setup.
+Subsequent public-browser room timeouts block acceptance and reopening traffic;
+the candidate/database are retained in maintenance for a reviewed repair.
 Existing staging, backup, restore, and browser evidence do not replace the
 remaining accessibility, security, capacity, reboot, and final acceptance gates.
 

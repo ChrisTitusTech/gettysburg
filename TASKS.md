@@ -2,6 +2,70 @@
 
 ## Current source rollup: 2026-09-07
 
+### VPS rollout and acceptance blocker: 2026-09-07
+
+The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55
+head `c7510e2` merged as `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` with a
+matching tree. Post-merge Application `34139146639`, Documentation `34139146460`,
+and Firefox/WebKit `34139146656` all passed before deployment.
+
+The exact VPS image is
+`d82327daa7268779d61cc095f6faf957e44e05d35bb4b9a502435f0cc9842490`.
+Trivy 0.74.0 found zero HIGH/CRITICAL findings, including unfixed advisories,
+across 18 Alpine and 361 Node packages. Scan evidence and rollback files are in
+`/srv/gettysburg/backups/deploy-20260907T155416Z`. Public health/readiness,
+non-root image verification, and two-client HTTPS/WebSocket movement/resume passed.
+Pre-deployment encrypted backup `20260907T155353Z` passed isolated PostgreSQL
+restore and off-host checksum/decryption checks, preserving 26 deleted games,
+no active games, and ledger acknowledgement 26. No existing data was wiped.
+
+**Release blocker:** two consecutive public Chromium 151.0.7922.34 runs failed
+at `browser-push-consent.mjs:91`, waiting 30 seconds for a connected session.
+The server logged a room-delivery cancellation/timeout. Home Screen metadata and
+synthetic notification-worker checks passed, but consent, subsequent two-layout
+browser workflows, and full 24-turn games did not complete. Logs are retained at
+`/tmp/gettysburg-rollout.VX9cqa/browser.log` and `browser-retry.log` on the
+maintainer workstation. Report timing mode was selected for diagnostic Internet
+testing; it did not waive this functional failure or the strict hardware gate.
+
+A read-only VPS probe measured a 22,778,651-byte JSON service snapshot and three
+query/parse plus hydration timings of 631/437, 480/397, and 521/342 ms.
+Whole-service reconstruction under concurrent requests is a suspected contributor
+to the two-second delivery deadline, not a proven sole cause. The two failed
+harness games were identified by their creation times, recovered through audited
+host recovery, and normally deleted; they were not purged. The harness currently
+closes contexts without deleting its game on this failure path, another follow-up.
+
+The application restart probe passed: both credentials resumed identical saved
+state, followed by normal probe deletion. Final encrypted backup
+`20260907T160346Z` passed isolated restore and off-host checksum/decryption
+verification. Final audit found zero active/30 deleted games and both database
+ledger and off-host acknowledgement at 30. Caddy now returns public HTTP 503
+maintenance; private readiness and both rootless containers remain healthy.
+Restart probe and sanitized operational logs are retained under
+`/tmp/gettysburg-rollout.VX9cqa`; no credentials or private scans were published.
+
+Owner: engineering must reproduce and repair bounded room delivery and failure
+cleanup, complete independent review/exact-head CI, redeploy, and rerun both
+desktop/tablet full-game checks before reopening public traffic. Preserve the
+candidate/database in maintenance mode; do not start older rules against newer
+writes or relax the deadline merely to pass acceptance. ChrisTitusTech owns the
+remaining physical-device, gameplay, reboot-window, and final release gates.
+Push is disabled with no VAPID key provisioned. A pending host reboot marker was
+observed; no host upgrade/reboot or real provider enrollment was performed.
+
+Documentation-rollup local validation passed frozen installation, format, lint,
+typecheck, 755 workspace/34 harness tests, build, and smoke. The 26 PostgreSQL
+integration tests were skipped in this default local run; exact deployed-head CI
+and the preceding 329-test database run retain that evidence. The existing
+502.68 kB bundle warning remains. No Phase 3/4 completion is claimed.
+Final Markdown/format/diff checks pass. Independent Codex review found no
+actionable documentation defects; remote evidence was verified by the deploying
+engineer, not independently repeated by that reviewer. CodeRabbit 0.7.6 hit its
+review limit and was skipped under the owner's explicit instruction.
+
+### Prior timing-policy closeout
+
 Owner-approved timing policy: shared CI uses diagnostic-only timing, retaining
 misses and warnings. Strict mode remains the default and enforces 100 ms on
 calibrated desktop hardware for release acceptance. Incomplete interactions
@@ -38,13 +102,13 @@ and evidence; they do not supersede this current status or close owner gates.
 
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
-| Phases 0-2 | Complete; last verified VPS revision is `40cff572aab183660dfeee188c4b6acddb2b1de5` | New source is not yet a new VPS rollout |
+| Phases 0-2 | Historical closeout complete; VPS candidate is `dc6b73b` | Current rollout is blocked on public-browser room delivery; maintenance required |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
-| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
+| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |
 | Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
 | Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private; local candidate image scan and runtime evidence recorded below | Remaining accessibility/device/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
+| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan and backup/restore evidence recorded above | Room-delivery blocker, accessibility/device/performance, compatible rollback/reboot, measured capacity, and final release approval |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates

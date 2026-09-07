@@ -17,8 +17,12 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   strength are approved. Supplied scans remain private.
 - All 253 terrain hexes are owner-verified; B2/F11 are woods. Connections are
   approved best guesses, not a request to repeat or overwrite the terrain audit.
-- Phase 2 is complete. The last verified VPS source remains
-  `40cff572aab183660dfeee188c4b6acddb2b1de5`; newer local/CI results are not a rollout.
+- Phase 2 is complete. The 2026-09-07 development VPS rollout uses source
+  `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` and immutable image
+  `d82327daa7268779d61cc095f6faf957e44e05d35bb4b9a502435f0cc9842490`.
+  This is not final public-release or Phase 3/4 acceptance.
+  Public traffic is held in maintenance after repeated browser connection
+  timeouts. Do not reopen it until a reviewed repair passes the failed checks.
 
 ## Owner gameplay acceptance
 
@@ -66,15 +70,35 @@ leave contrast over the image/SVG board for manual inspection.
 
 Responsible owner: ChrisTitusTech approves the maintenance window and release;
 engineering executes and records the reviewed procedures in `VPS.md`.
-These operations remain pending approval; this worksheet is not authorization.
+The owner authorized the application rollout on 2026-09-07. That authorization
+does not close separate disruptive exercises or final public-release approval.
 
-- [ ] Approve the candidate and maintenance window before rollout or disruptive
-  backup/restore, rollback, restart/reboot, and capacity exercises.
-- [ ] Verify the candidate's encrypted database/state/VAPID recovery set and
-  off-host restore, including deletion-ledger reconciliation and key continuity.
-- [ ] Exercise migration and compatible rollback on a copy, then verify public
-  health/readiness, authenticated WebSocket play, persistence, application restart,
-  and VPS reboot against the deployed immutable image.
+- [x] Approve and execute the reviewed application rollout. Exact merge-commit
+  Application, Documentation, and Firefox/WebKit CI passed. Trivy 0.74.0 found
+  zero HIGH/CRITICAL findings across 18 Alpine and 361 Node packages in the exact
+  deployed image, including unfixed advisories.
+- [x] Verify an encrypted pre-deployment database/state/ledger backup, isolated
+  restore, and off-host checksum/decryption checks. Backup `20260907T155353Z`
+  preserved 26 deleted games and ledger watermark 26; no active games existed.
+- [x] Verify the post-test recovery set and ledger acknowledgement. Encrypted
+  backup `20260907T160346Z` passed isolated restore and off-host checks; final
+  state is zero active/30 deleted games, with database and acknowledgement at 30.
+- [ ] Verify actual VAPID key continuity and off-host recovery. Push remains
+  disabled and no signing key was provisioned; absent-key backup checks are not
+  evidence of real key recovery or provider delivery.
+- [x] Verify public health/readiness and authenticated two-client HTTPS/WebSocket
+  movement and saved-state resume against the deployed immutable image.
+- [ ] Complete desktop/tablet public-site browser and full 24-turn checks.
+  Two Chromium runs failed at the consent fixture's connected-session wait;
+  the server logged a room-delivery timeout. Owner: engineering, with reproduction,
+  reviewed repair, exact-head CI, and both-layout rerun required. See `TASKS.md`.
+- [x] Verify both saved credentials and authoritative state after an application
+  restart, then back up the resulting deletion receipt. Both credentials resumed
+  identical state; the probe was normally deleted and included in the final backup.
+- [ ] Exercise migration and compatible rollback on an isolated copy. Saved
+  rollback files alone do not establish compatibility with newer game writes.
+- [ ] Approve and exercise VPS reboot/recovery. A pending reboot marker was
+  observed on 2026-09-07; this application rollout did not reboot the host.
 - [ ] Measure concurrent-room capacity on the target VPS and publish only the
   demonstrated limit. Local zoom timings do not establish broadband loading,
   all board-interaction latency, Internet-excluded command latency, or VPS capacity.

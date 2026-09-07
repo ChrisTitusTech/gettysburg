@@ -13,16 +13,18 @@ phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 
 ## Current status
 
-PR #4 merged on 2026-09-06. Its reviewed terrain and operational repairs are
-deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`, with passing exact-head
-and post-merge CI, healthy containers, public readiness, verified encrypted
-backups, desktop/tablet two-player browser checks, and application restart/resume.
-Phase 2 operational closeout is complete. The newer source candidate uses
+The reviewed source through PR #55 was deployed on 2026-09-07 as
+`dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd`, after passing post-merge CI,
+exact-image vulnerability scanning, encrypted backup/restore checks, and public
+readiness/two-client HTTPS/WebSocket checks. Subsequent public-browser acceptance
+failed on room connection timeouts; the candidate is held in maintenance mode
+pending repair. Phase 2 historical operational closeout remains
+complete. The deployed candidate uses
 `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
 weighted movement, continuous stack activation, reinforcement costs, connected
 terrain defense, retreat/advance, and mandatory night withdrawal. Existing saves
 retain their original rules. Dependency advisories were patched separately.
-The newer candidate has not been deployed by this change; retained-version replay,
+Push remains disabled pending signing-key/provider setup. Retained-version replay,
 owner gameplay acceptance, and Phase 4 release gates remain open.
 See `TASKS.md` for dated evidence; this is a development deployment, not a claim
 of production readiness.
