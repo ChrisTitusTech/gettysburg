@@ -15,7 +15,14 @@ import {
   type ManagementEvent,
   type Side,
 } from "@gettysburg/game";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   ApiResponseError,
@@ -30,12 +37,17 @@ import {
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
+import { NotificationBoundary } from "./NotificationBoundary";
 import { ReplayViewer } from "./ReplayViewer";
 import { SpectatorHostControls } from "./SpectatorHostControls";
 import { createSerialOperations } from "./serial-operations";
 import { invitationUrl, type SecretGrantFragment } from "./invitation";
 import { leaveOpenRoom } from "./room-lifecycle";
 import { TabletopControls } from "./TabletopControls";
+
+const PushControls = lazy(() =>
+  import("./PushControls").then((module) => ({ default: module.PushControls })),
+);
 
 interface AppProps {
   readonly initialGrant?: SecretGrantFragment | null;
@@ -821,6 +833,22 @@ export function App({
           </button>
         ) : null}
       </header>
+
+      {activeGame.seat !== null &&
+      connectionStatus === "connected" &&
+      activeGame.state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      activeGame.state.phase !== "completed" ? (
+        <NotificationBoundary>
+          <Suspense
+            fallback={<p role="status">Loading notification controls...</p>}
+          >
+            <PushControls
+              key={`${activeGame.game_id}:${activeGame.seat}`}
+              gameId={activeGame.game_id}
+            />
+          </Suspense>
+        </NotificationBoundary>
+      ) : null}
 
       {activeGame.invitationUrl === undefined &&
       activeInvitationLookupId === null ? null : (
