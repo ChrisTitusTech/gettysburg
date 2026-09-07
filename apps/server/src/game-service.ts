@@ -11,6 +11,7 @@ import {
 
 import {
   BOARD_TERRAIN,
+  MANDATORY_CONTENT_REVISION,
   SCENARIO_CONTENT_REVISION,
   SCENARIO_HEXES,
   SCENARIO_UNITS,
@@ -22,6 +23,7 @@ import {
   hostManagementCommandSchema,
   isHexCoordinate,
   LEGACY_RULESET_VERSION,
+  MANDATORY_RULESET_VERSION,
   reduceGameplayCommand,
   RULESET_VERSION,
   toCommandSuccess,
@@ -37,6 +39,7 @@ import {
   type Side,
 } from "@gettysburg/game";
 import canonicalize from "canonicalize";
+import { hasPinnedMandatoryContent } from "./mandatory-content.js";
 
 import {
   credentialVerifier,
@@ -568,10 +571,15 @@ function normalizeSavedState(
 }
 
 interface GameVersionHandler {
+  accepts?(state: GameState): boolean;
   normalize(state: GameState, actions: readonly StoredAction[]): GameState;
 }
 
 const gameVersionRegistry = new Map<string, GameVersionHandler>([
+  [
+    `${MANDATORY_RULESET_VERSION}\u0000${MANDATORY_CONTENT_REVISION}`,
+    { accepts: hasPinnedMandatoryContent, normalize: (state) => state },
+  ],
   [
     `${LEGACY_RULESET_VERSION}\u0000${SCENARIO_CONTENT_REVISION}`,
     { normalize: normalizeSavedState },
@@ -583,9 +591,10 @@ const gameVersionRegistry = new Map<string, GameVersionHandler>([
 ]);
 
 function gameVersionHandler(state: GameState): GameVersionHandler | undefined {
-  return gameVersionRegistry.get(
+  const handler = gameVersionRegistry.get(
     `${state.ruleset_version}\u0000${state.content_revision}`,
   );
+  return handler?.accepts?.(state) === false ? undefined : handler;
 }
 
 function canonicalCommand(command: {

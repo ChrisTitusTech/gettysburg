@@ -1,10 +1,12 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
+import { createMandatoryInitialState } from "@gettysburg/content";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
+import type { GameServiceSnapshot } from "./game-service.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
@@ -127,6 +129,113 @@ postgres("PostgreSQL durability", () => {
       snapshot_count: "2",
     });
     await restarted.close();
+  });
+
+  it("resumes a mandatory snapshot and persists its paid activation without legacy repairs", async () => {
+    const first = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await first.migrate();
+    const created = await first.createGame("union");
+    await first.close();
+    // Test-only seed: new-game defaults deliberately remain terrain-v3. Keep all
+    // three durable representations consistent before exercising real commands.
+    const initial = createMandatoryInitialState(created.gameId);
+    const stored = await administration.query<{
+      snapshot: GameServiceSnapshot;
+    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    const snapshot = stored.rows[0]!.snapshot;
+    const seeded = {
+      ...snapshot,
+      games: snapshot.games.map(([id, record]) => [
+        id,
+        id === created.gameId ? { ...record, state: initial } : record,
+      ]),
+    };
+    await administration.query(
+      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+      [JSON.stringify(seeded)],
+    );
+    await administration.query(
+      "UPDATE games SET state = $2::jsonb, ruleset_version = $3, content_revision = $4 WHERE id = $1",
+      [
+        created.gameId,
+        JSON.stringify(initial),
+        initial.ruleset_version,
+        initial.content_revision,
+      ],
+    );
+    await administration.query(
+      "UPDATE snapshots SET state = $2::jsonb, ruleset_version = $3, content_revision = $4 WHERE game_id = $1",
+      [
+        created.gameId,
+        JSON.stringify(initial),
+        initial.ruleset_version,
+        initial.content_revision,
+      ],
+    );
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    expect(await service.isReady()).toBe(true);
+    expect(await service.getGameState(created.gameId)).toEqual(initial);
+    const authorization = await service.authenticate(
+      created.credential,
+      created.gameId,
+    );
+    const command = {
+      command_id: randomUUID(),
+      command_name: "moveStack",
+      expected_version: 0,
+      game_id: created.gameId,
+      schema: COMMAND_SCHEMA_VERSION,
+      payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+    };
+    const accepted = await service.executeCommand(authorization, command);
+    expect(accepted).toMatchObject({
+      ok: true,
+      state: {
+        version: 1,
+        units: { "u-wadsworth": { location: "E4", movement_spent: 0.5 } },
+        normal_movement: { active_unit_ids: ["u-reynolds", "u-wadsworth"] },
+      },
+    });
+    await service.close();
+    const restarted = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await restarted.migrate();
+      const resumed = await restarted.authenticate(
+        created.credential,
+        created.gameId,
+      );
+      expect(await restarted.executeCommand(resumed, command)).toEqual(
+        accepted,
+      );
+      const actions = await restarted.getActions(created.gameId);
+      expect(actions).toHaveLength(1);
+      expect(actions[0]).toMatchObject({
+        sequence: 1,
+        resultingVersion: 1,
+        rulesetVersion: initial.ruleset_version,
+        contentRevision: initial.content_revision,
+      });
+      const persisted = await administration.query<{ state: unknown }>(
+        "SELECT state FROM snapshots WHERE game_id = $1 AND event_sequence = 1",
+        [created.gameId],
+      );
+      expect(persisted.rows[0]!.state).toEqual(
+        await restarted.getGameState(created.gameId),
+      );
+      expect(await restarted.isReady()).toBe(true);
+    } finally {
+      await restarted.close();
+    }
   });
 
   it("rolls state, action, and snapshot back together on a persistence failure", async () => {

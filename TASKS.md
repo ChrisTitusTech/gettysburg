@@ -479,6 +479,32 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Register mandatory saves, then enable new games and live acceptance.
+  - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
+    identity restore handler. Require the pinned full terrain/edge bundle,
+    static unit values/schedules, objective values, and explicit activation,
+    movement spending, and step state. Reject changed/missing data without
+    mutation or legacy state repair. Canonical comparison accepts PostgreSQL
+    JSON object reordering without silently changing content.
+  - Boundary: New games still use terrain-v3. This adds a saved-state handler,
+    not a migration, rollout, or full persisted-state integrity audit. Mutable
+    combat results and objective ownership remain gameplay state. Full command
+    coverage, deterministic replay, default activation, and live two-player
+    mandatory acceptance remain separate work.
+  - Validation: Twenty-one service cases cover exact restore, unavailable
+    content, missing movement state, reordered JSON, paid continuation across
+    restart, closed groups, idempotency, rejected-command immutability, and
+    opposing-seat authorization. An isolated PostgreSQL case seeds a complete
+    mandatory fixture, migrates/restarts, executes a paid stack move, and checks
+    the saved state, action/version pair, snapshot, and retry identity. Frozen
+    install, format, lint, typecheck, 480 default tests plus six harness tests,
+    build, smoke, Markdown lint, and all 115 PostgreSQL tests pass. Two-session
+    desktop/tablet and 24-turn regression pass
+    (`test-results/mandatory-version-regression`); mandatory browser fixtures
+    pass (`test-results/mandatory-version-fixtures`), including the parent PR's
+    repaired held-drag capture. Fresh independent built-in review found no
+    actionable regressions. Publish only after the parent merges; exact-head CI
+    and published review checks remain required before merge.
 - [ ] Pin and activate the complete mandatory content/version pair.
   - Scope: Add an isolated initial-state constructor with all approved terrain,
     existing movement edges, unchanged Scenario Five units/schedules/objectives,
@@ -488,9 +514,10 @@ validation remain separate gates.
     `docs/references/TERRAIN_CONNECTIONS.md`; do not modify owner terrain rows.
   - Boundary: The new pair is `gettysburg-mandatory-v4` /
     `gettysburg-mandatory-board-v1`. This preparatory constructor does not
-    register the pair or change server-created games. Strict server bundle
-    validation, activation, persistence/replay integration, and live two-player
-    mandatory acceptance remain separate work. Owner gameplay review of inferred
+    register the pair or change server-created games; the separate saved-state
+    handler above now supplies strict server bundle validation. New-game
+    activation, replay integration, and live two-player mandatory acceptance
+    remain separate work. Owner gameplay review of inferred
     road/rail border crossings remains required before release.
   - Validation: Nineteen cases cover complete content, immutable identity,
     isolated snapshots, unique boundary entries, every scheduled entry cost, and
