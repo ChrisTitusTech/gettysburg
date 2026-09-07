@@ -67,6 +67,9 @@ it("lets a read-only viewer inspect either side without sending commands", async
   const onMove = vi.fn();
   const user = userEvent.setup();
   render(<Board readOnly seat="confederate" state={state} onMove={onMove} />);
+  for (const name of ["Board controls", "Board destinations", "Counters"]) {
+    expect(screen.getByRole("group", { name })).toBeVisible();
+  }
   const opponent = screen.getByRole("button", {
     name: /Union fixture counter, P7, selectable/,
   });

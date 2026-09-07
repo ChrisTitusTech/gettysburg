@@ -17,6 +17,10 @@ describe("App", () => {
     render(<App />);
 
     expect(
+      screen.getByRole("group", { name: "Choose a host seat" }),
+    ).toBeVisible();
+
+    expect(
       screen.getByRole("button", { name: "Host as Confederate" }),
     ).toBeVisible();
     expect(screen.getByRole("button", { name: "Host as Union" })).toBeVisible();

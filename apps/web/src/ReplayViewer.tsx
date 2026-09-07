@@ -72,7 +72,11 @@ export function ReplayViewer({
         Event 0 is the opening. Each step is one accepted gameplay or management
         event. Live play continues separately; replay never sends game commands.
       </p>
-      <div className="zoom-controls" aria-label="Replay navigation">
+      <div
+        className="zoom-controls"
+        role="group"
+        aria-label="Replay navigation"
+      >
         <button
           disabled={blocked || snapshot?.sequence === 0}
           onClick={() => seek(0)}

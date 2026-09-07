@@ -12,7 +12,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49 | Browser consent UI, key backup/restore, Home Screen installability, and real provider/device acceptance |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, and encrypted key-recovery wiring are merged through PRs #49-51 | Home Screen acceptance, actual VPS key recovery, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -39,10 +39,14 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #41 targeting policy | `79ab265` | `34111783201` / `34111783231` | `99d710c` |
 | #43 protected subscriptions | `e1991d1` | `34112288240` / `34112288184` | `fc70599` |
 | #44 durable outbox | `3c49005` | `34113502719` / `34113502727` | `4ff4260` |
+| #45 container hardening | `e1c67d3` | `34120190523` / `34120190448` | `d3c658c` |
 | #46 provider transport | `cb99ec2` | `34113649123` / `34113649082` | `e603b16` |
 | #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
 | #48 optional startup | `d7c0d4c` | `34117338015` / `34117337993` | `2afd7ef` |
 | #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
+| #50 browser consent UI | `f9d5efd` | `34122292052` / `34122292041` | `88f96fc` |
+| #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
+| #52 Home Screen metadata | `54ee652` | `34123054048` / `34123054108` | `6790e3a` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1960,6 +1964,51 @@ Full local gates pass 755 workspace/24 harness tests, and Chromium input fixture
 pass in `test-results/transport-fixed-fixtures`. Fresh independent review found
 no actionable regressions and reran five focused regression tests. Exact-head
 CI still must replace the failed WebKit run before this increment can merge.
+
+### Accessibility audit increment
+
+Hosted review identified the missing WCAG 2.2 tags required by SPEC.md. Add
+2.2 A/AA to the retained 2.0/2.1 baseline and a regression assertion preventing
+that omission. The two-layout WCAG 2.2 rerun finds no automated violations;
+contrast remains incomplete. This supersedes the earlier narrower tag coverage.
+After integrating the merged consent UI, the full local gate passes 752
+workspace/22 harness tests. Both 24-turn games, protected consent, reload,
+replay, spectators, and input checks pass in
+`test-results/accessibility-wcag22-consent` and its `-fixtures` directory.
+Both games exercise loss/advance; the earlier run also exercised retreat.
+Fresh independent review found no actionable regressions and reran all 159 web
+tests plus the accessibility-baseline regression. Exact-head CI is required
+after publishing this hosted-review repair.
+The subsequent Home Screen integration passes the full local gate (753
+workspace/22 harness tests), both 24-turn games with all three combat choices,
+consent/replay/observer checks, and input fixtures in
+`test-results/accessibility-home-screen` and its `-fixtures` directory. Fresh
+independent review is clean and reran the baseline assertion and 38 focused web
+tests. PR #52 is merged; real Home Screen installation remains manual.
+
+Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
+the lobby, both live player views, and inspected replay at desktop and tablet
+widths. Retain only rule IDs, severity, counts, and help URLs, never raw HTML or
+private invitation/session values. Do not suppress automated violations.
+Initial checks found no violations but required review of ARIA labels and
+contrast. Labels on generic containers were not reliably exposed to assistive
+technology; named host-seat, board, counter, combat, and replay groups now have
+explicit group roles with semantic regression assertions. Corrected two-session
+browser checks pass in `test-results/accessibility-corrected`, leaving only
+gradient/image/SVG contrast as an incomplete automated rule. Full local gates,
+24-turn and input revalidation pass (739 workspace/nine harness tests).
+Both final games cover all three combat choices, reload, exact replay, and
+spectators in `test-results/accessibility-final`; input evidence is in its
+`-fixtures` directory. The rendered desktop board was inspected. Fresh
+independent review found no actionable defects and reran 146 web tests.
+Exact-head CI follows; unchanged backend retains the 329-test PostgreSQL gate.
+Integration with merged container/key-recovery work passes the full local gate
+again (739 workspace/18 harness tests) without changing browser runtime logic.
+
+Owner/manual gate remains open: verify contrast over the painted board and
+gradient surfaces, keyboard focus order and combat choices, actual screen-reader
+announcements, reduced motion, and current Firefox/Safari/iPad behavior. An axe
+pass is not a complete accessibility audit or Phase 4 acceptance.
 
 ### Container vulnerability closeout (release gate open)
 
