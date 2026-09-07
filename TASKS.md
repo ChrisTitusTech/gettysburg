@@ -519,6 +519,14 @@ validation remain separate gates.
     complete gate rerun passed. Fresh independent review found no actionable
     regressions and reran 105 client tests; it did not rerun the browser suites
     covered above. Exact-head CI and thread resolution remain before merge.
+    After merging PR #29's pacing repair, the combined full gate passes with
+    549 workspace/nine harness tests and all 167 PostgreSQL tests. Both full
+    games and input fixtures pass in `test-results/replay-viewer-context-paced`
+    and `test-results/replay-viewer-context-paced-fixtures`; desktop covered
+    loss/advance and tablet all three choices, with reload/replay checks passing.
+    The complete replay-container renders were inspected again. A fresh
+    independent review of the combined branch found no actionable regressions
+    and reran all 105 client tests and whitespace checks.
 - [ ] Strengthen the full-game browser acceptance beyond no-contact turns.
   - Scope: Use two actual browser sessions and visible keyboard/touch controls
     to play the pinned opening into two independent live combats, reload both
