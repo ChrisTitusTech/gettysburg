@@ -17,10 +17,11 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node --test scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs scripts/browser-push-consent.test.mjs scripts/scan-container.test.mjs scripts/vapid-backup.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
+    "test": "node --test scripts/browser-accessibility.test.mjs scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs scripts/browser-push-consent.test.mjs scripts/scan-container.test.mjs scripts/vapid-backup.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.13.0",
     "@colyseus/sdk": "0.17.43",
     "@eslint/js": "10.0.1",
     "@playwright/test": "1.62.1",

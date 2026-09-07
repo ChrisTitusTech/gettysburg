@@ -737,7 +737,11 @@ export function App({
           </p>
 
           {initialGrant === null && requestedGameId === null ? (
-            <div className="seat-actions" aria-label="Choose a host seat">
+            <div
+              className="seat-actions"
+              role="group"
+              aria-label="Choose a host seat"
+            >
               <button
                 disabled={isBusy}
                 onClick={() => void handleCreate("confederate")}
