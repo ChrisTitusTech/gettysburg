@@ -1012,6 +1012,13 @@ commit only once.
 - Secrets live outside Git in rootless service environment files with mode 0600.
 - Dependencies, container images, and migrations are reviewed before production
   deployment.
+- Browser push dispatch pins a validated public provider address while retaining
+  TLS hostname verification, rejects redirects, and bounds DNS/TLS/response
+  headers by a total deadline no longer than its durable lease. Provider bodies,
+  subscription endpoints/keys, and VAPID secrets are never logged. Standard
+  encryption uses [web-push request generation](https://github.com/web-push-libs/web-push#generaterequestdetailspushsubscription-payload-options);
+  [Node HTTPS](https://nodejs.org/docs/latest-v24.x/api/https.html) owns the
+  constrained network request rather than the library's socket-only timeout.
 
 The supplied scans may contain copyrighted Avalon Hill material. They remain
 local, are ignored by Git, and must never be force-added. Public or commercial

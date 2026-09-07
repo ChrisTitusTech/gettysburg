@@ -2010,6 +2010,29 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+Provider transport follow-up is in progress as a separate small PR. It uses
+`web-push` 3.6.7 for standard encrypted/VAPID request details and Node HTTPS for
+an address-pinned connection with normal hostname/certificate verification.
+Only approved provider authorities and public unicast DNS answers are allowed;
+translated, private, reserved, mixed, and empty answers fail closed. DNS can be
+cancelled, response headers have a total ten-second/lease-bounded deadline,
+redirects are not followed, and opaque provider bodies are discarded. A required
+authorization callback rechecks the persisted lease/current consent after DNS
+and holds its read lock only through synchronous request dispatch. Denied or
+late callbacks cannot start a request. Forty-two focused tests and the production
+dependency audit pass; full local gates pass 694 workspace/nine harness tests.
+Fresh independent review found no actionable defects. The initial real-database
+run passes 312 tests; the two new callback tests pass separately. Desktop/tablet
+24-turn games exercise all three choices, reload, exact replay, and input
+fixtures in `test-results/push-provider-transport` and its `-fixtures` directory.
+Exact-head CI remains required. No runtime worker calls this module yet; no real
+push-provider request or deployed VAPID credential was used.
+
+Integration with the reviewed completion-receipt repair passes the full local
+gate (697 workspace/nine harness tests) and all 317 PostgreSQL tests. Provider
+code is unchanged from the clean 42-test independent review and desktop/tablet
+browser evidence above. This new exact head still requires CI and final threads.
+
 PR #44 second review follow-up: lease-bounded private completion receipts retain
 consent identity after decision pruning or replacement by newer reminder work.
 A matching provider-gone outcome retires only unchanged consent; stale tokens,
