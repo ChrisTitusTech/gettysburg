@@ -493,14 +493,14 @@ validation remain separate gates.
     replacement dice or use recorded resulting states as replay starting points.
     Authorized server/API integration, replay UI, retained-version behavior,
     and the full rules-enforced acceptance game remain open.
-  - Validation: Twenty-six cases cover all 47 no-contact phase transitions across
+  - Validation: Twenty-seven cases cover all 47 no-contact phase transitions across
     24 turns, paid continuation and prefixes, recorded dice, two independent
     skirmishes with reordered keys, input isolation, recovered historical seats,
     surrendered seats, private management/audit records, corrupted state,
     malformed JSON, unavailable versions/schemas, hashes, and duplicate commands.
     The no-contact test is not a representative owner-adjudicated acceptance game.
-    Frozen install, format, lint, typecheck, 506 default tests plus six harness
-    tests, build, smoke, Markdown lint, and all 141 PostgreSQL tests pass.
+    Frozen install, format, lint, typecheck, 507 default tests plus six harness
+    tests, build, smoke, Markdown lint, and all 142 PostgreSQL tests pass.
     Two-session desktop/tablet and 24-turn regression pass
     (`test-results/mandatory-replay-chronology`); mandatory browser fixtures pass
     (`test-results/mandatory-replay-chronology-fixtures`). Independent built-in
@@ -539,6 +539,21 @@ validation remain separate gates.
     database gates pass again. Browser evidence above is unchanged by these
     verifier-only repairs. Fresh independent built-in review found no actionable
     defects; exact-head CI remains pre-merge.
+    A fifth hosted pass requires host-binding chronology and invitation-derived
+    revoke summaries. Host creation/recovery now persist activation/retirement
+    bounds just like seats. Replay indexes only this game's historical actors
+    once, rejects unknown/ambiguous/temporally invalid host attribution, and
+    derives revoke text from the retained invitation side instead of trusting
+    the recorded summary. Missing evidence fails closed; deletion and ordinary
+    resume policies are unchanged. Focused recovery and altered-summary checks,
+    full local/database gates, and two-session desktop/tablet acceptance pass
+    (`test-results/mandatory-replay-host`). The first fixture run lost its page
+    during a concurrent rebuild and timed out; rerunning without concurrent
+    builds passed (`test-results/mandatory-replay-host-fixtures`). Keep browser
+    fixtures isolated from rebuilding their watched workspace. Fresh independent
+    local review found no actionable defects and reran 130 server tests
+    (12 database checks skipped there; the separate database gate passed).
+    Exact-head CI remains before merge.
 - [ ] Register mandatory saves, then enable new games and live acceptance.
   - Scope: Resolve the exact mandatory-v4 / mandatory-board-v1 pair with an
     identity restore handler. Require the pinned full terrain/edge bundle,

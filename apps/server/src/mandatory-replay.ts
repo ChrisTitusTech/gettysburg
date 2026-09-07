@@ -10,7 +10,68 @@ import {
   type GameplayCommand,
 } from "@gettysburg/game";
 import canonicalize from "canonicalize";
-import type { SeatBinding, StoredAction } from "./game-service.js";
+import type {
+  HostBinding,
+  Invitation,
+  SeatBinding,
+  StoredAction,
+} from "./game-service.js";
+
+export interface ReplayManagementEvidence {
+  readonly hosts: readonly HostBinding[];
+  readonly invitations: readonly Pick<
+    Invitation,
+    "gameId" | "lookupId" | "allowedSeat"
+  >[];
+}
+
+function bindingIndex<T extends HostBinding>(
+  gameId: string,
+  bindings: readonly T[],
+) {
+  const index = new Map<string, T[]>();
+  for (const binding of bindings) {
+    if (binding.gameId !== gameId) continue;
+    const key = JSON.stringify([binding.id, binding.version]);
+    index.set(key, [...(index.get(key) ?? []), binding]);
+  }
+  return index;
+}
+
+function activeBinding<T extends HostBinding>(
+  index: Map<string, T[]>,
+  action: StoredAction,
+  kind: "seat" | "host",
+): T {
+  const actors = index.get(
+    JSON.stringify([action.authorizingId, action.authorizingVersion]),
+  );
+  if (actors?.length !== 1)
+    throw new ReplayError(
+      action.sequence,
+      `missing or ambiguous historical ${kind} binding`,
+    );
+  const actor = actors[0]!;
+  const after = actor.activeAfterSequence;
+  const until = actor.inactiveFromSequence;
+  if (
+    !Number.isSafeInteger(after) ||
+    after! < 0 ||
+    (until === undefined
+      ? actor.revokedAt !== null
+      : !Number.isSafeInteger(until) || until <= after!)
+  )
+    throw new ReplayError(action.sequence, "binding chronology unavailable");
+  if (
+    action.sequence <= after! ||
+    (until !== undefined && action.sequence >= until)
+  )
+    throw new ReplayError(
+      action.sequence,
+      "binding was not active at this sequence",
+    );
+  return actor;
+}
 
 export class ReplayError extends Error {
   constructor(
@@ -105,8 +166,22 @@ export function replayMandatoryActions(
   actions: readonly StoredAction[],
   bindings: readonly SeatBinding[],
   expectedFinal?: GameState,
+  management: ReplayManagementEvidence = { hosts: [], invitations: [] },
 ): GameState {
   let state = createMandatoryInitialState(gameId);
+  const seatIndex = bindingIndex(gameId, bindings);
+  const hostIndex = bindingIndex(gameId, management.hosts);
+  const invitationIndex = new Map<
+    string,
+    ReplayManagementEvidence["invitations"][number][]
+  >();
+  for (const invitation of management.invitations) {
+    if (invitation.gameId !== gameId) continue;
+    invitationIndex.set(invitation.lookupId, [
+      ...(invitationIndex.get(invitation.lookupId) ?? []),
+      invitation,
+    ]);
+  }
   const commandIds = new Set<string>();
   const operatorRequestIds = new Set<string>();
   const surrenderedBindings = new Set<string>();
@@ -169,6 +244,7 @@ export function replayMandatoryActions(
           if (!parsedHost.success)
             throw new ReplayError(sequence, "invalid management metadata");
           const host = parsedHost.data;
+          activeBinding(hostIndex, action, "host");
           assertReplay(
             commandHash(host) === action.canonicalRequestHash,
             "management hash mismatch",
@@ -181,20 +257,22 @@ export function replayMandatoryActions(
           );
           if (!hostResult?.ok)
             throw new ReplayError(sequence, "invalid management result");
+          const target =
+            host.command_name === "revokeInvitation"
+              ? (invitationIndex.get(host.payload.lookup_id) ?? [])
+              : [];
+          if (host.command_name === "revokeInvitation")
+            assertReplay(
+              target.length === 1 &&
+                ["union", "confederate"].includes(target[0]!.allowedSeat),
+              "missing or ambiguous historical invitation",
+            );
           const summary =
             host.command_name === "deleteGame"
               ? "Game deleted"
               : host.command_name === "issueInvitation"
                 ? `${host.payload.seat} invitation issued`
-                : hostResult.event.summary;
-          if (host.command_name === "revokeInvitation")
-            assertReplay(
-              [
-                "union invitation revoked",
-                "confederate invitation revoked",
-              ].includes(summary),
-              "invalid management summary",
-            );
+                : `${target[0]!.allowedSeat} invitation revoked`;
           assertReplay(
             equal(hostResult.event, {
               command_id: host.command_id,
@@ -243,35 +321,10 @@ export function replayMandatoryActions(
         action.authorizingType === "seat" && action.operatorRequestId === null,
         "gameplay actor is not a seat",
       );
-      const actor = bindings.filter(
-        (binding) =>
-          binding.id === action.authorizingId &&
-          binding.version === action.authorizingVersion &&
-          binding.gameId === gameId,
-      );
-      assertReplay(
-        actor.length === 1,
-        "missing or ambiguous historical seat binding",
-      );
+      const actor = [activeBinding(seatIndex, action, "seat")];
       assertReplay(
         actor[0]!.side === "union" || actor[0]!.side === "confederate",
         "invalid historical side",
-      );
-      const activeAfter = actor[0]!.activeAfterSequence;
-      const inactiveFrom = actor[0]!.inactiveFromSequence;
-      assertReplay(
-        Number.isSafeInteger(activeAfter) &&
-          activeAfter! >= 0 &&
-          (inactiveFrom === undefined
-            ? actor[0]!.revokedAt === null
-            : Number.isSafeInteger(inactiveFrom) &&
-              inactiveFrom > activeAfter!),
-        "binding chronology unavailable",
-      );
-      assertReplay(
-        sequence > activeAfter! &&
-          (inactiveFrom === undefined || sequence < inactiveFrom),
-        "binding was not active at this sequence",
       );
       const bindingKey = JSON.stringify([actor[0]!.id, actor[0]!.version]);
       assertReplay(
