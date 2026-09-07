@@ -22,13 +22,16 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   `459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
   This is not final public-release or Phase 3/4 acceptance.
   The repair passed both retained-data VPS full games and exact-head CI.
-  Public readiness/two-client smoke pass; extended public checks are in progress.
+  Public readiness/two-client smoke and the desktop full game pass. The public
+  tablet full-game timing gate remains failed near turn 24. Owner gameplay
+  testing is available, but this candidate is not release-accepted.
   PR #56 remains unmerged pending required code-owner approval.
-  Failed-run environment: Codex engineering automation on ChrisTitusTech's
+  Browser-run environment: Codex engineering automation on ChrisTitusTech's
   Fedora Linux 44 x86_64 workstation, headless Chromium 151.0.7922.34,
-  1440x900 desktop consent-fixture viewport. Neither physical-device acceptance
-  nor the later two-layout checks completed. Protected diagnostic copies are in
-  `/home/titus/.local/state/gettysburg/acceptance/20260907-rollout`.
+  1440x900 desktop keyboard and 1024x768 touch-tablet viewports. These do not
+  establish physical-device acceptance. Protected repair diagnostics are in
+  `/home/titus/.local/state/gettysburg/acceptance/20260907-repair`;
+  the earlier failed rollout is retained in the sibling `20260907-rollout` folder.
 
 ## Start an owner acceptance game
 
@@ -98,8 +101,10 @@ does not close separate disruptive exercises or final public-release approval.
 - [x] Verify an encrypted pre-deployment database/state/ledger backup, isolated
   restore, and off-host checksum/decryption checks. Backup `20260907T175422Z`
   preserved 30 deleted games and ledger watermark 30; no active games existed.
-- [ ] Verify the repaired candidate's post-test recovery set and ledger
-  acknowledgement after all browser/restart probe cleanup is complete.
+- [x] Verify the repaired candidate's post-test recovery set and ledger
+  acknowledgement after browser/restart probe cleanup. Backup
+  `20260907T194121Z` passed isolated restore and off-host checksum/decryption;
+  final audit: zero active games, 45 retained deleted games, ledger/ack 45.
 - [ ] Verify actual VAPID key continuity and off-host recovery. Push remains
   disabled and no signing key was provisioned; absent-key backup checks are not
   evidence of real key recovery or provider delivery.
@@ -107,10 +112,13 @@ does not close separate disruptive exercises or final public-release approval.
   movement and saved-state resume against the deployed immutable image.
 - [ ] Complete desktop/tablet public-site browser and full 24-turn checks.
   The reviewed repair passes both full games on an isolated retained-data VPS
-  copy; the exact deployed image's public suite is running. Prior connection and
-  time-limit failures remain recorded in `TASKS.md`. Owner: engineering.
-- [ ] Verify both saved credentials and authoritative state after restarting
-  the repaired candidate, then back up the resulting deletion receipt.
+  copy. Public desktop passes; the latest public tablet rerun exceeds eight
+  minutes near turn 24 despite recovered admissions. Both-width basic flows,
+  replay management, and private spectators pass. Engineering owns retained-
+  history latency repair and an unchanged tablet rerun; see `TASKS.md`.
+- [x] Verify both saved credentials and identical authoritative state after
+  restarting the repaired application. Normal probe deletion is covered by
+  backup `20260907T194121Z`; this was not a host reboot.
 - [ ] Exercise migration and compatible rollback on an isolated copy. Saved
   rollback files alone do not establish compatibility with newer game writes.
 - [ ] Approve and exercise VPS reboot/recovery. A pending reboot marker was

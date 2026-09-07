@@ -43,8 +43,9 @@ terrain/edge bundle and shared rule previews. It does not reinterpret existing
 saves or close the remaining owner/release acceptance gates.
 Public-browser acceptance exposed room connection timeouts. Reviewed repair
 candidate `1baebbd` is now deployed after exact-head CI and both retained-data
-VPS full games. Public readiness/two-client smoke pass; extended public checks
-are in progress. PR #56 still requires code-owner approval before merge.
+VPS full games. Public readiness/two-client smoke and the desktop full game pass.
+Owner gameplay testing is available, but the public tablet full-game timing gate
+still fails near turn 24. PR #56 requires code-owner approval before merge.
 `TASKS.md` preserves the failed-run history and current evidence.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,

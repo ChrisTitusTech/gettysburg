@@ -2,7 +2,7 @@
 
 ## Current source rollup: 2026-09-07
 
-### Repair deployed; public validation in progress
+### Repair deployed for owner testing; tablet timing gate remains failed
 
 Reviewed source `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as
 immutable image
@@ -28,8 +28,11 @@ HEALTHCHECK warnings are retained; Quadlet supplies the running health check.
 Rollback and scan evidence: `/srv/gettysburg/backups/deploy-20260907T184725Z`.
 Encrypted pre-deployment backup `20260907T175422Z` passed isolated restore and
 off-host verification. Public readiness and authenticated two-client
-HTTPS/WebSocket movement/resume pass. The extended public browser suite,
-candidate restart probe, and final off-host acknowledgement are still pending.
+HTTPS/WebSocket movement/resume pass. After an application restart, both saved
+credentials resumed identical authoritative state; its owned probe was normally
+deleted. Final backup `20260907T194121Z` passed isolated restore and off-host
+checksum/decryption verification. The final live audit found zero active games,
+45 retained deleted games, and matching ledger/off-host watermarks of 45.
 Owner: engineering. Performance/capacity, physical-device, gameplay adjudication,
 real push delivery/key recovery, reboot, rollback exercise, and final release
 approval remain open; Phases 3/4 are not complete.
@@ -42,8 +45,8 @@ initial invitation. Ten games (including deployment smoke) had been created
 between 18:48:56 and 18:56:04 UTC, before the 19:03:18 failure. This suggests the
 10-per-source/15-minute creation limit; the failed HTTP response was not captured,
 so the cause is not proven. A post-window creation probe succeeds and is normally
-deleted. The unfinished tablet full game is rerunning with creation-status
-diagnostics and unchanged limits/timeouts. Engineering owns better initial-error
+deleted. Subsequent tablet results are recorded below with unchanged limits and
+timeouts. Engineering owns better initial-error
 capture in the harness; do not relax admission or creation safeguards.
 Public board captures at both widths were visually inspected. Reconnect takes
 about 2.9 seconds; input-to-both-players is about 2.8-3.4 seconds and misses its
@@ -59,15 +62,25 @@ same-origin POST admission 503 console messages as diagnostics (one message per
 response); unrelated errors still fail. This aligns the audit with intentional
 bounded admission retries; connection/workflow/time-limit assertions remain
 unchanged. Unit regressions cover wrong origin/path/status/method/location/type,
-unobserved/stale/duplicate messages, and required diagnostic recording. Validate
-this harness increment independently and rerun tablet; do not claim the prior
+unobserved/stale/duplicate messages, and required diagnostic recording. Independent
+review and the tablet rerun are complete; do not claim the prior
 strict console audit passed. Runtime code/image remains `1baebbd`/`459eeb03`.
 The harness increment passes frozen installation, formatting, lint, typecheck,
 766 workspace/39 harness tests, all 338 PostgreSQL tests, build, and smoke.
 Fresh independent Codex review and CodeRabbit 0.7.6 report zero actionable
-findings, including the new classifier and negative tests. The final public
-tablet rerun has recorded the expected admission diagnostic and remains in
-progress; exact-head CI is required after this harness/documentation push.
+findings, including the new classifier and negative tests. Harness head
+`ff14fce` passes exact-head Application, Documentation, Security, CodeQL, and
+Firefox/WebKit CI. The final public tablet rerun recorded the expected admission
+diagnostic but failed the unchanged eight-minute limit at turn 24, movement,
+version 57 while waiting for version 58; the database subsequently held version
+58. The owned failed probe was deleted through audited host recovery and normal
+deletion. Evidence: protected `public-tablet-diagnostic.log` and
+`cleanup-failed-tablet.log`. No public tablet full-game pass is claimed.
+
+The site is open for owner gameplay testing, not final release acceptance.
+Engineering owns retained-history latency investigation and another unchanged
+public tablet gate after a reviewed repair. A broader persistence redesign is
+not part of this deployment. Push remains disabled. Do not close Phases 3/4.
 
 ### Room-delivery repair investigation and validation history
 
@@ -379,13 +392,13 @@ and evidence; they do not supersede this current status or close owner gates.
 
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
-| Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd` | Extended public validation and final backup/restart checks are in progress |
+| Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd`; restart and final backup verified | Public tablet timing gate remains failed; owner gameplay testing is available |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |
 | Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
 | Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan and backup/restore evidence recorded above | Room-delivery blocker, accessibility/device/performance, compatible rollback/reboot, measured capacity, and final release approval |
+| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan and backup/restore evidence recorded above | Public tablet latency gate, accessibility/device/performance, compatible rollback/reboot, measured capacity, and final release approval |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates

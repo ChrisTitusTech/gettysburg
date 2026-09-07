@@ -42,12 +42,15 @@ not remain compatible. The owner subsequently authorized retirement of five old
 development games after encrypted backup verification. Normal audited deletion
 retired those games; the database was preserved.
 
-The 2026-09-07 development VPS rollout deploys `dc6b73b` through PR #55,
-including mandatory Scenario Five for new games, replay, and private spectators.
+The 2026-09-07 development VPS repair deploys reviewed candidate `1baebbd`
+from PR #56, including mandatory Scenario Five for new games, replay, and private
+spectators. PR #56 remains unmerged pending required code-owner approval.
 Push remains disabled pending signing-key/provider setup. This does not claim
 owner acceptance of Phase 3 or Phase 4 production readiness.
-The candidate is held in maintenance after public-browser room connection
-timeouts; deployment success does not supersede that failed acceptance gate.
+The site is open for owner gameplay testing. Public desktop full-game checks,
+both-width basic workflows, restart recovery, and final backup verification pass.
+The public tablet full-game timing gate still fails near turn 24; deployment
+success does not supersede that failure or establish release acceptance.
 Historical Phase 2 operational closeout completed on 2026-09-06:
 PR #4 passed independent review and exact-head CI, merged with passing post-merge
 CI, and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Public readiness,

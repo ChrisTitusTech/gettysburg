@@ -16,8 +16,9 @@ phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 The reviewed repair candidate `1baebbd2a31963bfdb3974b714914a29bd839957`
 was deployed on 2026-09-07 after exact-head CI, independent review, retained-data
 VPS full games, vulnerability scanning, and encrypted backup/restore checks.
-Public readiness and two-client HTTPS/WebSocket checks pass; the extended public
-browser run is in progress. PR #56 remains unmerged pending required code-owner
+Public readiness and two-client HTTPS/WebSocket checks pass; gameplay is available
+for owner testing. The public tablet full-game timing gate still fails near
+turn 24; this is not release acceptance. PR #56 awaits required code-owner
 approval. Phase 2 historical operational closeout remains
 complete. The deployed candidate uses
 `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including

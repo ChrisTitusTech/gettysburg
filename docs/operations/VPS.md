@@ -56,8 +56,20 @@ No live games were purged or database volumes removed. Temporary test copies
 were rebuilt from the verified encrypted backup, then removed after validation.
 
 Public readiness and authenticated two-client HTTPS/WebSocket movement/resume
-pass. Extended public browser checks, a candidate restart probe, and final
-post-test backup/acknowledgement are in progress. Real push remains disabled;
+pass. Public desktop completes the full game; the latest tablet run still
+exceeds its unchanged eight-minute limit near turn 24. The site is available
+for owner gameplay testing, not release acceptance. Engineering owns the
+remaining retained-history latency repair and tablet rerun.
+
+Both saved credentials resumed identical authoritative state after restarting
+the repaired application. Its owned probe was normally deleted. Final encrypted
+backup `20260907T194121Z` passed isolated restore and off-host checksum/decryption.
+The final audit found zero active games, 45 retained deleted games, and matching
+ledger/off-host acknowledgement watermarks of 45. Both rootless containers are
+healthy and the application still runs immutable image `459eeb03` above.
+Protected logs are under
+`/home/titus/.local/state/gettysburg/acceptance/20260907-repair`.
+Real push remains disabled;
 no VAPID key, host upgrade, or reboot was performed. Final release and Phase 3/4
 acceptance remain open in `RELEASE_ACCEPTANCE.md`.
 
