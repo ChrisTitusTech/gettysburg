@@ -921,6 +921,7 @@ export function App({
             error={error ?? undefined}
             onAdvance={handleAdvance}
             onMove={handleMove}
+            onExit={(unit_ids) => sendCommand("exitBoard", { unit_ids })}
             onRetreat={handleRetreat}
             seat={activeGame.seat}
             state={activeGame.state}

@@ -479,6 +479,29 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory normal-movement group and exit controls.
+  - Scope: Offer all legal subsets of a selected stack, retaining source capacity,
+    printed budgets, general accompaniment, and active/closed move boundaries.
+    Selecting a group never commits movement. An affordable edge exit requires
+    a separate permanent-exit confirmation; a new server version or selection
+    discards that confirmation, and pending requests disable controls.
+  - Boundary: Mandatory-v4 remains disabled for new games. Entry/advance/night
+    guidance, complete version/content activation, and two-player acceptance
+    remain separate work. Existing rules keep their previous controls.
+  - Validation: Seven focused cases cover legal subsets, activation, pair selection,
+    confirmation/cancel, stale confirmation, disabled controls, and illegal exits.
+    Desktop keyboard and tablet touch fixtures select a pair while an immobile
+    counter stays behind, then exercise confirmed normal exit through the real
+    schema and reducer. Rendered controls were inspected in
+    `test-results/mandatory-movement-controls`. Frozen install, format, lint,
+    typecheck, 425 default workspace tests plus six harness tests, build, smoke,
+    Markdown lint, and all 93 isolated PostgreSQL tests pass. Two-session
+    desktop/tablet and 24-turn regression also pass
+    (`test-results/mandatory-movement-controls-review`). Independent review
+    and exact-head CI remain required before merge. Independent review identified
+    radio focus loss after selection: only the exit confirmation now remounts,
+    while component and real-browser arrow-key tests verify preserved radio focus.
+    Re-selecting a prior group cannot revive its discarded confirmation.
 - [ ] Finish mandatory retreat browser controls and full-game acceptance.
   - Scope: Each original stack has legal next-step buttons, undo, a suggested
     route, and explicit confirmation. Friendly transit continues to the first
@@ -500,8 +523,10 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 418 default workspace tests plus six
     harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
     tests pass. Two-session desktop/tablet and 24-turn full-game regression also
-    pass (`test-results/mandatory-retreat-controls-review`). Independent
-    review and exact-head CI remain required before merge.
+    pass (`test-results/mandatory-retreat-controls-review`). PR #19 merged as
+    `ce95600` after fresh independent built-in review, hosted Codex review,
+    and exact-head CI passed. CodeRabbit was limited and skipped under owner
+    direction; no unresolved review threads remained.
 - [ ] Complete mandatory movement browser previews and acceptance.
   - Scope: Click, keyboard, touch, and drag previews share the authoritative
     movement validator. Drag overshoot stops at an affordable legal endpoint;
@@ -520,7 +545,11 @@ validation remain separate gates.
     tests plus six harness tests, build, smoke, Markdown lint, and all 93 isolated
     PostgreSQL server tests pass. Existing two-session desktop/tablet and 24-turn
     full-game regression also pass (`test-results/mandatory-movement-preview-review`).
-    Independent review and exact-head CI remain required before merge.
+    PR #18 merged as `e1af65e` after independent built-in review, repaired-head
+    hosted Codex review, and exact-head CI passed. All four hosted findings were
+    fixed and their threads resolved. CodeRabbit was skipped while limited;
+    its final Free-plan check completed without substituting for independent
+    built-in review.
   - Hosted review follow-up: Preserve an active pair when it stops with a
     stationary friendly counter; show weighted cost in the SVG overlay; exercise
     a genuine touch drag at tablet width; and clamp beyond-budget friendly full
@@ -529,7 +558,7 @@ validation remain separate gates.
     used HTML-only `innerText` on SVG; switching to `textContent` fixes the harness
     without weakening its exact `1 / 1` assertion. All local gates and browser
     checks passed again after these fixes; fresh independent review and exact-head
-    CI remain required on the repaired head before merge.
+    CI passed on the repaired head before merge.
 - [ ] Complete mandatory night withdrawal and browser guidance.
   - Scope: End-of-movement enforcement searches affordable legal withdrawals
     using the same weighted movement calculator and validator as normal moves.

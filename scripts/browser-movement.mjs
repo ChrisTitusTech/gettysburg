@@ -160,6 +160,58 @@ try {
       await selectTarget("F3");
       await state().filter({ hasText: "v1: a=F3, g=F3, b=F5" }).waitFor();
 
+      await fixture("group");
+      if (hasTouch) await counter().tap();
+      else await counter().press("Enter");
+      const pair = page.getByRole("radio", {
+        name: "Fixture infantry + Fixture general (2 movement remaining)",
+      });
+      assert.equal(
+        await page.getByRole("radio", { name: /Stationary friend/ }).count(),
+        0,
+      );
+      if (hasTouch) await pair.tap();
+      else {
+        await pair.press("Space");
+        assert.equal(
+          await pair.evaluate((element) => element === document.activeElement),
+          true,
+        );
+        await page.keyboard.press("ArrowUp");
+        assert.equal(
+          await page
+            .getByRole("radio", {
+              name: "Fixture infantry (1 movement remaining)",
+              exact: true,
+            })
+            .isChecked(),
+          true,
+        );
+        await page.keyboard.press("ArrowDown");
+        assert.equal(await pair.isChecked(), true);
+      }
+      assert.equal(await state().innerText(), "v0: a=F5, g=F5, b=F5");
+      await page
+        .getByRole("region", { name: "Normal movement group" })
+        .screenshot({ path: resolve(evidence, `${name}-movement-group.png`) });
+      if (hasTouch) await hex("F3").tap();
+      else await hex("F3").press("Enter");
+      await state().filter({ hasText: "v1: a=F3, g=F3, b=F5" }).waitFor();
+
+      await fixture("exit");
+      const exiting = page.getByRole("button", {
+        name: /Fixture infantry, A2, selectable/,
+      });
+      if (hasTouch) await exiting.tap();
+      else await exiting.press("Enter");
+      await choose("Leave board with selected counters");
+      assert.equal(await state().innerText(), "v0: a=A2");
+      await page
+        .getByRole("region", { name: "Normal movement group" })
+        .screenshot({ path: resolve(evidence, `${name}-normal-exit.png`) });
+      await choose("Confirm permanent board exit");
+      await state().filter({ hasText: "v1: a=exited" }).waitFor();
+
       async function retreat(kind) {
         await page.goto(origin);
         await page.evaluate(async (selected) => {
