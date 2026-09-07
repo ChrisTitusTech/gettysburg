@@ -17,6 +17,7 @@ import {
   type SpectatorAuthorization,
   type HostManagementCommitOptions,
   type SpectatorGrantSummary,
+  type PushSubscriptionStatus,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -39,6 +40,19 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  setPushSubscription(
+    credential: string | undefined,
+    gameId: string,
+    input: unknown,
+  ): Promise<PushSubscriptionStatus>;
+  getPushSubscriptionStatus(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<PushSubscriptionStatus>;
+  removePushSubscription(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<PushSubscriptionStatus>;
   verifyRoomGame(gameId: string, signal: AbortSignal): Promise<void>;
   deliverAuthorizedState(
     authorization: GameAuthorization | SpectatorAuthorization,
@@ -161,6 +175,22 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async setPushSubscription(
+    credential: string | undefined,
+    gameId: string,
+    input: unknown,
+  ) {
+    return this.service.setPushSubscription(credential, gameId, input);
+  }
+  async getPushSubscriptionStatus(
+    credential: string | undefined,
+    gameId: string,
+  ) {
+    return this.service.getPushSubscriptionStatus(credential, gameId);
+  }
+  async removePushSubscription(credential: string | undefined, gameId: string) {
+    return this.service.removePushSubscription(credential, gameId);
+  }
   async verifyRoomGame(gameId: string, signal: AbortSignal) {
     if (!signal.aborted) this.service.getGameState(gameId);
   }
@@ -310,6 +340,28 @@ export class InMemoryAsyncGameService implements GameService {
 }
 
 export class PostgresGameService implements GameService {
+  async setPushSubscription(
+    credential: string | undefined,
+    gameId: string,
+    input: unknown,
+  ) {
+    return this.#mutate((service) =>
+      service.setPushSubscription(credential, gameId, input),
+    );
+  }
+  async getPushSubscriptionStatus(
+    credential: string | undefined,
+    gameId: string,
+  ) {
+    return this.#read((service) =>
+      service.getPushSubscriptionStatus(credential, gameId),
+    );
+  }
+  async removePushSubscription(credential: string | undefined, gameId: string) {
+    return this.#mutate((service) =>
+      service.removePushSubscription(credential, gameId),
+    );
+  }
   readonly #pool: Pool;
   readonly #deliveryPool: Pool;
   readonly #deliverySlots = new DeliverySlots();

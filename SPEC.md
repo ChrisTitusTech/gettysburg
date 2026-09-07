@@ -852,6 +852,26 @@ On iOS/iPadOS, supported push is for web apps added to the Home Screen; include
 that setup and actual device acceptance in the release checklist. See
 [WebKit's platform guidance](https://webkit.org/blog/13878/web-push-for-web-apps-on-ios-and-ipados/).
 
+The protected-subscription increment adds a same-origin, rate-limited
+`GET`/`PUT`/`DELETE /api/games/:gameId/push-subscription` API. Only a current
+player seat in an active mandatory game may subscribe. Each binding owns at
+most one subscription, capped by browser-session and provider expiry; recovery
+does not transfer consent. The same browser may opt out after surrender.
+Responses expose only enabled state and expiry, never endpoint or key material.
+Canonical HTTPS production Chrome/Firefox/Safari provider authorities and valid
+P-256/auth keys are required. Subscription credentials are encrypted with a
+domain-separated key derived from the server credential pepper and authenticated
+to their seat binding. They live in the optional canonical service snapshot,
+not gameplay state, action logs, replay, or player recovery exports. Missing
+old-snapshot data defaults to no consent; damaged credentials are discarded
+without blocking game resume. Expiration, revoked bindings/sessions, deletion,
+and game completion remove consent during snapshot processing.
+
+This API alone does not enable notifications: browser permission controls,
+VAPID configuration, worker registration, durable dispatch, bounded provider
+requests with public-address validation and no redirects, and actual-device
+acceptance remain required. No provider requests are made by this increment.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
