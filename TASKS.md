@@ -2016,13 +2016,17 @@ without it, push stays disabled. The loader requires an owned regular 0600 file,
 rejects symlinks/FIFOs/oversized or mismatched key pairs, and never echoes secrets.
 The CLI creates a persistent key with exclusive creation and refuses overwrite.
 `GET /api/push-config` exposes only enabled/public-key metadata without a database
-read. Full local gates pass 707 workspace/nine harness tests; all 329 real
+read. After integration with the merged observer/worker changes, full local
+gates pass 725 workspace/nine harness tests; all 329 real
 PostgreSQL tests pass, including two actual configured-server startups with a
 stable key and clean shutdown on an isolated empty database. Fresh independent
 review found no actionable defects and reran 303 server tests/typecheck. The
 compiled key CLI also passes protected creation/no-overwrite checks. Initial
 HTTP test setup used the wrong helper signature; correcting it passed all six
-configuration tests. Browser acceptance, encrypted VAPID backup/restore wiring,
+configuration tests. Desktop/tablet 24-turn games, pending-result reload, exact
+replay, observer flows, and input fixtures pass in `test-results/push-startup`
+and `test-results/push-startup-fixtures`; desktop covers all three combat choices,
+tablet loss/advance. Encrypted VAPID backup/restore wiring,
 browser opt-in/service-worker implementation, exact-head CI, and real-device
 acceptance remain before release. No VPS key was created or enabled.
 
