@@ -33,6 +33,17 @@ export async function checkPushConsent(browser, origin, evidence, options) {
     ...options.contextOptions,
     viewport: options.viewport,
   });
+  let host;
+  let failure;
+  function recordFailure(error) {
+    failure =
+      failure === undefined
+        ? error
+        : new AggregateError(
+            [failure, error],
+            "Consent acceptance and cleanup failed",
+          );
+  }
   try {
     for (const context of [hostContext, guestContext]) {
       const keys = createECDH("prime256v1");
@@ -79,7 +90,7 @@ export async function checkPushConsent(browser, origin, evidence, options) {
         });
       }, subscription);
     }
-    const host = await hostContext.newPage();
+    host = await hostContext.newPage();
     const guest = await guestContext.newPage();
     await host.goto(origin);
     await host.getByRole("button", { name: "Host as Confederate" }).click();
@@ -132,7 +143,28 @@ export async function checkPushConsent(browser, origin, evidence, options) {
     );
     assert.equal((await readStatus(guest)).status, 401);
     await deleteAcceptanceGame(host);
+  } catch (error) {
+    recordFailure(error);
   } finally {
-    await Promise.all([hostContext.close(), guestContext.close()]);
+    try {
+      // A failed join must not abandon a created game when contexts close.
+      // Successful cleanup navigates home, so it is not repeated here.
+      if (
+        host &&
+        /^\/game\/[0-9a-f-]{36}$/.test(new URL(host.url()).pathname)
+      ) {
+        await deleteAcceptanceGame(host);
+      }
+    } catch (error) {
+      recordFailure(error);
+    } finally {
+      const closed = await Promise.allSettled([
+        hostContext.close(),
+        guestContext.close(),
+      ]);
+      for (const result of closed)
+        if (result.status === "rejected") recordFailure(result.reason);
+    }
   }
+  if (failure !== undefined) throw failure;
 }

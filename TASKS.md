@@ -2,6 +2,299 @@
 
 ## Current source rollup: 2026-09-07
 
+### Repair deployed for owner testing; tablet timing gate remains failed
+
+Reviewed source `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as
+immutable image
+`459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
+Exact-head Application `34152244060`, Firefox/WebKit `34152244030`, Documentation
+`34152244048`, Security `34152244015`, and CodeQL `34152241466` all pass.
+Independent Codex and CodeRabbit reviews found no actionable regression; all
+three hosted feedback threads are resolved. PR #56 remains unmerged because
+GitHub requires code-owner approval; no approval requirement was bypassed.
+
+Both retained-data VPS full games pass within their unchanged eight-minute
+bounds, with pending-result reload and exact replay. Desktop covers retreat/
+advance; tablet covers loss/advance. Both normally delete their owned games.
+Evidence: `test-results/vps-private-write-repair` and protected logs under
+`/home/titus/.local/state/gettysburg/acceptance/20260907-repair`.
+Temporary local and VPS fixtures are disposable copies, not the live database.
+
+The deployment's exact-image Trivy scan found zero HIGH/CRITICAL findings,
+including unfixed advisories, across 18 Alpine and 363 Node packages.
+The scanner's missing Alpine 3.24 EOL metadata warning remains an engineering
+follow-up, not proof of lifecycle support. The bundle-size and OCI image
+HEALTHCHECK warnings are retained; Quadlet supplies the running health check.
+Rollback and scan evidence: `/srv/gettysburg/backups/deploy-20260907T184725Z`.
+Encrypted pre-deployment backup `20260907T175422Z` passed isolated restore and
+off-host verification. Public readiness and authenticated two-client
+HTTPS/WebSocket movement/resume pass. After an application restart, both saved
+credentials resumed identical authoritative state; its owned probe was normally
+deleted. Final backup `20260907T194121Z` passed isolated restore and off-host
+checksum/decryption verification. The final live audit found zero active games,
+45 retained deleted games, and matching ledger/off-host watermarks of 45.
+Owner: engineering. Performance/capacity, physical-device, gameplay adjudication,
+real push delivery/key recovery, reboot, rollback exercise, and final release
+approval remain open; Phases 3/4 are not complete.
+
+Public Chromium 151.0.7922.34 on Fedora 44 x86_64 passes consent, both-width
+connection/movement/reconnect/replay, replay management, and private spectators.
+Desktop completes turn 24 with loss/retreat/advance, pending-result reload, and
+exact replay. The combined suite then timed out waiting for the tablet game's
+initial invitation. Ten games (including deployment smoke) had been created
+between 18:48:56 and 18:56:04 UTC, before the 19:03:18 failure. This suggests the
+10-per-source/15-minute creation limit; the failed HTTP response was not captured,
+so the cause is not proven. A post-window creation probe succeeds and is normally
+deleted. Subsequent tablet results are recorded below with unchanged limits and
+timeouts. Engineering owns better initial-error
+capture in the harness; do not relax admission or creation safeguards.
+Public board captures at both widths were visually inspected. Reconnect takes
+about 2.9 seconds; input-to-both-players is about 2.8-3.4 seconds and misses its
+target. Report mode retains that miss; strict calibrated-hardware acceptance
+and target-VPS capacity remain open.
+
+The focused public tablet run completed turn 24, verified replay, and normally
+deleted its game, but its final console audit rejected a native HTTP 503 message.
+A separate two-player reload diagnostic reproduced an observed 503 specifically
+at `/matchmake/joinOrCreate/game`, followed by successful connections through
+five observation cycles. The harness now records only matching, fresh, observed
+same-origin POST admission 503 console messages as diagnostics (one message per
+response); unrelated errors still fail. This aligns the audit with intentional
+bounded admission retries; connection/workflow/time-limit assertions remain
+unchanged. Unit regressions cover wrong origin/path/status/method/location/type,
+unobserved/stale/duplicate messages, and required diagnostic recording. Independent
+review and the tablet rerun are complete; do not claim the prior
+strict console audit passed. Runtime code/image remains `1baebbd`/`459eeb03`.
+The harness increment passes frozen installation, formatting, lint, typecheck,
+766 workspace/39 harness tests, all 338 PostgreSQL tests, build, and smoke.
+Fresh independent Codex review and CodeRabbit 0.7.6 report zero actionable
+findings, including the new classifier and negative tests. Harness head
+`ff14fce` passes exact-head Application, Documentation, Security, CodeQL, and
+Firefox/WebKit CI. The final public tablet rerun recorded the expected admission
+diagnostic but failed the unchanged eight-minute limit at turn 24, movement,
+version 57 while waiting for version 58; the database subsequently held version
+58. The owned failed probe was deleted through audited host recovery and normal
+deletion. Evidence: protected `public-tablet-diagnostic.log` and
+`cleanup-failed-tablet.log`. No public tablet full-game pass is claimed.
+
+The site is open for owner gameplay testing, not final release acceptance.
+Engineering owns retained-history latency investigation and another unchanged
+public tablet gate after a reviewed repair. A broader persistence redesign is
+not part of this deployment. Push remains disabled. Do not close Phases 3/4.
+
+### Room-delivery repair investigation and validation history
+
+The owner authorized repairing and reopening the site for acceptance testing.
+PostgreSQL read paths now project only the requested game's canonical record,
+while preserving the full authorization metadata and existing delivery SHARE
+lock. The two-second deadline, bounded admission, cancellation, and revocation
+checks are unchanged. The initial read-only increment left mutations unchanged;
+retained games are not deleted, purged, or rewritten by this optimization. Provider
+receipt authorization retains its full-snapshot path because its target game is
+resolved from the receipt. The consent harness also deletes its owned game on
+failed connection before closing browser contexts.
+
+The initial 330-test PostgreSQL run found two stale query-observation assertions;
+the corrected suite passes all 330 tests, including canonical-read isolation,
+foreign-credential rejection, unchanged retained data, cancellation, and locked
+revocation coverage. Five consent-harness tests cover failure cleanup and retain
+the original connection error if cleanup also fails. A private restored VPS
+backup supplies retained-data browser evidence;
+the old source passes basic local browser checks on faster workstation hardware
+but takes about 3.3 seconds to reconnect and 1.85 seconds to synchronize a move.
+That does not invalidate the repeated actual-VPS failure. The documentation PR's
+initial WebKit CI also failed on a connected-session wait; it must pass on the
+repaired exact head, not be treated as a documentation-only exception.
+
+The read projection alone still reproduced the connection failure on an isolated
+VPS database copy: a concurrent write can hold the canonical lock past the read
+deadline. Deadline failures now return explicit transient status 503. Player and
+spectator admission retry only that status, at most four attempts with 500/1000/
+2000 ms backoff, cancelling on navigation. Denied/revoked access is not retried.
+Five browser-unit regressions cover success after busy, denial, exhaustion,
+outlasting an overlapping two-second admission, and
+cancelled backoff; the room-creation test confirms the timed-out attempt frees its
+slot before retry. This preserves the original bounded server deadline rather
+than increasing it. Test fixtures use an isolated clone without the live
+off-host acknowledgement file; the deployed service's readiness policy remains
+unchanged and must pass with a freshly verified backup before rollout.
+
+Full local gates, retained-data full games, independent review, exact-head CI,
+exact-image scan, redeployment, and public browser acceptance remain required
+before the maintenance blocker below is closed. Owner: engineering.
+
+Repair validation: frozen installation, format, lint, typecheck, 759 workspace/
+36 harness tests, separate 330-test PostgreSQL run, build, smoke, Markdown, and
+diff checks pass. Fresh independent Codex review found no actionable regression
+and reran 17 focused tests. CodeRabbit's follow-up review found zero issues in
+the tracked repair files; the new retry helper/tests were included in the Codex
+review. Its earlier query-count concern was checked against the passing database
+suite; the expected five observations are three pool reads and two delivery reads.
+The cleanup-error preservation finding was repaired and regression-tested.
+
+Both retained-data local 24-turn games pass with reload/exact replay evidence in
+`test-results/vps-retained-repaired` (the read-projection increment). The complete
+repair passes private-VPS desktop/tablet consent, connection, movement, reconnect,
+and replay checks in `test-results/vps-private-repair-retry`; full-game and
+remaining observer checks are still running. Observed private-VPS reconnects
+are about 5.9 seconds and input-to-both-players about 4.9 seconds, above the
+performance targets. These diagnostic timings are not waived or release-complete.
+Public traffic remains in maintenance until the reviewed exact-head rollout and
+its required checks succeed.
+
+The private retry run subsequently failed its replay-management console audit:
+the SDK reported a rejected admission, then emitted a duplicate unexpected-close
+warning when that same rejected socket closed. Extend the existing pinned SDK
+patch to remember an explicit pre-join error frame and avoid reporting that
+closure a second time. The original error still rejects admission; unexplained
+closures still warn and reject. Three real-socket regressions cover busy (503),
+denied (401), and a missing error frame (4002 plus warning). The acceptance
+harness's warning/error assertions are unchanged. This increment requires fresh
+gates/review and exact-head CI; the private VPS full-suite rerun is in progress.
+Patch-format validation rejected blank-context trimming and exposed pnpm's
+incorrect placement of zero-context insertions; independent review also caught
+the resulting syntax failure. Neither invalid patch was committed or deployed.
+Regenerated context-bearing hunks now pass frozen installation and exact byte
+comparison of installed CJS, ESM, and TypeScript against the intended package,
+plus both runtime syntax checks. Repeat full gates and independent review after
+this correction. CodeRabbit was limit-skipped on this increment as authorized.
+
+The next private run reached replay management but exposed overlapping room
+creation: the existing no-split guard returned a non-retryable generic error
+while the first creation was still pending. The guard now returns transient 503,
+without permitting a second room. Pending-creation and locked-room regressions
+verify the status and invariant. Focused private-VPS replay/observer/full-game
+checks run next without repeating the already-passing earlier fixtures.
+
+The final admission increment passes the full local gate: 763 workspace and
+36 harness tests, all 333 PostgreSQL tests, formatting, lint, typecheck, build,
+and startup smoke. Fresh independent Codex review found no actionable regression
+and passed all 31 focused server/client tests. Private-VPS replay and spectator
+management pass at both widths; the two full-game checks are still running.
+These checks precede integration of the concurrent main-branch security changes;
+repeat the gate and exact-head CI on that integration before deployment.
+
+The integration preserves main's security hardening. Frozen installation and
+the full local gate pass: 766 workspace/36 harness tests, format, lint,
+typecheck, build, and smoke. A mistyped database environment variable initially
+skipped the PostgreSQL cases; the corrected dedicated run passes all 336 server
+tests. Fresh independent Codex review against main reports no actionable
+regressions; its focused run omitted PostgreSQL, covered by the separate run.
+Markdown and diff checks pass. The protected pre-deployment recovery set
+`20260907T175422Z` passes isolated restore and off-host checksum/decryption.
+
+The private VPS full-game run reached turn 20/v50 but exceeded the unchanged
+eight-minute bound; tablet full-game execution was not reached. Replay and
+spectator management passed both widths. Investigation found that every API
+request's readiness check still reconstructed all retired games. Its query now
+projects active games only, preserving the same version-registry check and all
+stored records. A regression verifies retired unsupported versions are excluded,
+active games remain present, and the canonical snapshot is unchanged; the
+existing unsupported-active-version test must still fail closed. No application
+or harness deadline is raised. Fresh gates, review, and actual-VPS full-game
+reruns are required for this additional repair.
+
+The readiness increment passes the full local gate (766 workspace/36 harness
+tests, all 337 PostgreSQL tests, format, lint, typecheck, build, smoke). Its
+initial new assertion incorrectly assumed no earlier active database fixtures;
+the corrected assertion verifies every active fixture and excludes the retired
+record. Fresh independent Codex review found no actionable regression and passed
+server typecheck; the engineer's separate run supplies database evidence.
+
+On a fresh isolated restore, desktop completed turn 24 with retreat/advance,
+pending-result reload, and exact replay. Tablet reached turn 24/completed/v59
+but exceeded eight minutes during its final replay read, so that run did not
+pass. The failed runs and protected logs remain retained; no timing gate is
+waived. Gameplay writes still reconstructed and compared all retired histories.
+The next increment loads all undeleted games plus an explicitly targeted retired
+game, then overlays those records in PostgreSQL under the original canonical
+UPDATE lock, preserving omitted histories and ordering. All active games remain
+available for global notification pruning. A guard forbids inventory changes;
+creation, host management, recovery, and retention use the original full path.
+Regression coverage checks retained/other-active records, other-game push consent,
+idempotent retries, stale retired authorization, and normalized state mirrors.
+Initial fixture failures were an unsupported synthetic provider URL and an
+incorrect returned-error assumption for revoked authorization; correct those
+fixtures and require fresh complete validation/review/CI and VPS full games.
+
+Gameplay-write validation passes format, lint, typecheck, 766 workspace/36
+harness tests, all 338 PostgreSQL tests, build, and smoke. Fresh independent
+Codex review found no actionable regression and passed 309 server tests and
+typecheck; its database cases were skipped, covered by the engineer's full run.
+CodeRabbit 0.7.6 also completed this four-file review with zero findings.
+
+### Historical failed VPS rollout: 2026-09-07
+
+The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55
+head `c7510e2` merged as `dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` with a
+matching tree. Post-merge Application `34139146639`, Documentation `34139146460`,
+and Firefox/WebKit `34139146656` all passed before deployment.
+
+The exact VPS image is
+`d82327daa7268779d61cc095f6faf957e44e05d35bb4b9a502435f0cc9842490`.
+Trivy 0.74.0 found zero HIGH/CRITICAL findings, including unfixed advisories,
+across 18 Alpine and 361 Node packages. Scan evidence and rollback files are in
+`/srv/gettysburg/backups/deploy-20260907T155416Z`. Public health/readiness,
+non-root image verification, and two-client HTTPS/WebSocket movement/resume passed.
+Pre-deployment encrypted backup `20260907T155353Z` passed isolated PostgreSQL
+restore and off-host checksum/decryption checks, preserving 26 deleted games,
+no active games, and ledger acknowledgement 26. No existing data was wiped.
+
+**Release blocker:** two consecutive public Chromium 151.0.7922.34 runs failed
+at `browser-push-consent.mjs:91`, waiting 30 seconds for a connected session.
+The server logged a room-delivery cancellation/timeout. Home Screen metadata and
+synthetic notification-worker checks passed, but consent, subsequent two-layout
+browser workflows, and full 24-turn games did not complete. Logs are retained at
+`/tmp/gettysburg-rollout.VX9cqa/browser.log` and `browser-retry.log` on the
+maintainer workstation. Report timing mode was selected for diagnostic Internet
+testing; it did not waive this functional failure or the strict hardware gate.
+
+Durable copies of both failed browser logs and the deployment log are retained
+with mode 0600 under the maintainer's
+`/home/titus/.local/state/gettysburg/acceptance/20260907-rollout` directory;
+the copied browser log's checksum matches its original. These protected local
+diagnostics are not public attachments. Tester: Codex engineering automation on
+ChrisTitusTech's Fedora Linux 44 x86_64 workstation, using headless Chromium
+151.0.7922.34. The failed consent fixture used a 1440x900
+desktop viewport; later planned desktop 1440x900 and touch-tablet 1024x768
+workflows were not reached. No physical tablet/device acceptance is claimed.
+
+A read-only VPS probe measured a 22,778,651-byte JSON service snapshot and three
+query/parse plus hydration timings of 631/437, 480/397, and 521/342 ms.
+Whole-service reconstruction under concurrent requests is a suspected contributor
+to the two-second delivery deadline, not a proven sole cause. The two failed
+harness games were identified by their creation times, recovered through audited
+host recovery, and normally deleted; they were not purged. The harness currently
+closes contexts without deleting its game on this failure path, another follow-up.
+
+The application restart probe passed: both credentials resumed identical saved
+state, followed by normal probe deletion. Final encrypted backup
+`20260907T160346Z` passed isolated restore and off-host checksum/decryption
+verification. Final audit found zero active/30 deleted games and both database
+ledger and off-host acknowledgement at 30. Caddy now returns public HTTP 503
+maintenance; private readiness and both rootless containers remain healthy.
+Restart probe and sanitized operational logs are retained under
+`/tmp/gettysburg-rollout.VX9cqa`; no credentials or private scans were published.
+
+Owner: engineering must reproduce and repair bounded room delivery and failure
+cleanup, complete independent review/exact-head CI, redeploy, and rerun both
+desktop/tablet full-game checks before reopening public traffic. Preserve the
+candidate/database in maintenance mode; do not start older rules against newer
+writes or relax the deadline merely to pass acceptance. ChrisTitusTech owns the
+remaining physical-device, gameplay, reboot-window, and final release gates.
+Push is disabled with no VAPID key provisioned. A pending host reboot marker was
+observed; no host upgrade/reboot or real provider enrollment was performed.
+
+Documentation-rollup local validation passed frozen installation, format, lint,
+typecheck, 755 workspace/34 harness tests, build, and smoke. The 26 PostgreSQL
+integration tests were skipped in this default local run; exact deployed-head CI
+and the preceding 329-test database run retain that evidence. The existing
+502.68 kB bundle warning remains. No Phase 3/4 completion is claimed.
+Final Markdown/format/diff checks pass. Independent Codex review found no
+actionable documentation defects; remote evidence was verified by the deploying
+engineer, not independently repeated by that reviewer. CodeRabbit 0.7.6 hit its
+review limit and was skipped under the owner's explicit instruction.
+
 ### Public repository security hardening
 
 Published revision `f2b7e35` closed CodeQL alerts #1 and #2 and passed secret
@@ -61,6 +354,8 @@ concurrent workspace load. CI now runs PostgreSQL integration checks in a
 separate step after the unit suite, preserving the existing test and runtime
 deadlines. No release phase or production deployment is closed here.
 
+### Prior timing-policy closeout
+
 Owner-approved timing policy: shared CI uses diagnostic-only timing, retaining
 misses and warnings. Strict mode remains the default and enforces 100 ms on
 calibrated desktop hardware for release acceptance. Incomplete interactions
@@ -97,13 +392,13 @@ and evidence; they do not supersede this current status or close owner gates.
 
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
-| Phases 0-2 | Complete; last verified VPS revision is `40cff572aab183660dfeee188c4b6acddb2b1de5` | New source is not yet a new VPS rollout |
+| Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd`; restart and final backup verified | Public tablet timing gate remains failed; owner gameplay testing is available |
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
-| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
+| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |
 | Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
 | Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private; local candidate image scan and runtime evidence recorded below | Remaining accessibility/device/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
+| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan and backup/restore evidence recorded above | Public tablet latency gate, accessibility/device/performance, compatible rollback/reboot, measured capacity, and final release approval |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates

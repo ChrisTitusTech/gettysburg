@@ -32,6 +32,7 @@ describe("authorized broadcast ordering", () => {
     const Room = createGettysburgRoom(service, { isReady: () => true });
     const first = new Room();
     const retry = new Room();
+    const overlapping = new Room();
     vi.spyOn(first, "setMetadata").mockResolvedValue(undefined);
     vi.spyOn(retry, "setMetadata").mockResolvedValue(undefined);
     let signal: AbortSignal | undefined;
@@ -52,14 +53,19 @@ describe("authorized broadcast ordering", () => {
         () => undefined,
         (error: unknown) => error,
       );
+      await expect(
+        overlapping.onCreate!({ gameId: host.gameId }),
+      ).rejects.toMatchObject({ code: 503 });
       await vi.advanceTimersByTimeAsync(ROOM_DELIVERY_TIMEOUT_MS);
       expect(await result).toBeInstanceOf(Error);
+      expect(await result).toMatchObject({ code: 503 });
       expect(signal?.aborted).toBe(true);
       await retry.onCreate!({ gameId: host.gameId });
       expect(retry.setMetadata).toHaveBeenCalledWith({ gameId: host.gameId });
     } finally {
       await first.onDispose!();
       await retry.onDispose!();
+      await overlapping.onDispose!();
       vi.restoreAllMocks();
       vi.useRealTimers();
     }

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { observeAdmissionDiagnostics } from "./browser-admission.mjs";
 import { spawn } from "node:child_process";
 import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -97,8 +98,10 @@ async function stopServer(server, serverOutput) {
 
 const intentionalReloads = new WeakSet();
 function watchPage(page, issues) {
+  const admissionDiagnostic = observeAdmissionDiagnostics(page);
   page.on("console", (message) => {
-    if (isScreenshotDiagnostic(page, message)) return;
+    if (isScreenshotDiagnostic(page, message) || admissionDiagnostic(message))
+      return;
     if (
       intentionalReloads.has(page) &&
       message.type() === "warning" &&

@@ -37,9 +37,16 @@ authorized merge, deployment, and backed-up retirement of five old development
 games; those delivery actions completed on 2026-09-06.
 Current evidence and remaining gates are in `TASKS.md`.
 
-The newer source candidate enables mandatory Scenario Five for new games with
-the complete pinned terrain/edge bundle and shared rule previews. It does not
-change the last verified VPS revision above or reinterpret existing saves.
+The initial 2026-09-07 development rollout deployed `dc6b73b` through PR #55,
+enabling mandatory Scenario Five for new games with the complete pinned
+terrain/edge bundle and shared rule previews. It does not reinterpret existing
+saves or close the remaining owner/release acceptance gates.
+Public-browser acceptance exposed room connection timeouts. Reviewed repair
+candidate `1baebbd` is now deployed after exact-head CI and both retained-data
+VPS full games. Public readiness/two-client smoke and the desktop full game pass.
+Owner gameplay testing is available, but the public tablet full-game timing gate
+still fails near turn 24. PR #56 requires code-owner approval before merge.
+`TASKS.md` preserves the failed-run history and current evidence.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,
 reinforcement, combat choices, night, and victory enforcement are implemented

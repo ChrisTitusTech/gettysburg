@@ -28,7 +28,102 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Verified development rollout: 2026-09-06
+## Current repair rollout: 2026-09-07
+
+The owner authorized repair and reopening for acceptance. Reviewed PR #56 source
+`1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as immutable image
+`459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
+The clean detached VPS checkout was advanced using a verified Git bundle.
+The PR remains unmerged pending required code-owner approval; deployment of this
+reviewed development candidate does not bypass that merge requirement.
+
+Exact-head Application, Documentation, Firefox/WebKit, Security, and CodeQL pass;
+independent Codex and CodeRabbit reviews found no actionable defects. Both
+24-turn retained-data games pass on an isolated VPS restore, including reload,
+exact replay, and normal cleanup. Earlier incomplete runs remain recorded in
+`TASKS.md`; no test or application deadline was increased.
+
+Trivy 0.74.0, with the verified binary checksum recorded below, found zero
+HIGH/CRITICAL findings including unfixed advisories in 18 Alpine and 363 Node
+packages. Immutable-image scan and rollback files are retained in
+`/srv/gettysburg/backups/deploy-20260907T184725Z`. Pre-deployment encrypted backup
+`20260907T175422Z` passed isolated restore and off-host checksum/decryption checks.
+The scanner warned that Alpine 3.24 was missing from its EOL metadata list;
+zero vulnerability findings do not establish lifecycle support. Engineering
+owns a scanner/lifecycle metadata follow-up. The bundle-size warning remains;
+Quadlet provides the health check ignored by the OCI image builder.
+No live games were purged or database volumes removed. Temporary test copies
+were rebuilt from the verified encrypted backup, then removed after validation.
+
+Public readiness and authenticated two-client HTTPS/WebSocket movement/resume
+pass. Public desktop completes the full game; the latest tablet run still
+exceeds its unchanged eight-minute limit near turn 24. The site is available
+for owner gameplay testing, not release acceptance. Engineering owns the
+remaining retained-history latency repair and tablet rerun.
+
+Both saved credentials resumed identical authoritative state after restarting
+the repaired application. Its owned probe was normally deleted. Final encrypted
+backup `20260907T194121Z` passed isolated restore and off-host checksum/decryption.
+The final audit found zero active games, 45 retained deleted games, and matching
+ledger/off-host acknowledgement watermarks of 45. Both rootless containers are
+healthy and the application still runs immutable image `459eeb03` above.
+Protected logs are under
+`/home/titus/.local/state/gettysburg/acceptance/20260907-repair`.
+Real push remains disabled;
+no VAPID key, host upgrade, or reboot was performed. Final release and Phase 3/4
+acceptance remain open in `RELEASE_ACCEPTANCE.md`.
+
+## Historical failed development rollout: 2026-09-07
+
+The owner authorized updating the VPS and release acceptance worksheet. Source
+`dc6b73baa8dbabf06cb78c70544eaf51cd4cdfdd` (through PR #55) passed post-merge
+Application `34139146639`, Documentation `34139146460`, and both browser jobs
+in `34139146656` before deployment. The clean VPS checkout was fast-forwarded
+using a local Git bundle because its configured remote did not advertise `main`.
+No private source scans or credentials were included.
+
+Deployed image:
+`d82327daa7268779d61cc095f6faf957e44e05d35bb4b9a502435f0cc9842490`.
+Trivy 0.74.0, verified binary SHA-256
+`d89bcc6510a267f11b773398cbf1be5520ce39f9e8b6633178c4487f05b7d791`,
+reported zero HIGH/CRITICAL findings, including unfixed advisories, across
+18 Alpine and 361 Node packages before service changes. Scan/version evidence
+and previous units/Caddy files are retained under
+`/srv/gettysburg/backups/deploy-20260907T155416Z`.
+The older image remains available; this is not a tested compatible rollback
+after new mandatory-rule writes.
+
+Pre-deployment encrypted backup `20260907T155353Z` passed isolated PostgreSQL
+restore and workstation off-host checksum/decryption checks at
+`/home/titus/.local/state/gettysburg/offhost-backups/20260907T155353Z`.
+It retained 26 deleted games, no active games, and acknowledged ledger 26.
+The deployment also took its maintenance-window backup before restarting services.
+Public health/readiness, exact image/non-root validation, and two-client
+HTTPS/WebSocket movement/resume passed. Both rootless containers are healthy;
+Quadlet supplies the readiness health check despite the OCI image-build warning
+that Dockerfile HEALTHCHECK metadata is ignored.
+
+Push is disabled (`/api/push-config` reports `enabled: false`); no VAPID key was
+generated or rotated. A host reboot-required marker is present. No host upgrade,
+reboot, destructive migration, or existing-game retirement was performed.
+Final browser/restart/backup results and open release gates are tracked in
+`RELEASE_ACCEPTANCE.md` and `TASKS.md`; Phases 3/4 remain open.
+
+Subsequent public Chromium acceptance failed twice at the connected-session
+wait, with a server room-delivery timeout. Public traffic is therefore held
+behind the saved maintenance Caddy configuration, while the candidate and
+database remain running. A reviewed delivery repair and successful two-layout
+acceptance are required before reopening traffic. Do not use the older image
+as an untested rollback against the newer writes. The two failed test games
+were normally deleted through audited host recovery; all retained data remains.
+Application restart then preserved identical authoritative state for both saved
+credentials. The restart probe was normally deleted. Final encrypted backup
+`20260907T160346Z` passed isolated restore and off-host checksum/decryption
+verification. Final audit: zero active games, 30 deleted games, ledger and
+off-host acknowledgement both 30. Public maintenance returns HTTP 503; private
+readiness and both rootless container health checks remain healthy.
+
+## Historical development rollout: 2026-09-06
 
 PR #4 merged and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`
 after independent review and passing Application/Documentation CI on both the

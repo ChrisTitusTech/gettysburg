@@ -1,4 +1,5 @@
 import { Client as ColyseusClient, type Room } from "@colyseus/sdk";
+import { connectRoom } from "./connect-room";
 import {
   acceptGameplayEvent,
   acceptManagementEvent,
@@ -202,6 +203,7 @@ export function App({
     }
     let active = true;
     let connectedRoom: Room | undefined;
+    const connectionAbort = new AbortController();
     let serverEvicting = false;
     eventCursorReference.current = {
       event_sequence: activeGame.state.event_sequence,
@@ -239,9 +241,13 @@ export function App({
 
     const connect = async () => {
       const client = new ColyseusClient(window.location.origin);
-      connectedRoom = await client.joinOrCreate("game", {
-        gameId: activeGame.game_id,
-      });
+      connectedRoom = await connectRoom(
+        () =>
+          client.joinOrCreate("game", {
+            gameId: activeGame.game_id,
+          }),
+        connectionAbort.signal,
+      );
       if (!active) {
         await leaveOpenRoom(connectedRoom);
         return;
@@ -377,6 +383,7 @@ export function App({
 
     return () => {
       active = false;
+      connectionAbort.abort();
       roomReference.current = null;
       if (connectedRoom !== undefined && !serverEvicting) {
         void leaveOpenRoom(connectedRoom);
