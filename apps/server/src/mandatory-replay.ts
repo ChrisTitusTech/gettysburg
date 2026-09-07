@@ -13,6 +13,7 @@ import canonicalize from "canonicalize";
 import type {
   HostBinding,
   Invitation,
+  RecoveryGrant,
   SeatBinding,
   StoredAction,
 } from "./game-service.js";
@@ -29,6 +30,21 @@ export interface ReplayManagementEvidence {
     | "revokedAt"
     | "activeAfterSequence"
     | "revokedAtSequence"
+  >[];
+  readonly recoveries?: readonly Pick<
+    RecoveryGrant,
+    | "gameId"
+    | "oldBindingId"
+    | "oldBindingVersion"
+    | "newBindingId"
+    | "targetBindingType"
+    | "side"
+    | "operatorIdentity"
+    | "operatorRequestId"
+    | "auditSequence"
+    | "consumedAt"
+    | "revokedAt"
+    | "expiresAt"
   >[];
 }
 
@@ -182,11 +198,32 @@ export function replayMandatoryActions(
     string,
     ReplayManagementEvidence["invitations"][number][]
   >();
+  const issuedInvitations = new Map<
+    number,
+    ReplayManagementEvidence["invitations"][number][]
+  >();
   for (const invitation of management.invitations) {
     if (invitation.gameId !== gameId) continue;
     invitationIndex.set(invitation.lookupId, [
       ...(invitationIndex.get(invitation.lookupId) ?? []),
       invitation,
+    ]);
+    if (invitation.activeAfterSequence !== undefined)
+      issuedInvitations.set(invitation.activeAfterSequence, [
+        ...(issuedInvitations.get(invitation.activeAfterSequence) ?? []),
+        invitation,
+      ]);
+  }
+  const recoveryIndex = new Map<
+    string,
+    NonNullable<ReplayManagementEvidence["recoveries"]>[number][]
+  >();
+  for (const recovery of management.recoveries ?? []) {
+    if (recovery.gameId !== gameId || recovery.operatorRequestId === undefined)
+      continue;
+    recoveryIndex.set(recovery.operatorRequestId, [
+      ...(recoveryIndex.get(recovery.operatorRequestId) ?? []),
+      recovery,
     ]);
   }
   const commandIds = new Set<string>();
@@ -252,6 +289,14 @@ export function replayMandatoryActions(
             throw new ReplayError(sequence, "invalid management metadata");
           const host = parsedHost.data;
           activeBinding(hostIndex, action, "host");
+          if (host.command_name === "issueInvitation") {
+            const issued = issuedInvitations.get(sequence) ?? [];
+            assertReplay(
+              issued.length === 1 &&
+                issued[0]!.allowedSeat === host.payload.seat,
+              "missing or ambiguous issued invitation evidence",
+            );
+          }
           assertReplay(
             commandHash(host) === action.canonicalRequestHash,
             "management hash mismatch",
@@ -333,6 +378,54 @@ export function replayMandatoryActions(
             "duplicate operator request identifier",
           );
           operatorRequestIds.add(action.operatorRequestId!);
+          const recoveries = recoveryIndex.get(action.operatorRequestId!) ?? [];
+          assertReplay(
+            recoveries.length === 1,
+            "missing or ambiguous recovery audit evidence",
+          );
+          const recovery = recoveries[0]!;
+          assertReplay(
+            recovery.auditSequence === sequence &&
+              recovery.operatorIdentity === action.authorizingId &&
+              recovery.consumedAt !== null &&
+              recovery.revokedAt === null &&
+              Number.isFinite(recovery.consumedAt) &&
+              Number.isFinite(recovery.expiresAt) &&
+              recovery.consumedAt < recovery.expiresAt &&
+              (recovery.targetBindingType === "host"
+                ? recovery.side === null
+                : recovery.targetBindingType === "seat" &&
+                  ["union", "confederate"].includes(recovery.side ?? "")),
+            "invalid recovery audit evidence",
+          );
+          const index =
+            recovery.targetBindingType === "host" ? hostIndex : seatIndex;
+          const old =
+            index.get(
+              JSON.stringify([
+                recovery.oldBindingId,
+                recovery.oldBindingVersion,
+              ]),
+            ) ?? [];
+          const replacement =
+            index.get(
+              JSON.stringify([
+                recovery.newBindingId,
+                recovery.oldBindingVersion + 1,
+              ]),
+            ) ?? [];
+          assertReplay(
+            old.length === 1 &&
+              replacement.length === 1 &&
+              old[0]!.inactiveFromSequence === sequence &&
+              old[0]!.revokedAt === recovery.consumedAt &&
+              replacement[0]!.activeAfterSequence === sequence &&
+              replacement[0]!.id !== old[0]!.id &&
+              (recovery.targetBindingType === "host" ||
+                ((old[0] as SeatBinding).side === recovery.side &&
+                  (replacement[0] as SeatBinding).side === recovery.side)),
+            "recovery audit does not match binding rotation",
+          );
         }
         // Validate management records without executing or exposing them. Their
         // only gameplay-state effect is consuming a sequence, not a version.
@@ -380,14 +473,21 @@ export function replayMandatoryActions(
         "command hash mismatch",
       );
       const result = action.result;
-      if (!result?.ok || !("state" in result))
+      if (result?.ok !== true || !("state" in result))
         throw new ReplayError(sequence, "missing accepted result");
       assertReplay(
-        result.event.command_id === command.command_id &&
-          result.event.command_name === command.command_name &&
-          result.event.kind === "gameplay" &&
-          result.event.event_sequence === sequence &&
-          result.event.state_version === action.resultingVersion,
+        equal(Object.keys(result).sort(), ["event", "ok", "state"]),
+        "invalid accepted result",
+      );
+      assertReplay(
+        equal(result.event, {
+          command_id: command.command_id,
+          command_name: command.command_name,
+          kind: "gameplay",
+          event_sequence: sequence,
+          state_version: action.resultingVersion,
+          summary: result.event.summary,
+        }),
         "event metadata mismatch",
       );
       if (command.command_name === "surrenderSeat") {
