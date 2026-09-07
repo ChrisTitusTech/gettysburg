@@ -10,6 +10,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "browser:acceptance": "pnpm build && node scripts/browser-acceptance.mjs",
+    "browser:movement": "pnpm build && node scripts/browser-movement.mjs",
     "container:smoke": "node scripts/container-smoke.mjs",
     "dev": "pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && node scripts/dev.mjs",
     "format": "prettier --write .",

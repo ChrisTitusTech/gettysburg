@@ -74,6 +74,9 @@ jobs:
       - name: Run two-player browser acceptance
         run: pnpm browser:acceptance
 
+      - name: Verify mandatory movement inputs in browser fixtures
+        run: pnpm browser:movement
+
       - name: Smoke-test startup and readiness
         run: timeout 45s pnpm smoke
 

@@ -479,6 +479,34 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Complete mandatory movement browser previews and acceptance.
+  - Scope: Click, keyboard, touch, and drag previews share the authoritative
+    movement validator. Drag overshoot stops at an affordable legal endpoint;
+    clicked destinations report their full cost or rejection. General bonuses
+    and closed continuous moves use the same activation state as the reducer.
+    Releasing a drag while the board is disabled cannot submit a command.
+  - Boundary: Mandatory-v4 is still unavailable to new server games. The new
+    `pnpm browser:movement` check exercises labelled local fixtures through the
+    real command schema and reducer, not a live mandatory-rules server session.
+    Final activation and two-player rules-enforced acceptance remain open.
+  - Validation: Desktop mouse/keyboard and tablet touch fixtures cover half-point
+    roads, weighted overshoot, unaffordable woods, closed moves, and general
+    accompaniment. Rendered desktop/tablet evidence was visually inspected in
+    `test-results/mandatory-movement-preview`. The fixture check also runs in
+    Application CI. Frozen install, format, lint, typecheck, 410 default workspace
+    tests plus six harness tests, build, smoke, Markdown lint, and all 93 isolated
+    PostgreSQL server tests pass. Existing two-session desktop/tablet and 24-turn
+    full-game regression also pass (`test-results/mandatory-movement-preview-review`).
+    Independent review and exact-head CI remain required before merge.
+  - Hosted review follow-up: Preserve an active pair when it stops with a
+    stationary friendly counter; show weighted cost in the SVG overlay; exercise
+    a genuine touch drag at tablet width; and clamp beyond-budget friendly full
+    targets while retaining source-capacity and reachable-target errors.
+    Added unit/browser regressions for these findings. The first overlay test
+    used HTML-only `innerText` on SVG; switching to `textContent` fixes the harness
+    without weakening its exact `1 / 1` assertion. All local gates and browser
+    checks passed again after these fixes; fresh independent review and exact-head
+    CI remain required on the repaired head before merge.
 - [ ] Complete mandatory night withdrawal and browser guidance.
   - Scope: End-of-movement enforcement searches affordable legal withdrawals
     using the same weighted movement calculator and validator as normal moves.
@@ -494,8 +522,9 @@ validation remain separate gates.
     install, format, lint, typecheck, 399 default workspace tests plus six harness
     tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL server
     tests pass. Desktop/tablet and full-game regression pass with evidence in
-    `test-results/mandatory-night-withdrawal`. Independent review and exact-head
-    CI remain required before merge.
+    `test-results/mandatory-night-withdrawal`. PR #17 merged as `d527a8a` after
+    independent built-in review, hosted Codex review, and exact-head CI passed.
+    No unresolved review threads remained; CodeRabbit is skipped when limited.
 - [ ] Complete mandatory combat inheritance and advance controls.
   - Scope: Mandatory-v4 uses the approved reduced combat factors and terrain
     calculation, including participating-attacker region cancellation, strongest
@@ -513,8 +542,10 @@ validation remain separate gates.
     Frozen install, format, lint, typecheck, 389 default workspace tests plus six
     harness tests, build, smoke, Markdown lint, and all 93 isolated PostgreSQL
     server tests pass. Desktop/tablet and full-game regression pass with evidence
-    in `test-results/mandatory-combat-and-advance-review`. Independent review and
-    exact-head CI remain required before merge.
+    in `test-results/mandatory-combat-and-advance-review`. PR #16 merged as
+    `1840c5f` after fresh independent built-in review and exact-head CI passed.
+    Both hosted Codex findings were fixed and their threads resolved. CodeRabbit
+    was limited and skipped under the owner's instruction.
 - [ ] Complete forced-retreat command and browser integration.
   - Scope: Authorize the pending seat and complete original stack; use the shared
     route validator for single/stack retreat commands. New mandatory-only
