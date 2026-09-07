@@ -2010,6 +2010,22 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+Home Screen metadata is the next small browser increment: stable root identity,
+standalone display, and no credential-bearing launch URL. The manifest introduces
+no new artwork, offline cache, automatic worker registration, or permission
+prompt. WebKit's monogram fallback avoids publishing unapproved icon assets.
+Unit and served-metadata checks, full local gates, desktop/tablet workflows,
+and independent review pass: 740 workspace/nine harness tests, frozen install,
+format, lint, typecheck, build, smoke, and Markdown/diff checks. The actual served
+manifest has the correct MIME type and does not register a worker on load.
+Both 24-turn desktop/tablet games, notification-worker checks, reload, replay,
+spectators, and input fixtures pass in `test-results/home-screen` and its
+`-fixtures` directory. Tablet covers all three combat choices; desktop
+loss/advance. The unchanged backend retains startup's 329-test PostgreSQL
+evidence. Exact-head CI follows. Owner-reviewed custom icons and
+Chromium install promotion remain open; actual iPad Home Screen launch/session,
+permission, delivery, and click-through require real-device acceptance.
+
 The next browser increment supplies a notification-only service worker without
 registering it in the product yet. Generic messages, strict payload validation,
 same-origin click destinations, serial processing, and stable notification tags
