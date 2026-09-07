@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+export function performanceMode(value = "strict") {
+  assert(value === "strict" || value === "report", "Unknown performance mode");
+  return value;
+}
+
 export function summarizeSessionTimings(measurements) {
   const budgets = {
     initialInteractiveMs: 3_000,
@@ -70,7 +75,13 @@ export function summarizeResponseTimes(samples) {
 // Two animation frames include a paint opportunity after the React zoom update.
 // Keep only numeric timings and public environment metadata; never retain URLs,
 // cookies, invitations, game identifiers, or raw performance resource entries.
-export async function measureBoardResponse(page, evidence, label) {
+export async function measureBoardResponse(
+  page,
+  evidence,
+  label,
+  mode = "strict",
+) {
+  performanceMode(mode);
   await page.getByRole("button", { name: "Fit", exact: true }).click();
   const samples = [];
   const frameDiagnostics = [];
@@ -146,6 +157,7 @@ export async function measureBoardResponse(page, evidence, label) {
     `${JSON.stringify(
       {
         schemaVersion: 1,
+        mode,
         measurement: "local-click-to-confirmed-zoom-and-paint-opportunity",
         browser: page.context().browser().version(),
         viewport: page.viewportSize(),
@@ -175,9 +187,14 @@ export async function measureBoardResponse(page, evidence, label) {
     undefined,
     `${label}: incomplete board response measurement; inspect performance evidence`,
   );
-  assert.equal(
-    summary.overBudget,
-    0,
-    `${label}: board response exceeded the 100 ms budget; inspect performance evidence`,
-  );
+  if (mode === "strict")
+    assert.equal(
+      summary.overBudget,
+      0,
+      `${label}: board response exceeded the 100 ms budget; inspect performance evidence`,
+    );
+  else if (summary.overBudget > 0)
+    console.warn(
+      `${label}: diagnostic-only timing miss; the strict desktop release benchmark remains required`,
+    );
 }

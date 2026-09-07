@@ -5,9 +5,55 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   measureBoardResponse,
+  performanceMode,
   summarizeResponseTimes,
   summarizeSessionTimings,
 } from "./browser-performance.mjs";
+
+test("performance mode defaults strict and rejects unknown settings", () => {
+  assert.equal(performanceMode(), "strict");
+  assert.equal(performanceMode("report"), "report");
+  for (const value of ["", "false", "REPORT", null])
+    assert.throws(() => performanceMode(value));
+});
+
+test("report mode preserves budget misses but never accepts incomplete input", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "gettysburg-timing-mode-"));
+  try {
+    for (const mode of ["strict", "report"]) {
+      for (const confirmed of [true, false]) {
+        let reads = 0;
+        const button = { click: async () => {}, evaluate: async () => {} };
+        const page = {
+          getByRole: () => button,
+          evaluate: async () =>
+            ++reads % 2 === 1
+              ? { durationMs: 150, confirmed, confirmedAtMs: 12 }
+              : undefined,
+          context: () => ({ browser: () => ({ version: () => "fixture" }) }),
+          viewportSize: () => ({ width: 1440, height: 900 }),
+        };
+        const run = measureBoardResponse(page, directory, "desktop", mode);
+        if (!confirmed) await assert.rejects(run, /incomplete board response/);
+        else if (mode === "strict")
+          await assert.rejects(run, /exceeded the 100 ms budget/);
+        else await run;
+        const evidence = JSON.parse(
+          await readFile(join(directory, "desktop-performance.json"), "utf8"),
+        );
+        assert.equal(evidence.mode, mode);
+        assert.equal(evidence.budgetMs, 100);
+        assert.equal(evidence.overBudget, confirmed ? 20 : 1);
+        assert.equal(
+          evidence.failure,
+          confirmed ? null : "zoom-not-confirmed-before-deadline",
+        );
+      }
+    }
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 test("session observations use declared budgets without retaining extra fields", () => {
   const result = summarizeSessionTimings({

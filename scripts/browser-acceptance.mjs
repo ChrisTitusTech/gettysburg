@@ -19,6 +19,7 @@ import {
 import { checkHomeScreen } from "./browser-home-screen.mjs";
 import {
   measureBoardResponse,
+  performanceMode,
   recordSessionTimings,
 } from "./browser-performance.mjs";
 import { startBrowserHttps } from "./browser-https.mjs";
@@ -285,7 +286,12 @@ async function runScenario(browser, origin, options) {
     }
     await hostPage.getByText("connected", { exact: true }).waitFor();
     const reconnectMs = performance.now() - reconnectStarted;
-    await measureBoardResponse(hostPage, evidenceDirectory, options.label);
+    await measureBoardResponse(
+      hostPage,
+      evidenceDirectory,
+      options.label,
+      timingMode,
+    );
     await hostPage
       .getByRole("button", { exact: true, name: "Revoke" })
       .waitFor();
@@ -559,6 +565,7 @@ async function runScenario(browser, origin, options) {
 }
 
 const browserName = process.env.GETTYSBURG_BROWSER ?? "chromium";
+const timingMode = performanceMode(process.env.GETTYSBURG_PERFORMANCE_MODE);
 assert(
   ["chromium", "firefox", "webkit"].includes(browserName),
   "Unsupported browser engine",

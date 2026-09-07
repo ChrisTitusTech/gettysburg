@@ -2,6 +2,21 @@
 
 ## Current source rollup: 2026-09-07
 
+Owner-approved timing policy: shared CI uses diagnostic-only timing, retaining
+misses and warnings. Strict mode remains the default and enforces 100 ms on
+calibrated desktop hardware for release acceptance. Incomplete interactions
+still fail in both modes. This approval supersedes the pending policy decision
+in the historical PR #55 failure entries below, not their measured results.
+Implementation, fresh review, and exact-head CI are required before merge;
+the calibrated-hardware performance and other release gates remain open.
+Policy implementation validation: full local gates pass (755 workspace/32
+harness tests); a separate PostgreSQL run passes all 329 server tests. Both
+Chromium layouts pass report-mode consent/reconnect/replay/spectator/accessibility
+checks in `test-results/performance-report-approved`. New mode regressions prove
+strict rejection, diagnostic retention, invalid-setting rejection, and failure
+on incomplete confirmation. Independent Codex review and CodeRabbit 0.7.6 review
+both found no actionable defects. No application runtime or deployment changed.
+
 This rollup distinguishes merged source from the last verified VPS deployment.
 Older incremental entries below preserve their contemporaneous stopping points
 and evidence; they do not supersede this current status or close owner gates.

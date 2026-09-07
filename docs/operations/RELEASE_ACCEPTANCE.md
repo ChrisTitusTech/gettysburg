@@ -78,6 +78,9 @@ These operations remain pending approval; this worksheet is not authorization.
 - [ ] Measure concurrent-room capacity on the target VPS and publish only the
   demonstrated limit. Local zoom timings do not establish broadband loading,
   all board-interaction latency, Internet-excluded command latency, or VPS capacity.
+- [ ] Run the strict 100 ms benchmark on calibrated supported desktop hardware;
+  record hardware, OS/browser, workload, and numeric evidence. Shared-CI report
+  mode retains misses as diagnostics and cannot close this release gate.
 - [ ] Complete final candidate review, exact-head CI, full 24-turn acceptance,
   rights/privacy inspection, and explicit public-release approval. Close Phases
   3/4 only after their remaining exit criteria have evidence, not from this

@@ -1097,6 +1097,10 @@ including [WebKit's visible-notification requirement](https://webkit.org/blog/12
 - A board interaction should provide visual feedback within 100 ms on supported
   desktop hardware; accepted network commands should normally appear to both
   players within 500 ms excluding Internet latency.
+  The owner approved diagnostic-only timing on shared CI on 2026-09-07. CI must
+  retain timing misses, while incomplete interactions remain failures. The
+  unchanged 100 ms release benchmark is enforced on calibrated desktop hardware;
+  a report-mode CI pass does not constitute performance acceptance.
 - Initial application content should become interactive within 3 seconds on a
   typical broadband connection after compression and caching.
 - Reconnection should restore a normal active game within 5 seconds after the

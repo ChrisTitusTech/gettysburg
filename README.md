@@ -97,9 +97,16 @@ runners. CI allows 25 minutes for these games plus the other required gates.
 These automated checks do not replace owner tabletop adjudication.
 Browser acceptance also records 20 click-to-confirmed-zoom/paint-opportunity
 samples at each layout in `desktop-performance.json` and
-`tablet-performance.json`, failing the specified 100 ms feedback budget when
-exceeded. These are unthrottled test-machine measurements, not broadband-load,
+`tablet-performance.json`. Strict mode (the default) fails the specified 100 ms
+feedback budget when exceeded. Shared CI explicitly sets
+`GETTYSBURG_PERFORMANCE_MODE=report`: misses retain their numeric evidence and
+warnings without failing otherwise complete interactions. Missing confirmation,
+input failure, and invalid configuration still fail in either mode.
+These are unthrottled test-machine measurements, not broadband-load,
 physical-device, cross-player-latency, or VPS-capacity claims.
+Release acceptance still requires `GETTYSBURG_PERFORMANCE_MODE=strict` on
+calibrated desktop hardware, recording hardware, OS/browser, workload, and
+evidence. A green report-mode CI run does not close that gate.
 Companion `desktop-session-performance.json` and `tablet-session-performance.json`
 record one initial-lobby, reload/reconnect, and input-to-both-player observation
 against the 3,000/5,000/500 ms targets. They include automation/render/network
