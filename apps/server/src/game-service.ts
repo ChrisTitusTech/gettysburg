@@ -28,6 +28,7 @@ import {
   type CommandFailure,
   type CommandResult,
   type AuditEvent,
+  type ActionEvent,
   type GameState,
   type GameplayCommand,
   type HexCoordinate,
@@ -39,6 +40,7 @@ import {
 import canonicalize from "canonicalize";
 import { hasPinnedMandatoryContent } from "./mandatory-content.js";
 import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
+import { publicActionLog } from "./public-action-log.js";
 
 import {
   credentialVerifier,
@@ -302,6 +304,15 @@ export interface ReplaySnapshot {
   readonly state: GameState;
   readonly sequence: number;
   readonly latest_sequence: number;
+}
+
+export interface GameView {
+  readonly action_log: readonly ActionEvent[];
+  readonly active_invitations: readonly { lookup_id: string; seat: Side }[];
+  readonly game_id: string;
+  readonly is_host: boolean;
+  readonly seat: Side | null;
+  readonly state: GameState;
 }
 
 export type ServiceErrorCode =
@@ -2221,6 +2232,37 @@ export class InMemoryGameService {
 
   getGameState(gameId: string): GameState {
     return cloneState(this.#requireActiveGame(gameId).state);
+  }
+
+  getGameView(credential: string | undefined, gameId: string): GameView {
+    const game = this.#requireActiveGame(gameId);
+    const session = this.#findSession(credential);
+    const seat =
+      session === undefined
+        ? undefined
+        : this.#activeSeatBindings(gameId).find(
+            (binding) => binding.sessionId === session.id,
+          );
+    const isHost =
+      session !== undefined &&
+      this.#hostBindings.some(
+        (binding) =>
+          binding.gameId === gameId &&
+          binding.sessionId === session.id &&
+          binding.revokedAt === null,
+      );
+    if (seat === undefined && !isHost)
+      throw new ServiceError("unauthorized", "No game access was found.");
+    // All authorization and response fields come from this single snapshot.
+    // No cross-request cache may outlive a binding rotation or revocation.
+    return {
+      action_log: publicActionLog(game.actions),
+      active_invitations: isHost ? this.getActiveInvitations(gameId) : [],
+      game_id: gameId,
+      is_host: isHost,
+      seat: seat?.side ?? null,
+      state: cloneState(game.state),
+    };
   }
 
   getAuthorizedState(authorization: GameAuthorization): GameState {

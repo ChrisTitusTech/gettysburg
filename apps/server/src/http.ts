@@ -12,6 +12,7 @@ import express, {
 } from "express";
 
 import { ServiceError, type ServiceErrorCode } from "./game-service.js";
+import { publicActionLog } from "./public-action-log.js";
 import { isCanonicalCredential } from "./credentials.js";
 import type { GameEventBus } from "./event-bus.js";
 import {
@@ -146,27 +147,7 @@ async function actionLog(
   gameService: GameService,
   gameId: string,
 ): Promise<ActionEvent[]> {
-  return (await gameService.getActions(gameId)).flatMap<ActionEvent>(
-    (action) => {
-      if (action.result?.ok === true) return [action.result.event];
-      if (
-        action.kind === "operator_audit" &&
-        action.operatorRequestId !== null
-      ) {
-        return [
-          {
-            command_id: action.operatorRequestId,
-            command_name: "operatorRecovery" as const,
-            event_sequence: action.sequence,
-            kind: "operator_audit" as const,
-            state_version: action.resultingVersion,
-            summary: "Operator recovery completed",
-          },
-        ];
-      }
-      return [];
-    },
-  );
+  return publicActionLog(await gameService.getActions(gameId));
 }
 
 const UUID_PATTERN =
@@ -580,44 +561,14 @@ export function configureHttpApplication(
 
   application.get("/api/games/:gameId", async (request, response, next) => {
     try {
-      const gameId = request.params.gameId ?? "";
-      const credential = readSessionCredential(request);
-      let seatAuthorization;
-      let hostAuthorization;
-      try {
-        seatAuthorization = await gameService.authenticate(credential, gameId);
-      } catch (error) {
-        if (!(error instanceof ServiceError) || error.code !== "unauthorized") {
-          throw error;
-        }
-      }
-      try {
-        hostAuthorization = await gameService.authenticateHost(
-          credential,
-          gameId,
+      response
+        .status(200)
+        .json(
+          await gameService.getGameView(
+            readSessionCredential(request),
+            request.params.gameId ?? "",
+          ),
         );
-      } catch (error) {
-        if (!(error instanceof ServiceError) || error.code !== "unauthorized") {
-          throw error;
-        }
-      }
-      if (seatAuthorization === undefined && hostAuthorization === undefined) {
-        throw new ServiceError("unauthorized", "No game access was found.");
-      }
-      response.status(200).json({
-        action_log: await actionLog(gameService, gameId),
-        active_invitations:
-          hostAuthorization === undefined
-            ? []
-            : await gameService.getActiveInvitations(gameId),
-        game_id: gameId,
-        is_host: hostAuthorization !== undefined,
-        seat: seatAuthorization?.side ?? null,
-        state:
-          seatAuthorization === undefined
-            ? await gameService.getGameState(gameId)
-            : await gameService.getAuthorizedState(seatAuthorization),
-      });
     } catch (error) {
       next(error);
     }

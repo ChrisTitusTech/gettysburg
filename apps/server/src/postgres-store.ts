@@ -10,6 +10,7 @@ import {
   type CreateGameResult,
   type DeletionReceipt,
   type GameAuthorization,
+  type GameView,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -95,6 +96,10 @@ export interface GameService {
   getDeletionLedger(): Promise<readonly DeletionReceipt[]>;
   getAuthorizedState(authorization: GameAuthorization): Promise<GameState>;
   getGameState(gameId: string): Promise<GameState>;
+  getGameView(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<GameView>;
   getReplay(
     credential: string | undefined,
     gameId: string,
@@ -197,6 +202,9 @@ export class InMemoryAsyncGameService implements GameService {
   }
   async getGameState(gameId: string) {
     return this.service.getGameState(gameId);
+  }
+  async getGameView(credential: string | undefined, gameId: string) {
+    return this.service.getGameView(credential, gameId);
   }
   async getReplay(
     credential: string | undefined,
@@ -513,6 +521,9 @@ export class PostgresGameService implements GameService {
 
   async getGameState(gameId: string) {
     return this.#read((service) => service.getGameState(gameId));
+  }
+  async getGameView(credential: string | undefined, gameId: string) {
+    return this.#read((service) => service.getGameView(credential, gameId));
   }
   async getReplay(
     credential: string | undefined,

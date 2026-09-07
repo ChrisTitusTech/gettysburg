@@ -43,6 +43,40 @@ async function withServer(
 }
 
 describe("service health", () => {
+  it("assembles resume through one authorized service read", async () => {
+    const service = new InMemoryAsyncGameService();
+    const created = await service.createGame("union");
+    const view = vi.spyOn(service, "getGameView");
+    const reads = [
+      "authenticate",
+      "authenticateHost",
+      "getActions",
+      "getActiveInvitations",
+      "getGameState",
+      "getAuthorizedState",
+    ] as const;
+    const spies = reads.map((name) => vi.spyOn(service, name));
+    await withServer(
+      true,
+      async (origin) => {
+        const response = await fetch(`${origin}/api/games/${created.gameId}`, {
+          headers: {
+            cookie: `__Host-gettysburg-session=${created.credential}`,
+          },
+        });
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual(
+          service.service.getGameView(created.credential, created.gameId),
+        );
+        expect(view).toHaveBeenCalledExactlyOnceWith(
+          created.credential,
+          created.gameId,
+        );
+        for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+      },
+      service,
+    );
+  });
   it("reports process liveness without internal detail", async () => {
     await withServer(true, async (origin) => {
       const response = await fetch(`${origin}/healthz`);

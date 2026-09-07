@@ -1331,6 +1331,29 @@ validation remain separate gates.
 
 ### Phase 4
 
+- [ ] Consolidate ordinary resume into one authorized snapshot read.
+  - Scope: Replace the response's four/five independent snapshot hydrations with
+    one read for current host/seat access, public action events, host-only
+    invitation metadata, and game state. Preserve the HTTP contract, immediate
+    revocation/recovery, expiry, and deleted-game behavior. Copy public events
+    without cloning historical resulting states; never cache access across
+    requests. Readiness remains a separate read and persistence is unchanged.
+  - Evidence: Initial server typecheck and 163 default server tests pass.
+    Added role/privacy/isolation, recovery/revocation, expiry/deletion, HTTP
+    single-service-read, and PostgreSQL single-query regressions. Full local,
+    isolated database, desktop/tablet browser, fresh independent review, and
+    exact-head CI gates follow before merge. Owner: ChrisTitusTech. Compare
+    browser timing as a local observation only; VPS capacity remains unmeasured.
+  - Validation: Frozen install, format, lint, typecheck, 558 workspace plus nine
+    harness tests, build, smoke, Markdown/whitespace, and all 177 PostgreSQL
+    tests pass. The database regression proves one canonical query for a resume
+    response, excluding readiness. Both desktop/tablet enforced games, reload
+    with pending dice, exact replay, and input fixtures pass in
+    `test-results/atomic-resume-read` and `test-results/atomic-resume-read-fixtures`.
+    Desktop covered all three combat choices; tablet loss/advance. Fresh
+    independent review found no actionable regressions and reran typecheck and
+    163 server tests; its 14 database skips are covered above. This is a read
+    consolidation, not a query cache, schema migration, or VPS capacity result.
 - [ ] Finish responsive interaction design using the owner-approved original
   board, counter symbols, and clearly marked reduced strength. Current original
   presentation has explicit release approval; supplied scans stay private.

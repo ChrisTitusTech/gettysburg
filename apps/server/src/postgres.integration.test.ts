@@ -3,7 +3,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
 import { Pool } from "pg";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
 
@@ -32,6 +32,38 @@ postgres("PostgreSQL durability", () => {
 
   afterAll(async () => {
     await administration.end();
+  });
+
+  it("hydrates one canonical snapshot per authorized resume view", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await service.migrate();
+      const created = await service.createGame("union");
+      const query = vi.spyOn(Pool.prototype, "query");
+      try {
+        const view = await service.getGameView(
+          created.credential,
+          created.gameId,
+        );
+        expect(view).toMatchObject({
+          game_id: created.gameId,
+          is_host: true,
+          seat: "union",
+          state: created.state,
+        });
+        expect(query).toHaveBeenCalledTimes(1);
+        expect(query.mock.calls[0]![0]).toBe(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        );
+      } finally {
+        query.mockRestore();
+      }
+    } finally {
+      await service.close();
+    }
   });
 
   it("runs migrations idempotently and reconstructs credentials, state, and actions", async () => {
