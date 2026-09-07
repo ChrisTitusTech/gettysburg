@@ -1771,6 +1771,16 @@ validation remain separate gates.
 
 ### Browser push foundation
 
+Integration evidence: PR #41 head `19ba6e8` passed Application `34102616922`
+and Documentation `34102617045`. With the reviewed transport handshake repair,
+the full local gate passes 608 workspace/nine harness tests and all 227
+PostgreSQL tests. Fresh independent review found no actionable defects and
+reran 207 server tests. The helper still has no runtime caller or sender;
+unchanged browser behavior is covered by the transport's desktop/tablet full
+games and input fixtures in `test-results/spectator-handshake-authorization`
+and its `-fixtures` directory. Publish the integration and verify exact-head
+CI, final review threads, and merge the transport base before this PR.
+
 - [ ] Add deterministic turn-notification targeting.
   - Scope: Pure server policy for consecutive compatible mandatory-game
     snapshots. Notify the other seat only when a newly required decision
