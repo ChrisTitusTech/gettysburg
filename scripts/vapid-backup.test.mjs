@@ -20,10 +20,14 @@ const verify = resolve("scripts/verify-vapid-backup.mjs");
 const backup = resolve("scripts/vps-backup.sh");
 function keyData() {
   const key = createECDH("prime256v1");
+  const publicKey = key.generateKeys().toString("base64url");
+  const scalar = key.getPrivateKey();
+  const privateKey = Buffer.alloc(32);
+  scalar.copy(privateKey, privateKey.length - scalar.length);
   return JSON.stringify({
     subject: "mailto:test@example.com",
-    publicKey: key.generateKeys().toString("base64url"),
-    privateKey: key.getPrivateKey().toString("base64url"),
+    publicKey,
+    privateKey: privateKey.toString("base64url"),
   });
 }
 function run(command, args, options = {}) {

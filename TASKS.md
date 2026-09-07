@@ -2168,8 +2168,18 @@ Five local tests exercise the actual backup script with controlled container/UID
 boundaries and real age encryption/decryption, unchanged-byte recovery, malformed
 keys, disabled push, missing keys, symlinks, and partial-backup cleanup. Shell
 syntax/ShellCheck/shfmt and lint pass after replacing an errexit-bypassing `!`
-check with explicit failure. CI installs age for these tests. Full local gates,
-independent review, and exact-head CI remain. Actual VPS/on-off-host recovery and
+check with explicit failure. CI installs age for these tests. Full local gates
+pass after integrating startup, worker, and scanner changes: 739 workspace and
+18 harness tests, frozen installation, format, lint, typecheck, build, smoke,
+Markdown, and diff checks. The unchanged runtime retains the integrated
+desktop/tablet browser and 329-test PostgreSQL evidence; this scripts-only
+increment does not claim a new browser or database run. Initial independent
+review found no defects and reran five backup tests plus shell checks. The
+post-integration review found variable-length generated private scalars in test
+fixtures; left-padding to 32 bytes removes that intermittent test failure.
+Focused revalidation and fresh independent review pass with all five backup
+tests; exact-head CI follows.
+Actual VPS/on-off-host recovery and
 push enablement remain unattempted owner gates; no remote data or keys changed.
 
 The next browser increment supplies a notification-only service worker without
