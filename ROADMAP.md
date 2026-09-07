@@ -202,11 +202,15 @@ Terrain-defense work started on 2026-09-06 with approved A-W data and authorized
 best-guess connections. This does not complete Phase 3. Phase 2 pulled forward
 several movement, stacking,
 combat, and core night rules. Phase 2 operational closeout and owner per-hex
-approval are complete; terrain gameplay acceptance and movement rules remain
-open. Optional rules/additional scenarios are excluded by owner decision. The
+approval are complete. The newer source candidate enables mandatory rules for
+new games, including weighted movement, reinforcement costs, retreat/advance,
+and night guidance, under its complete pinned version pair. Replay delivery and
+representative full-game/owner gameplay acceptance remain open. This source
+activation is not a deployment or Phase 3 completion. Optional rules/additional
+scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in
 `docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
-Forest/hill links feed combat; road/rail/stream estimates await movement rules.
+Forest/hill links feed combat; road/rail/stream estimates now feed mandatory movement.
 TASKS.md records validation, review, and remaining owner acceptance.
 
 ### Included work

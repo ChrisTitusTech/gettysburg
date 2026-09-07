@@ -6,7 +6,6 @@ import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
-import type { GameServiceSnapshot } from "./game-service.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
@@ -124,8 +123,8 @@ postgres("PostgreSQL durability", () => {
     );
     expect(rows.rows[0]).toMatchObject({
       action_count: "1",
-      content_revision: "gettysburg-painted-board-v2",
-      ruleset_version: "gettysburg-terrain-v3",
+      content_revision: "gettysburg-mandatory-board-v1",
+      ruleset_version: "gettysburg-mandatory-v4",
       snapshot_count: "2",
     });
     await restarted.close();
@@ -139,42 +138,8 @@ postgres("PostgreSQL durability", () => {
     await first.migrate();
     const created = await first.createGame("union");
     await first.close();
-    // Test-only seed: new-game defaults deliberately remain terrain-v3. Keep all
-    // three durable representations consistent before exercising real commands.
     const initial = createMandatoryInitialState(created.gameId);
-    const stored = await administration.query<{
-      snapshot: GameServiceSnapshot;
-    }>("SELECT snapshot FROM service_state WHERE singleton = true");
-    const snapshot = stored.rows[0]!.snapshot;
-    const seeded = {
-      ...snapshot,
-      games: snapshot.games.map(([id, record]) => [
-        id,
-        id === created.gameId ? { ...record, state: initial } : record,
-      ]),
-    };
-    await administration.query(
-      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
-      [JSON.stringify(seeded)],
-    );
-    await administration.query(
-      "UPDATE games SET state = $2::jsonb, ruleset_version = $3, content_revision = $4 WHERE id = $1",
-      [
-        created.gameId,
-        JSON.stringify(initial),
-        initial.ruleset_version,
-        initial.content_revision,
-      ],
-    );
-    await administration.query(
-      "UPDATE snapshots SET state = $2::jsonb, ruleset_version = $3, content_revision = $4 WHERE game_id = $1",
-      [
-        created.gameId,
-        JSON.stringify(initial),
-        initial.ruleset_version,
-        initial.content_revision,
-      ],
-    );
+    expect(created.state).toEqual(initial);
     const service = new PostgresGameService({
       connectionString: connectionString!,
       pepper,

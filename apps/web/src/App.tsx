@@ -3,6 +3,7 @@ import {
   acceptGameplayEvent,
   acceptManagementEvent,
   COMMAND_SCHEMA_VERSION,
+  MANDATORY_RULESET_VERSION,
   type CommandResult,
   type AuditEvent,
   type ActionEvent,
@@ -697,7 +698,7 @@ export function App({
     return (
       <main className="lobby-shell">
         <section className="lobby-card" aria-labelledby="page-title">
-          <p className="eyebrow">Phase 2 digital tabletop</p>
+          <p className="eyebrow">Scenario Five mandatory rules</p>
           <h1 id="page-title">Gettysburg</h1>
           <p className="summary">
             Create a private 24-turn game or claim the opposing seat. The
@@ -761,7 +762,11 @@ export function App({
     <main className="game-shell">
       <header className="game-header">
         <div>
-          <p className="eyebrow">Private Phase 2 room</p>
+          <p className="eyebrow">
+            {activeGame.state.ruleset_version === MANDATORY_RULESET_VERSION
+              ? "Private mandatory-rules game"
+              : "Private saved tabletop"}
+          </p>
           <h1>Gettysburg</h1>
         </div>
         <dl className="game-facts">

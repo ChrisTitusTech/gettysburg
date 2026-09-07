@@ -479,6 +479,35 @@ validation remain separate gates.
 
 ### Phase 3
 
+- [ ] Enable mandatory new games and complete representative acceptance.
+  - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
+    `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,
+    exact-group continuation, reinforcement entry, normal exit, forced retreat,
+    advance, and mandatory night controls now run against real authoritative
+    games. Saved legacy/terrain pairs retain their prior interpretation.
+  - Boundary: This supersedes the preparatory increments' not-yet-activated
+    notes below. No database rewrite, VPS deployment, Phase 3 completion, or
+    public-release acceptance is implied. Authorized replay controls, owner
+    representative gameplay, and Phase 4 work remain open.
+  - Acceptance: Prove a newly created PostgreSQL game uses the pinned opening,
+    resumes paid continuation after restart, rejects a closed group, and retains
+    both earlier movement handlers. Use two real browser sessions at desktop
+    and tablet widths for weighted movement, reconnect, pointer/touch drag,
+    keyboard single-counter movement, and the no-contact 24-turn sequence.
+    Inspect rendered evidence and run the complete local gate, isolated database
+    suite, container restart smoke, independent review, and exact-head CI.
+  - Validation: Frozen install, format, lint, typecheck, 501 default workspace
+    tests plus six harness tests, build, smoke, Markdown lint, and all 136 server
+    tests with isolated PostgreSQL pass. Local rootless container smoke passes:
+    UID/GID 1000, restart/resume, fail-closed readiness, and clean shutdown.
+    Two-session desktop/tablet and no-contact 24-turn browser acceptance pass in
+    `test-results/mandatory-default-final`; mandatory input fixtures pass in
+    `test-results/mandatory-default-final-fixtures`.
+    The tablet fit and held-drag views were inspected; screenshots mask any
+    one-time invitation. Fresh independent built-in review found no actionable
+    defects. Exact-head CI remains a pre-merge gate. CodeRabbit is limited and
+    skipped per owner direction. This no-contact game does not replace owner
+    gameplay acceptance.
 - [ ] Verify mandatory replay, then expose authorized replay controls.
   - Scope: Reconstruct mandatory-v4 from its pinned opening and ordered
     accepted commands, resolving the historical seat binding and recorded dice.

@@ -46,14 +46,14 @@ client cannot supply or edit it through gameplay commands. Combat preview,
 automatic dice resolution, and confirmation use the same pure calculation.
 The overall unit-plus-terrain modifier remains capped at +10.
 
-Road, rail, and stream edge data are transcribed and tested for adjacency and
-uniqueness, but variable movement costs are NOT enabled by this terrain-defense
-change. The existing one-point-per-hex movement remains. Complete road movement,
-stream costs, rough-hill/artillery restrictions, generals, and remaining ZOC
-rules are the separate Phase 3 movement task; these edge estimates are inputs
-to that task, not a claim that it is already complete.
+The original terrain-defense revision transcribed and tested road, rail, and
+stream edges without enabling variable movement costs. Saved terrain-v3 games
+retain that one-point-per-hex behavior. New mandatory-v4 games use those links
+for road/rail/stream costs and enforce rough-hill/artillery, accompaniment, and
+ZOC movement rules as described below. Gameplay acceptance of these inferred
+links remains separate from their implementation and automated validation.
 
-## Mandatory movement bundle (not yet enabled)
+## Mandatory movement bundle
 
 `packages/content/src/mandatory.ts` pins the complete new Scenario Five opening
 under `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1`. It includes
@@ -62,8 +62,8 @@ pairs, 82 counters with unchanged schedules, eight objectives worth 16 points,
 and empty continuous-movement activation. The first active phase is Union
 movement, turn 1. Each constructor call returns an isolated snapshot; a content
 fingerprint guards against silently changing this revision's interpretation.
-The server registers this exact pair for saved-state interpretation but does
-not yet create it by default. It requires the complete pinned terrain/edge
+The server registers this exact pair for saved-state interpretation and creates
+new games with it by default. It requires the complete pinned terrain/edge
 bundle, unit metadata/schedules, objective values, and explicit movement/step
 state. Missing or changed data fails readiness and gameplay with
 `version_unavailable`; it is never filled from today's defaults. JSON object

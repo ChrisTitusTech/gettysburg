@@ -8,8 +8,8 @@ interface that can be self-hosted on the dedicated Gettysburg VPS.
 The local project workspace contains supplied board, rules, and order-of-battle
 references that are deliberately ignored by Git. The repository contains only
 the approved implementation plan and rights-safe project work. The current
-application candidate implements the Phase 2 rules-light tabletop in
-`ROADMAP.md`.
+application candidate enables mandatory Scenario Five for new games; complete
+phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 
 ## Current status
 
@@ -17,8 +17,13 @@ PR #4 merged on 2026-09-06. Its reviewed terrain and operational repairs are
 deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`, with passing exact-head
 and post-merge CI, healthy containers, public readiness, verified encrypted
 backups, desktop/tablet two-player browser checks, and application restart/resume.
-Phase 2 operational closeout is complete. Phase 3 movement rules, owner terrain
-gameplay acceptance, dependency alerts, and public-release gates remain open.
+Phase 2 operational closeout is complete. The newer source candidate uses
+`gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
+weighted movement, continuous stack activation, reinforcement costs, connected
+terrain defense, retreat/advance, and mandatory night withdrawal. Existing saves
+retain their original rules. Dependency advisories were patched separately.
+The newer candidate has not been deployed by this change; replay delivery,
+owner gameplay acceptance, and Phase 4 release gates remain open.
 See `TASKS.md` for dated evidence; this is a development deployment, not a claim
 of production readiness.
 
@@ -48,8 +53,9 @@ unit factors, objective and casualty scoring, PostgreSQL
 state/actions/snapshots, restart-safe browser sessions, and a non-root
 production-shaped local container path. Reduced combat factors are owner-approved
 derived values: halve the full factor and round up, while a combat-one counter
-has one step and is eliminated by its first loss. Per-hex terrain modifiers are
-explicitly deferred to Phase 3 and remain unavailable as rules data.
+has one step and is eliminated by its first loss. All 253 owner-approved terrain
+records now feed rules and previews. Inferred movement/forest/hill connections
+and scenario adaptations remain explicit owner gameplay acceptance checks.
 
 ## Development
 
@@ -66,6 +72,7 @@ pnpm build
 pnpm smoke
 pnpm exec playwright install --with-deps chromium
 pnpm browser:acceptance
+pnpm browser:movement
 pnpm container:smoke
 ```
 
@@ -74,18 +81,25 @@ For interactive development, run `pnpm dev`. The web client listens on
 the server on `http://127.0.0.1:2567`.
 
 The browser acceptance command creates two isolated sessions at desktop and
-tablet widths and writes rights-safe board captures to `test-results/phase-2`.
+tablet widths and writes rights-safe board captures to
+`test-results/browser-acceptance`. `pnpm browser:movement` separately exercises
+mandatory-rule edge cases in clearly labelled development-only browser fixtures.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl
 before dragging to move only the grabbed counter, or Ctrl-click once to keep it
-in single-counter mode for a later drag. A normal click rejoins its stack. When
-a retreat is pending, the highlighted losing stack is dragged together to the
-first empty hex. When an advance is pending, drag a highlighted winning stack
-to a highlighted vacated defender hex, or into the visible Decline advance
-tray. You can also select an eligible winning counter and click or
-keyboard-activate the tray to decline. All board movement and combat movement
-is coordinate-entry-free.
+in single-counter mode for a later drag. Use the group selector for other legal
+subsets. Repeated drags must retain the exact group until a different group moves;
+previous movers then cannot resume that phase. Roads/rails cost half a point
+outside enemy ZOC; other costs use the pinned terrain and connections.
+
+Reinforcement controls select a single counter or common-entry group and show
+the actual entry cost and blocked-entry alternatives. Retreat controls offer
+legal next steps, undo, and confirmation, including trapped losses and permitted
+edge exits. Advance controls offer legal victorious groups and destinations or
+decline; normal movement spending does not restrict a free advance. Board
+shortcuts remain available. Night guidance names counters that must withdraw.
+All movement and combat choices are coordinate-entry-free.
 
 ## Local container path
 

@@ -42,9 +42,9 @@ not remain compatible. The owner subsequently authorized retirement of five old
 development games after encrypted backup verification. Normal audited deletion
 retired those games; the database was preserved.
 
-The merged application implements the Phase 2 Scenario Five rules-light digital
-tabletop, durable PostgreSQL state, recovery, and private-staging workflow. That
-evidence does not claim complete Phase 3 terrain/rule enforcement or Phase 4
+The last verified VPS deployment implements the Phase 2 Scenario Five
+rules-light digital tabletop, durable PostgreSQL state, recovery, and staging.
+That evidence does not claim complete Phase 3 rule enforcement or Phase 4
 production readiness. Phase 2 operational closeout completed on 2026-09-06:
 PR #4 passed independent review and exact-head CI, merged with passing post-merge
 CI, and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Public readiness,
@@ -312,6 +312,18 @@ gameplay events, delete retries during soft deletion, and the post-purge
 `game_purged` response.
 
 ### Rules enforcement stages
+
+The current source candidate creates new games under the complete pinned
+`gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` pair. The mandatory
+contract in `docs/references/MANDATORY_RULES.md` governs their weighted movement,
+continuous-move activation, reinforcement costs, terrain defense, retreat,
+advance, and night behavior. Preview controls and authoritative reducers share
+the same legality calculations. Missing or changed pinned content fails closed.
+Existing saves retain their own registered pair and legacy repair behavior;
+mandatory saves are never passed through those older repair routines.
+The Phase 2 contracts below document retained behavior, not the new-game default.
+Activation alone does not close replay delivery, owner gameplay acceptance,
+or the Phase 3/4 exit criteria. No deployment is implicit in source activation.
 
 Phase 2 is a rules-light digital tabletop: the server enforces seat ownership,
 turn order, state shape, unit ownership, counter occupancy, die rolls, and
