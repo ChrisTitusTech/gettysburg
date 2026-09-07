@@ -2,13 +2,45 @@ import { randomBytes, randomUUID } from "node:crypto";
 
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
-import { Pool } from "pg";
+import { Client as PgClient, Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
+
+function holdNextDeliveryRead() {
+  let release!: () => void;
+  let captured!: () => void;
+  const barrier = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const locked = new Promise<void>((resolve) => {
+    captured = resolve;
+  });
+  let held = false;
+  const original = PgClient.prototype.query;
+  const spy = vi
+    .spyOn(PgClient.prototype, "query")
+    .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+      const result: unknown = Reflect.apply(original, this, args);
+      if (
+        !held &&
+        args[0] ===
+          "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
+      ) {
+        held = true;
+        return Promise.resolve(result).then(async (value) => {
+          captured();
+          await barrier;
+          return value;
+        });
+      }
+      return result;
+    } as PgClient["query"]);
+  return { release, locked, restore: () => spy.mockRestore() };
+}
 
 postgres("PostgreSQL durability", () => {
   const pepper = randomBytes(32);
@@ -33,6 +65,118 @@ postgres("PostgreSQL durability", () => {
   afterAll(async () => {
     await administration.end();
   });
+
+  it.each([false, true])(
+    "orders delivery before revocation or cancels its read lock (cancel=%s)",
+    async (cancel) => {
+      const reader = new PostgresGameService({
+        connectionString: connectionString!,
+        pepper,
+      });
+      const writer = new PostgresGameService({
+        connectionString: connectionString!,
+        pepper,
+      });
+      const controller = new AbortController();
+      let held: ReturnType<typeof holdNextDeliveryRead> | undefined;
+      let delivery: Promise<unknown> | undefined;
+      let revoke: Promise<unknown> | undefined;
+      try {
+        await reader.migrate();
+        const host = await reader.createGame("union");
+        const authorization = await reader.authenticateHost(
+          host.credential,
+          host.gameId,
+        );
+        const command = {
+          command_id: randomUUID(),
+          command_name: "issueSpectatorInvitation",
+          payload: {},
+          game_id: host.gameId,
+          expected_version: 0,
+          schema: COMMAND_SCHEMA_VERSION,
+        };
+        const issued = await reader.executeHostCommand(authorization, command);
+        if (!issued.ok || !issued.invitation)
+          throw new Error("Missing invitation");
+        const observer = await reader.claimSpectatorInvitation({
+          claimId: randomUUID(),
+          lookupId: issued.invitation.lookup_id,
+          secret: issued.invitation.secret,
+        });
+        const observerAuth = await reader.authenticateSpectator(
+          observer.credential,
+          host.gameId,
+        );
+        const order: string[] = [];
+        const send = vi.fn(() => {
+          order.push("deliver");
+        });
+        held = holdNextDeliveryRead();
+        delivery = reader
+          .deliverAuthorizedSpectators([observerAuth], send, controller.signal)
+          .then(
+            () => undefined,
+            (error: unknown) => error,
+          );
+        await held.locked;
+        revoke = writer
+          .executeHostCommand(authorization, {
+            ...command,
+            command_id: randomUUID(),
+            command_name: "revokeSpectatorAccess",
+            payload: { lookup_id: issued.invitation.lookup_id },
+          })
+          .then((result) => {
+            expect(result.ok).toBe(true);
+            order.push("revoke");
+          });
+        await vi.waitFor(async () => {
+          const waiting = await administration.query<{ count: string }>(
+            "SELECT count(*) FROM pg_stat_activity WHERE query = 'SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE' AND wait_event_type = 'Lock'",
+          );
+          expect(Number(waiting.rows[0]!.count)).toBeGreaterThan(0);
+        });
+        if (cancel) {
+          controller.abort();
+          await revoke;
+          expect(send).not.toHaveBeenCalled();
+          held.release();
+          expect(await delivery).toBeInstanceOf(Error);
+          expect(order).toEqual(["revoke"]);
+        } else {
+          held.release();
+          await delivery;
+          await revoke;
+          expect(send).toHaveBeenCalledExactlyOnceWith([
+            observerAuth.bindingId,
+          ]);
+          expect(order).toEqual(["deliver", "revoke"]);
+        }
+        const later = vi.fn();
+        await reader.deliverAuthorizedSpectators(
+          [observerAuth],
+          later,
+          new AbortController().signal,
+        );
+        expect(later).toHaveBeenCalledExactlyOnceWith([]);
+        await expect(
+          reader.deliverAuthorizedState(
+            observerAuth,
+            vi.fn(),
+            new AbortController().signal,
+          ),
+        ).rejects.toThrow(/Current spectator access/);
+      } finally {
+        controller.abort();
+        held?.release();
+        await delivery;
+        await revoke;
+        held?.restore();
+        await Promise.all([reader.close(), writer.close()]);
+      }
+    },
+  );
 
   it("restores spectator-only sessions and persists revoked access", async () => {
     const first = new PostgresGameService({
@@ -107,19 +251,70 @@ postgres("PostgreSQL durability", () => {
       expect(
         (await restarted.getReplay(observer.credential, host.gameId)).state,
       ).toEqual(observer.view.state);
+      const spectatorAuthorization = await restarted.authenticateSpectator(
+        observer.credential,
+        host.gameId,
+      );
       expect(
-        (
-          await restarted.executeHostCommand(
-            await restarted.authenticateHost(host.credential, host.gameId),
-            {
-              ...command,
-              command_id: randomUUID(),
-              command_name: "revokeSpectatorAccess",
-              payload: { lookup_id: input.lookupId },
-            },
-          )
-        ).ok,
-      ).toBe(true);
+        await restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).toEqual(observer.view.state);
+      const revokeCommand = {
+        ...command,
+        command_id: randomUUID(),
+        command_name: "revokeSpectatorAccess",
+        payload: { lookup_id: input.lookupId },
+      };
+      const hostAuthorization = await restarted.authenticateHost(
+        host.credential,
+        host.gameId,
+      );
+      const publish = vi.fn();
+      await administration.query(`
+        CREATE OR REPLACE FUNCTION gettysburg_reject_spectator_action() RETURNS trigger
+        LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected spectator action failure'; END $$;
+        CREATE TRIGGER reject_gettysburg_spectator_action BEFORE INSERT ON actions
+        FOR EACH ROW EXECUTE FUNCTION gettysburg_reject_spectator_action();
+      `);
+      try {
+        await expect(
+          restarted.executeHostCommand(hostAuthorization, revokeCommand, {
+            afterCommit: publish,
+          }),
+        ).rejects.toThrow("injected spectator action failure");
+      } finally {
+        await administration.query(
+          "DROP TRIGGER IF EXISTS reject_gettysburg_spectator_action ON actions",
+        );
+        await administration.query(
+          "DROP FUNCTION IF EXISTS gettysburg_reject_spectator_action()",
+        );
+      }
+      expect(publish).not.toHaveBeenCalled();
+      expect(
+        await restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).toEqual(observer.view.state);
+      const revoked = await restarted.executeHostCommand(
+        hostAuthorization,
+        revokeCommand,
+        { afterCommit: publish },
+      );
+      expect(revoked.ok).toBe(true);
+      expect(publish).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ command_name: "revokeSpectatorAccess" }),
+        spectatorAuthorization.bindingId,
+      );
+      expect(JSON.stringify(revoked)).not.toContain(
+        spectatorAuthorization.bindingId,
+      );
+      expect(
+        await restarted.executeHostCommand(hostAuthorization, revokeCommand, {
+          afterCommit: publish,
+        }),
+      ).toEqual(revoked);
+      expect(publish).toHaveBeenCalledOnce();
+      await expect(
+        restarted.getAuthorizedSpectatorState(spectatorAuthorization),
+      ).rejects.toThrow(/Current spectator access/);
       expect(
         await restarted.getSpectatorGrants(host.credential, host.gameId),
       ).toEqual([]);

@@ -13,6 +13,8 @@ import {
   type GameView,
   type SpectatorClaimResult,
   type SpectatorView,
+  type SpectatorAuthorization,
+  type HostManagementCommitOptions,
   type SpectatorGrantSummary,
   type GameServiceSnapshot,
   type HostAuthorization,
@@ -36,6 +38,23 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  deliverAuthorizedState(
+    authorization: GameAuthorization | SpectatorAuthorization,
+    deliver: (state: GameState) => void,
+    signal: AbortSignal,
+  ): Promise<void>;
+  deliverAuthorizedSpectators(
+    authorizations: readonly SpectatorAuthorization[],
+    deliver: (permitted: readonly string[]) => void,
+    signal: AbortSignal,
+  ): Promise<void>;
+  authenticateSpectator(
+    credential: string | undefined,
+    gameId: string,
+  ): Promise<SpectatorAuthorization>;
+  getAuthorizedSpectatorState(
+    authorization: SpectatorAuthorization,
+  ): Promise<GameState>;
   getSpectatorGrants(
     credential: string | undefined,
     gameId: string,
@@ -101,7 +120,7 @@ export interface GameService {
   executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options?: { afterCommit?: (event: ManagementEvent) => void },
+    options?: HostManagementCommitOptions,
   ): Promise<HostManagementResult>;
   getActions(gameId: string): Promise<readonly StoredAction[]>;
   getActiveInvitations(
@@ -140,6 +159,32 @@ export interface GameService {
 
 export class InMemoryAsyncGameService implements GameService {
   constructor(readonly service = new InMemoryGameService()) {}
+  async deliverAuthorizedState(
+    authorization: GameAuthorization | SpectatorAuthorization,
+    deliver: (state: GameState) => void,
+    signal: AbortSignal,
+  ) {
+    if (signal.aborted) return;
+    deliver(
+      "kind" in authorization
+        ? this.service.getAuthorizedSpectatorState(authorization)
+        : this.service.getAuthorizedState(authorization),
+    );
+  }
+  async deliverAuthorizedSpectators(
+    authorizations: readonly SpectatorAuthorization[],
+    deliver: (permitted: readonly string[]) => void,
+    signal: AbortSignal,
+  ) {
+    if (!signal.aborted)
+      deliver(this.service.authorizeSpectatorDelivery(authorizations));
+  }
+  async authenticateSpectator(credential: string | undefined, gameId: string) {
+    return this.service.authenticateSpectator(credential, gameId);
+  }
+  async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
+    return this.service.getAuthorizedSpectatorState(authorization);
+  }
   async getSpectatorGrants(credential: string | undefined, gameId: string) {
     return this.service.getSpectatorGrants(credential, gameId);
   }
@@ -209,7 +254,7 @@ export class InMemoryAsyncGameService implements GameService {
   async executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+    options: HostManagementCommitOptions = {},
   ) {
     return this.service.executeHostCommand(authorization, input, options);
   }
@@ -262,6 +307,41 @@ export class InMemoryAsyncGameService implements GameService {
 export class PostgresGameService implements GameService {
   readonly #pool: Pool;
   readonly #pepper: Uint8Array;
+  async deliverAuthorizedState(
+    authorization: GameAuthorization | SpectatorAuthorization,
+    deliver: (state: GameState) => void,
+    signal: AbortSignal,
+  ) {
+    await this.#readForDelivery(
+      (service) =>
+        deliver(
+          "kind" in authorization
+            ? service.getAuthorizedSpectatorState(authorization)
+            : service.getAuthorizedState(authorization),
+        ),
+      signal,
+    );
+  }
+  async deliverAuthorizedSpectators(
+    authorizations: readonly SpectatorAuthorization[],
+    deliver: (permitted: readonly string[]) => void,
+    signal: AbortSignal,
+  ) {
+    await this.#readForDelivery(
+      (service) => deliver(service.authorizeSpectatorDelivery(authorizations)),
+      signal,
+    );
+  }
+  async authenticateSpectator(credential: string | undefined, gameId: string) {
+    return this.#read((service) =>
+      service.authenticateSpectator(credential, gameId),
+    );
+  }
+  async getAuthorizedSpectatorState(authorization: SpectatorAuthorization) {
+    return this.#read((service) =>
+      service.getAuthorizedSpectatorState(authorization),
+    );
+  }
   async getSpectatorGrants(credential: string | undefined, gameId: string) {
     return this.#read((service) =>
       service.getSpectatorGrants(credential, gameId),
@@ -282,6 +362,7 @@ export class PostgresGameService implements GameService {
     this.#pool = new Pool({
       connectionString: options.connectionString,
       max: 10,
+      connectionTimeoutMillis: 2_000,
     });
     this.#pepper = options.pepper;
   }
@@ -527,19 +608,24 @@ export class PostgresGameService implements GameService {
   async executeHostCommand(
     authorization: HostAuthorization,
     input: unknown,
-    options: { afterCommit?: (event: ManagementEvent) => void } = {},
+    options: HostManagementCommitOptions = {},
   ) {
     const execution = await this.#mutate((service) => {
       let committedEvent: ManagementEvent | undefined;
+      let revokedSpectatorBindingId: string | undefined;
       const result = service.executeHostCommand(authorization, input, {
-        afterCommit: (event) => {
+        afterCommit: (event, bindingId) => {
           committedEvent = event;
+          revokedSpectatorBindingId = bindingId;
         },
       });
-      return { committedEvent, result };
+      return { committedEvent, result, revokedSpectatorBindingId };
     });
     if (execution.committedEvent !== undefined) {
-      options.afterCommit?.(execution.committedEvent);
+      options.afterCommit?.(
+        execution.committedEvent,
+        execution.revokedSpectatorBindingId,
+      );
     }
     return execution.result;
   }
@@ -604,6 +690,45 @@ export class PostgresGameService implements GameService {
     return this.#mutate((service) =>
       service.synchronizeDeletionLedger(receipts),
     );
+  }
+
+  async #readForDelivery(
+    operation: (service: InMemoryGameService) => void,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const client = await this.#pool.connect();
+    let released = false;
+    const discard = () => {
+      if (!released) {
+        released = true;
+        client.release(true);
+      }
+    };
+    signal.addEventListener("abort", discard, { once: true });
+    try {
+      if (signal.aborted) throw new Error("Room delivery was cancelled.");
+      await client.query("BEGIN");
+      await client.query("SET LOCAL statement_timeout = '2000ms'");
+      const result = await client.query<{ snapshot: GameServiceSnapshot }>(
+        "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE",
+      );
+      const snapshot = result.rows[0]?.snapshot;
+      if (snapshot === undefined || signal.aborted)
+        throw new Error("Room delivery snapshot is unavailable.");
+      // The synchronous send occurs while this lock prevents a revocation from
+      // committing. Returning authorization and sending later would race again.
+      operation(new InMemoryGameService({ pepper: this.#pepper, snapshot }));
+      await client.query("COMMIT");
+    } catch (error) {
+      discard(); // Closing the connection also rolls back any held read lock.
+      throw error;
+    } finally {
+      signal.removeEventListener("abort", discard);
+      if (!released) {
+        released = true;
+        client.release();
+      }
+    }
   }
 
   async #read<T>(operation: (service: InMemoryGameService) => T): Promise<T> {
