@@ -5,7 +5,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-import { chromium } from "@playwright/test";
+import { chromium, firefox, webkit } from "@playwright/test";
 
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { runEnforcedGame } from "./browser-enforced-game.mjs";
@@ -79,8 +79,19 @@ async function stopServer(server, serverOutput) {
   }
 }
 
+const intentionalReloads = new WeakSet();
 function watchPage(page, issues) {
   page.on("console", (message) => {
+    if (
+      intentionalReloads.has(page) &&
+      message.type() === "warning" &&
+      message.text() === "Room connection was closed unexpectedly (1001): "
+    ) {
+      console.log(
+        "Expected WebSocket Going Away during deliberate page reload",
+      );
+      return;
+    }
     if (message.type() === "error" || message.type() === "warning") {
       issues.push(`${message.type()}: ${message.text()}`);
     }
@@ -226,7 +237,17 @@ async function runScenario(browser, origin, options) {
       .getByLabel("One-time invitation URL")
       .inputValue();
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
-    await hostPage.reload();
+    await hostPage.locator(".board-svg image").evaluate(async (element) => {
+      const image = new Image();
+      image.src = element.href.baseVal;
+      await image.decode();
+    });
+    intentionalReloads.add(hostPage);
+    try {
+      await hostPage.reload();
+    } finally {
+      intentionalReloads.delete(hostPage);
+    }
     await hostPage.getByText("connected", { exact: true }).waitFor();
     await hostPage
       .getByRole("button", { exact: true, name: "Revoke" })
@@ -377,7 +398,7 @@ async function runScenario(browser, origin, options) {
       x: panStart.x + panStart.width / 2,
       y: panStart.y + panStart.height / 2,
     };
-    if (options.label === "tablet") {
+    if (options.inputMode === "touch") {
       const touch = await unionPage.context().newCDPSession(unionPage);
       await touch.send("Input.dispatchTouchEvent", {
         type: "touchStart",
@@ -479,6 +500,15 @@ async function runScenario(browser, origin, options) {
   }
 }
 
+const browserName = process.env.GETTYSBURG_BROWSER ?? "chromium";
+assert(
+  ["chromium", "firefox", "webkit"].includes(browserName),
+  "Unsupported browser engine",
+);
+const browserType = { chromium, firefox, webkit }[browserName];
+// Continuous touch injection uses Chromium's CDP. Other engines still exercise
+// both layouts with actual keyboard/mouse input, never synthetic DOM events.
+const tabletInputMode = browserName === "chromium" ? "touch" : "keyboard";
 await mkdir(evidenceDirectory, { recursive: true });
 const configuredOrigin = process.env.GETTYSBURG_ACCEPTANCE_ORIGIN;
 const port = configuredOrigin === undefined ? await reservePort() : undefined;
@@ -512,7 +542,10 @@ try {
   }
 
   await waitForReadiness(origin, () => output);
-  browser = await chromium.launch({ headless: true });
+  browser = await browserType.launch({ headless: true });
+  console.log(
+    `Browser acceptance engine: ${browserName} ${browser.version()}; tablet input: ${tabletInputMode}`,
+  );
   await checkPushWorker(origin);
   await runScenario(browser, origin, {
     hostName: "Confederate",
@@ -523,7 +556,7 @@ try {
   });
   await runScenario(browser, origin, {
     hostName: "Union",
-    inputMode: "touch",
+    inputMode: tabletInputMode,
     label: "tablet",
     opponentName: "Confederate",
     viewport: { height: 768, width: 1024 },
@@ -547,7 +580,7 @@ try {
       },
       {
         label: "tablet",
-        inputMode: "touch",
+        inputMode: tabletInputMode,
         viewport: { height: 768, width: 1024 },
       },
     ])

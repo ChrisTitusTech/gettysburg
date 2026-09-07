@@ -1884,6 +1884,37 @@ validation remain separate gates.
 - [ ] Load-test the target VPS and document the supported capacity.
 - [ ] Complete production-candidate review and 24-turn acceptance.
 
+### Browser-engine acceptance increment
+
+The acceptance harness selects Chromium, Firefox, or WebKit explicitly and
+rejects unknown engine names before starting services. Chromium retains real
+tablet touch injection; Firefox/WebKit use keyboard/mouse at both desktop and
+tablet widths because the continuous-touch fixture requires Chromium CDP.
+Do not describe those non-Chromium tablet runs as touch/device acceptance.
+The notification-worker fixture remains separately identified Chromium coverage.
+An Ubuntu CI matrix installs each alternate engine's host libraries and runs
+both layouts and full 24-turn games without replacing the existing local gate.
+Local Firefox 153.0 launches. Local WebKit launch fails before application use
+because this workstation lacks libicu74/libjpeg-turbo8; record the failed attempt
+rather than claiming Safari coverage. Local Firefox/full gates and independent
+review follow, with exact-head CI required for both alternate engines.
+Actual current Safari/iPad behavior and push-provider acceptance remain owner
+release gates even when Playwright's WebKit engine passes.
+The first Firefox run completed its desktop scenario but failed the console
+gate on dependency eval probes and an image request interrupted by immediate
+reload. Use MessagePack's published no-eval build and Zod's browser-only jitless
+configuration; preserve the strict CSP and all runtime validation. Verify board
+image decoding before the deliberate reload. Only the exact WebSocket 1001
+Going Away warning during that explicit reload is classified as expected;
+all other warnings/errors still fail. Rerun both engines before publication.
+The corrected Firefox 153.0 run passes both 24-turn games, pending-choice reload,
+exact replay, spectators, and durable cleanup in `test-results/firefox-csp-safe`.
+Tablet-width keyboard/mouse covers all three combat choices; desktop covers
+loss/advance. There are no remaining CSP or image-decoding errors. The no-eval
+bundle reports 500.10 kB (148.59 kB gzip); the size warning remains visible.
+The 147 web tests, typecheck, and lint pass; final full gates, Chromium/input
+revalidation, independent review, and both alternate-engine CI jobs follow.
+
 ### Container vulnerability closeout (release gate open)
 
 Integrated startup and notification-worker code from merged PRs #48/#49 passes
