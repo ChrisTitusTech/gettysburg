@@ -110,6 +110,7 @@ export interface ReadinessState {
 }
 
 export interface HttpApplicationOptions {
+  readonly pushPublicKey?: string;
   readonly eventBus?: GameEventBus;
   readonly gameService: GameService;
   readonly readiness: ReadinessState;
@@ -219,6 +220,14 @@ export function configureHttpApplication(
   application.use("/api", (_request, response, next) => {
     response.setHeader("Cache-Control", "no-store");
     next();
+  });
+  // Public capability metadata is cheap and never triggers a database read.
+  application.get("/api/push-config", (_request, response) => {
+    response.json(
+      options.pushPublicKey
+        ? { enabled: true, applicationServerKey: options.pushPublicKey }
+        : { enabled: false },
+    );
   });
   // Register this gate before readiness: PostgreSQL readiness hydrates the
   // saved snapshot too, so even unavailable/unauthenticated reads need a bound.

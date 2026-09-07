@@ -370,6 +370,37 @@ runuser -u gettysburg -- env \
 The matching Podman environment avoids falling back from the user systemd cgroup
 manager during root-driven diagnostics.
 
+## Optional browser push configuration
+
+Push remains disabled unless `GETTYSBURG_PUSH_VAPID_FILE` points to a persistent
+regular JSON file owned by the application UID with mode 0600. The file contains
+a contact subject and a matching public/private P-256 key pair. It must not enter
+Git, logs, command-line arguments, or an unencrypted backup. Only the public key
+is exposed by `/api/push-config`; no configuration request reads game storage.
+
+The application image includes a key generator. From `/workspace`, running as
+UID 1000 with the persistent application volume mounted, the operator can use:
+
+```bash
+node apps/server/dist/push-vapid-cli.js /var/lib/gettysburg/push-vapid.json \
+  mailto:operator@example.com
+```
+
+Replace the example contact with the operator's contact. The command creates a
+new file only and never prints private key material or overwrites existing keys.
+It was validated against a temporary protected file; no VPS key was generated.
+Set `GETTYSBURG_PUSH_VAPID_FILE=/var/lib/gettysburg/push-vapid.json` in the protected
+application environment only after the browser opt-in/service-worker gates and
+encrypted on/off-host key-backup/restore coverage are ready. The current backup
+automation has not yet been extended for this new file. Keep that gate open.
+
+Restarting with the same file preserves the public key. Missing or invalid
+configured files fail startup; omitting the variable disables the worker. Do not
+rotate a key silently: existing subscriptions are tied to it and require an
+explicit consent invalidation/re-enrollment procedure. Opt-out prevents future
+dispatch but cannot recall a push already accepted by an external provider.
+No rollout or production enablement is authorized by this local implementation.
+
 ## Backups and recovery artifacts
 
 Existing host-configuration backups:

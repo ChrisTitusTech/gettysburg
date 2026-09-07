@@ -1,6 +1,8 @@
 import { fileURLToPath } from "node:url";
 
 import { PostgresGameService } from "./postgres-store.js";
+import { loadPushVapid } from "./push-config.js";
+import { startPushWorker } from "./push-worker.js";
 import {
   loadCredentialPepper,
   loadDeletionLedgerStartupReadiness,
@@ -39,6 +41,7 @@ const pepper = await loadCredentialPepper({
     ? {}
     : { file: process.env.GETTYSBURG_CREDENTIAL_PEPPER_FILE }),
 });
+const pushVapid = await loadPushVapid(process.env.GETTYSBURG_PUSH_VAPID_FILE);
 const gameService = new PostgresGameService({
   connectionString: databaseUrl,
   pepper,
@@ -61,6 +64,7 @@ const readiness = {
   },
 };
 const gameServer = createGettysburgServer({
+  ...(pushVapid ? { pushPublicKey: pushVapid.publicKey } : {}),
   gameService,
   readiness,
   staticDirectory,
@@ -68,6 +72,7 @@ const gameServer = createGettysburgServer({
 });
 
 let isShuttingDown = false;
+let pushWorker: ReturnType<typeof startPushWorker> | undefined;
 
 async function shutdown(signal: NodeJS.Signals) {
   if (isShuttingDown) {
@@ -76,6 +81,7 @@ async function shutdown(signal: NodeJS.Signals) {
 
   isShuttingDown = true;
   console.log(`Received ${signal}; stopping Gettysburg server`);
+  await pushWorker?.stop();
   await gameServer.gracefullyShutdown(false);
   await gameService.close();
   process.exit(0);
@@ -88,5 +94,12 @@ process.once("SIGTERM", () => {
   void shutdown("SIGTERM");
 });
 
+if (pushVapid && !(await readiness.isReady()))
+  throw new Error("Push worker startup requires readiness.");
 await gameServer.listen(port, host);
+if (pushVapid && !isShuttingDown)
+  pushWorker = startPushWorker(gameService, pushVapid, {
+    onFailure: () =>
+      console.error("Push delivery cycle failed; retrying later."),
+  });
 console.log(`Gettysburg server listening at http://${host}:${port}`);

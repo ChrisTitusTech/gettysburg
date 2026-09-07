@@ -929,6 +929,16 @@ lock; provider response waiting does not block game mutations. Shutdown cancels
 the worker before database closure and leaves abandoned leases recoverable.
 Startup and browser permission wiring remain separate acceptance gates.
 
+Optional startup configuration reads `GETTYSBURG_PUSH_VAPID_FILE` as a regular,
+owner-owned 0600 file with a validated matching P-256 key pair and contact
+subject. No configured file means no background worker. Configured startup
+requires successful migrations/readiness and stops the worker before database
+closure. `GET /api/push-config` returns only capability/public-key metadata,
+never private keys or provider credentials, and does not access game storage.
+Key generation is explicit and refuses overwrite; retain the stable file in
+encrypted backups. Browser permission/service-worker wiring and real-device
+acceptance remain separate gates even when startup is configured.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
