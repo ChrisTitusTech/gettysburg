@@ -1,4 +1,11 @@
 import { createECDH, randomBytes, randomUUID } from "node:crypto";
+import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { createServer } from "node:net";
+import { createPushVapidFile, loadPushVapid } from "./push-config.js";
 
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import { createMandatoryInitialState } from "@gettysburg/content";
@@ -66,6 +73,81 @@ postgres("PostgreSQL durability", () => {
   afterAll(async () => {
     await administration.end();
   });
+
+  it("starts and stops configured push with a stable public key on a fresh private test database", async () => {
+    const database = `push_startup_${randomUUID().replaceAll("-", "")}`;
+    const directory = await mkdtemp(join(tmpdir(), "gettysburg-push-startup-"));
+    const file = join(directory, "push.json");
+    await createPushVapidFile(file, "mailto:push@example.com");
+    const vapid = (await loadPushVapid(file))!;
+    const target = new URL(connectionString!);
+    target.pathname = `/${database}`;
+    await administration.query(`CREATE DATABASE ${database}`);
+    try {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const reservation = createServer();
+        await new Promise<void>((resolve) =>
+          reservation.listen(0, "127.0.0.1", resolve),
+        );
+        const address = reservation.address();
+        if (!address || typeof address === "string")
+          throw new Error("Missing test port.");
+        const origin = `http://127.0.0.1:${address.port}`;
+        await new Promise<void>((resolve) =>
+          reservation.close(() => resolve()),
+        );
+        const child = spawn(
+          process.execPath,
+          [
+            "--import",
+            "tsx",
+            fileURLToPath(new URL("./index.ts", import.meta.url)),
+          ],
+          {
+            env: {
+              ...process.env,
+              DATABASE_URL: target.href,
+              GETTYSBURG_SERVER_HOST: "127.0.0.1",
+              GETTYSBURG_SERVER_PORT: String(address.port),
+              GETTYSBURG_TRUSTED_ORIGIN: origin,
+              GETTYSBURG_PUSH_VAPID_FILE: file,
+              GETTYSBURG_CREDENTIAL_PEPPER: pepper.toString("base64url"),
+              GETTYSBURG_REQUIRED_DEPENDENCY: "",
+              GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE: undefined,
+            },
+            stdio: "ignore",
+          },
+        );
+        const closed = new Promise<number | null>((resolve) =>
+          child.once("exit", resolve),
+        );
+        try {
+          await vi.waitFor(
+            async () => {
+              expect((await fetch(`${origin}/readyz`)).status).toBe(200);
+            },
+            { timeout: 8_000, interval: 50 },
+          );
+          expect(
+            await (await fetch(`${origin}/api/push-config`)).json(),
+          ).toEqual({ enabled: true, applicationServerKey: vapid.publicKey });
+          child.kill("SIGTERM");
+          let exited = false;
+          void closed.then(() => {
+            exited = true;
+          });
+          await vi.waitFor(() => expect(exited).toBe(true), { timeout: 5_000 });
+          expect(await closed).toBe(0);
+        } finally {
+          if (child.exitCode === null) child.kill("SIGKILL");
+          await closed;
+        }
+      }
+    } finally {
+      await administration.query(`DROP DATABASE ${database} WITH (FORCE)`);
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 30_000);
 
   it("commits reminder intents with gameplay, rolls back both, and serializes worker claims", async () => {
     const first = new PostgresGameService({
