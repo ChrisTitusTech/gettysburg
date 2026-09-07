@@ -7,6 +7,7 @@ import type { GameService } from "./postgres-store.js";
 import { createGettysburgRoom } from "./room.js";
 
 export interface GettysburgServerOptions {
+  readonly pushPublicKey?: string;
   readonly gameService: GameService;
   readonly readiness: ReadinessState;
   readonly staticDirectory?: string;

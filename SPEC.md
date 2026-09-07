@@ -929,6 +929,16 @@ lock; provider response waiting does not block game mutations. Shutdown cancels
 the worker before database closure and leaves abandoned leases recoverable.
 Startup and browser permission wiring remain separate acceptance gates.
 
+Optional startup configuration reads `GETTYSBURG_PUSH_VAPID_FILE` as a regular,
+owner-owned 0600 file with a validated matching P-256 key pair and contact
+subject. No configured file means no background worker. Configured startup
+requires successful migrations/readiness and stops the worker before database
+closure. `GET /api/push-config` returns only capability/public-key metadata,
+never private keys or provider credentials, and does not access game storage.
+Key generation is explicit and refuses overwrite; retain the stable file in
+encrypted backups. Browser permission/service-worker wiring and real-device
+acceptance remain separate gates even when startup is configured.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
@@ -1041,6 +1051,19 @@ release requires confirmed rights or a clean-room set of original board,
 counter, and explanatory assets.
 
 ## Performance and compatibility
+
+The notification-only service worker never intercepts requests or caches game
+or session responses. It accepts bounded, schema-validated opaque game/event IDs,
+displays generic text, and opens only a constructed same-origin game route;
+normal session authorization still controls access. Stable delivery-ID tags and
+`renotify: false` coalesce retries into one existing notification card. Every
+valid push calls the display API as required by browsers; a retry after dismissal
+can reappear, so exactly-once delivery is not promised. No delivery metadata is
+cached. Registration and provider subscription require the
+separate explicit opt-in workflow. Browser behavior follows the
+[push event API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/push_event)
+and [notification click API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/notificationclick_event),
+including [WebKit's visible-notification requirement](https://webkit.org/blog/12945/meet-web-push/).
 
 - Support current stable Chrome/Chromium, Firefox, and Safari releases.
 - A board interaction should provide visual feedback within 100 ms on supported
