@@ -1924,6 +1924,11 @@ fixtures in `test-results/push-provider-transport` and its `-fixtures` directory
 Exact-head CI remains required. No runtime worker calls this module yet; no real
 push-provider request or deployed VAPID credential was used.
 
+Integration with the reviewed completion-receipt repair passes the full local
+gate (697 workspace/nine harness tests) and all 317 PostgreSQL tests. Provider
+code is unchanged from the clean 42-test independent review and desktop/tablet
+browser evidence above. This new exact head still requires CI and final threads.
+
 PR #44 second review follow-up: lease-bounded private completion receipts retain
 consent identity after decision pruning or replacement by newer reminder work.
 A matching provider-gone outcome retires only unchanged consent; stale tokens,
