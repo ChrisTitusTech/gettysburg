@@ -103,6 +103,24 @@ regressions; its focused run omitted PostgreSQL, covered by the separate run.
 Markdown and diff checks pass. The protected pre-deployment recovery set
 `20260907T175422Z` passes isolated restore and off-host checksum/decryption.
 
+The private VPS full-game run reached turn 20/v50 but exceeded the unchanged
+eight-minute bound; tablet full-game execution was not reached. Replay and
+spectator management passed both widths. Investigation found that every API
+request's readiness check still reconstructed all retired games. Its query now
+projects active games only, preserving the same version-registry check and all
+stored records. A regression verifies retired unsupported versions are excluded,
+active games remain present, and the canonical snapshot is unchanged; the
+existing unsupported-active-version test must still fail closed. No application
+or harness deadline is raised. Fresh gates, review, and actual-VPS full-game
+reruns are required for this additional repair.
+
+The readiness increment passes the full local gate (766 workspace/36 harness
+tests, all 337 PostgreSQL tests, format, lint, typecheck, build, smoke). Its
+initial new assertion incorrectly assumed no earlier active database fixtures;
+the corrected assertion verifies every active fixture and excludes the retired
+record. Fresh independent Codex review found no actionable regression and passed
+server typecheck; the engineer's separate run supplies database evidence.
+
 ### VPS rollout and acceptance blocker: 2026-09-07
 
 The owner authorized updating the VPS and acceptance checklist. Reviewed PR #55

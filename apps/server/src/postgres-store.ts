@@ -651,7 +651,11 @@ export class PostgresGameService implements GameService {
       }>(
         `SELECT
            (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2, 3)) AS count,
-           snapshot
+           jsonb_set(snapshot, '{games}', (
+             SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
+             FROM jsonb_array_elements(snapshot->'games') AS entry
+             WHERE entry->1->>'deletedAt' IS NULL
+           )) AS snapshot
          FROM service_state WHERE singleton = true`,
       );
       const row = result.rows[0];

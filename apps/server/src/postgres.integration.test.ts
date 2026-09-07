@@ -1602,6 +1602,80 @@ postgres("PostgreSQL durability", () => {
     });
   });
 
+  it("checks only active games for readiness without rewriting retained records", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const active = await service.createGame("union");
+      const retired = await service.createGame("confederate");
+      const snapshot = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      const record = snapshot.games.find(([id]) => id === retired.gameId)![1];
+      const retained = {
+        ...snapshot,
+        games: snapshot.games.map(([id, game]) => [
+          id,
+          id === retired.gameId
+            ? {
+                ...record,
+                deletedAt: Date.now(),
+                state: { ...record.state, ruleset_version: "missing-v99" },
+              }
+            : game,
+        ]),
+      };
+      await administration.query(
+        "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+        [JSON.stringify(retained)],
+      );
+      const seen: string[][] = [];
+      const original = Pool.prototype.query;
+      query = vi.spyOn(Pool.prototype, "query").mockImplementation(function (
+        this: Pool,
+        ...args: unknown[]
+      ) {
+        const result: unknown = Reflect.apply(original, this, args);
+        if (typeof args[0] === "string" && args[0].includes("AS count")) {
+          return Promise.resolve(result).then((value) => {
+            const rows = (
+              value as { rows: { snapshot: GameServiceSnapshot }[] }
+            ).rows;
+            seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+            return value;
+          });
+        }
+        return result;
+      } as Pool["query"]);
+      expect(await service.isReady()).toBe(true);
+      expect(seen).toEqual([
+        snapshot.games
+          .filter(
+            ([id, game]) => id !== retired.gameId && game.deletedAt == null,
+          )
+          .map(([id]) => id),
+      ]);
+      expect(seen[0]).toContain(active.gameId);
+      expect(seen[0]).not.toContain(retired.gameId);
+      expect(
+        (
+          await administration.query(
+            "SELECT snapshot FROM service_state WHERE singleton = true",
+          )
+        ).rows[0].snapshot,
+      ).toEqual(retained);
+    } finally {
+      query?.mockRestore();
+      await service.close();
+    }
+  });
+
   it("fails PostgreSQL readiness for an unavailable saved version pair", async () => {
     const service = new PostgresGameService({
       connectionString: connectionString!,
