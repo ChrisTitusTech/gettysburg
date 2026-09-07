@@ -2,6 +2,54 @@ import assert from "node:assert/strict";
 import { writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+export function summarizeSessionTimings(measurements) {
+  const budgets = {
+    initialInteractiveMs: 3_000,
+    reconnectMs: 5_000,
+    inputToBothPlayersMs: 500,
+  };
+  return Object.fromEntries(
+    Object.entries(budgets).map(([name, budgetMs]) => {
+      const durationMs = measurements[name];
+      assert(Number.isFinite(durationMs) && durationMs >= 0, `Invalid ${name}`);
+      return [
+        name,
+        { durationMs, budgetMs, withinBudget: durationMs <= budgetMs },
+      ];
+    }),
+  );
+}
+
+export async function recordSessionTimings(evidence, label, measurements) {
+  const timings = summarizeSessionTimings(measurements);
+  await writeFile(
+    resolve(evidence, `${label}-session-performance.json`),
+    `${JSON.stringify(
+      {
+        schemaVersion: 1,
+        timings,
+        limitations: [
+          "One sample per flow/layout; not a percentile or a capacity test.",
+          "Initial lobby load uses an empty browser context without network throttling.",
+          "Reconnect includes a reload with this context's existing asset cache.",
+          "Input-to-both-players includes automation/input/render overhead and all network latency.",
+          "These observations do not prove broadband, physical-device, or VPS acceptance.",
+        ],
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  console.log(
+    `${label}: session timings ${Object.entries(timings)
+      .map(
+        ([name, value]) =>
+          `${name}=${value.durationMs.toFixed(1)} (${value.withinBudget ? "within" : "outside"} target)`,
+      )
+      .join(", ")}`,
+  );
+}
+
 export function summarizeResponseTimes(samples) {
   assert(samples.length > 0, "At least one timing sample is required");
   assert(samples.every((sample) => Number.isFinite(sample) && sample >= 0));

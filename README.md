@@ -99,6 +99,10 @@ samples at each layout in `desktop-performance.json` and
 `tablet-performance.json`, failing the specified 100 ms feedback budget when
 exceeded. These are unthrottled test-machine measurements, not broadband-load,
 physical-device, cross-player-latency, or VPS-capacity claims.
+Companion `desktop-session-performance.json` and `tablet-session-performance.json`
+record one initial-lobby, reload/reconnect, and input-to-both-player observation
+against the 3,000/5,000/500 ms targets. They include automation/render/network
+overhead and do not establish percentiles or isolate Internet latency.
 The private source scans and Battle Manual remain local and ignored.
 
 On the board, drag any friendly counter to move its entire stack. Hold Ctrl

@@ -1917,6 +1917,20 @@ confirmation and input failures now save a sanitized failed sample and terminate
 before another measurement. Three harness regressions and a two-layout rerun
 pass in `test-results/performance-deadline` (32.0 ms p95 at both widths). Fresh
 review and final integration gates remain required.
+Also retain one observed initial-lobby interactivity, reload/reconnect, and
+input-to-both-player confirmation time per layout. Compare with the declared
+3,000/5,000/500 ms targets without claiming a percentile, typical-broadband,
+Internet-excluded command, or production-capacity result. Include automation
+and rendering overhead in these conservative observations; retain no URLs.
+These single-flow observations report target misses rather than declaring an
+entire performance gate complete. Application CI explicitly checks out the
+reviewed head; historical synthetic-merge results are not substituted.
+Integrated local gates pass 753 workspace/26 harness tests. Both layouts pass
+WCAG/consent/reconnect/replay/observer checks in `test-results/performance-session`.
+Desktop initial/reconnect/both-player observations are 63.5/234.0/120.5 ms;
+tablet observations are 62.0/353.8/238.3 ms. Zoom p95 is 32.0 ms at both widths.
+Fresh independent review found no actionable defects and reran all four
+performance regressions plus changed-script formatting.
 
 ### Accessibility audit increment
 

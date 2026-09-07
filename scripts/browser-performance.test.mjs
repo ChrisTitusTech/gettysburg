@@ -6,7 +6,22 @@ import { join } from "node:path";
 import {
   measureBoardResponse,
   summarizeResponseTimes,
+  summarizeSessionTimings,
 } from "./browser-performance.mjs";
+
+test("session observations use declared budgets without retaining extra fields", () => {
+  const result = summarizeSessionTimings({
+    initialInteractiveMs: 3_000,
+    reconnectMs: 5_001,
+    inputToBothPlayersMs: 300,
+    privateUrl: "ignored",
+  });
+  assert.equal(result.initialInteractiveMs.withinBudget, true);
+  assert.equal(result.reconnectMs.withinBudget, false);
+  assert.equal(result.inputToBothPlayersMs.budgetMs, 500);
+  assert.equal(Object.hasOwn(result, "privateUrl"), false);
+  assert.throws(() => summarizeSessionTimings({}));
+});
 
 test("response summary uses nearest-rank percentiles without mutating samples", () => {
   const samples = [110, ...Array.from({ length: 19 }, (_, index) => index + 1)];
