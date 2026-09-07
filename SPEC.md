@@ -695,6 +695,15 @@ single-column container at desktop and tablet widths. Retained-version coverage,
 measured capacity/checkpointing, and
 spectator authorization remain separate implementation/release gates.
 
+Ordinary game resume assembles current host/seat authorization, public events,
+host-only invitation metadata, and game state from one canonical service snapshot.
+Its response shape is unchanged and no authorization is cached between requests.
+Only public action events are copied into the resume response, not historical
+resulting states or private command/audit metadata. PostgreSQL performs one
+snapshot query for this response, in addition to the separate readiness gate.
+Readiness hydration and whole-service persistence costs remain performance work;
+this optimization is not a measured production capacity claim.
+
 Production runs as rootless Podman Quadlet services under the `gettysburg` user.
 Caddy is the only public application edge. The deployment target and current
 host baseline are specified in `docs/operations/VPS.md`.
