@@ -1,10 +1,8 @@
 import assert from "node:assert/strict";
 import { resolve } from "node:path";
-import { COMMAND_SCHEMA_VERSION } from "../packages/game/dist/index.js";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 
-// Issuance is API fixture setup until the separate host link-creation UI ships.
-// Claim, observation, replay, reload, and revocations use visible controls.
+// Issuance, claim, observation, replay, reload, and revocation use visible UI.
 export async function checkSpectatorManagement(
   browser,
   origin,
@@ -36,29 +34,26 @@ export async function checkSpectatorManagement(
       0,
     );
     const gameId = new URL(host.url()).pathname.split("/").at(-1);
-    const issue = () =>
-      host.evaluate(
-        async ({ gameId, schema }) => {
-          const current = await (await fetch(`/api/games/${gameId}`)).json();
-          const response = await fetch(`/api/games/${gameId}/host-commands`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              command_id: crypto.randomUUID(),
-              command_name: "issueSpectatorInvitation",
-              payload: {},
-              expected_version: current.state.version,
-              game_id: gameId,
-              schema,
-            }),
-          });
-          const result = await response.json();
-          if (!response.ok || !result.ok || !result.invitation)
-            throw new Error("Spectator fixture issuance failed");
-          return result.invitation;
-        },
-        { gameId, schema: COMMAND_SCHEMA_VERSION },
-      );
+    let previousUrl = "";
+    const issue = async () => {
+      await host.getByRole("button", { name: "Create spectator link" }).click();
+      await host.waitForFunction((previous) => {
+        const input = document.querySelector('input[value*="/observe/join/"]');
+        return input && input.value !== previous;
+      }, previousUrl);
+      previousUrl = await host
+        .getByLabel("Private spectator invitation URL")
+        .inputValue();
+      const url = new URL(previousUrl);
+      assert.equal(url.origin, origin);
+      assert.equal(url.search, "");
+      assert.match(url.pathname, /^\/observe\/join\/[0-9a-f-]{36}$/);
+      assert.match(url.hash, /^#[A-Za-z0-9_-]{43}$/);
+      return {
+        lookup_id: url.pathname.split("/").at(-1),
+        secret: url.hash.slice(1),
+      };
+    };
     const unclaimed = await issue();
     const claimed = await issue();
     const panel = host.getByRole("region", {
@@ -122,6 +117,10 @@ export async function checkSpectatorManagement(
       observer.evaluate(async (path) => (await fetch(path)).status, path);
     assert.equal(await observerStatus(`/api/games/${gameId}/spectator`), 200);
     await host.reload();
+    assert.equal(
+      await host.getByLabel("Private spectator invitation URL").count(),
+      0,
+    );
     await panel
       .getByText("Claimed; access remains revocable", { exact: false })
       .waitFor();

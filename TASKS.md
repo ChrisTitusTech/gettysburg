@@ -1795,6 +1795,44 @@ validation remain separate gates.
     contrast repair is included. Publish as a bounded PR stacked on transport,
     then verify exact-head CI and final threads before merge. Host link creation
     remains a separate PR; CodeRabbit limits are skipped as authorized.
+  - PR #40 head `b3dce87` passed Application `34102581640` and Documentation
+    `34102581605`. Integrating the separately reviewed host-link UI replaces
+    the last issuance API fixture with visible controls; claim, live updates,
+    replay, offline/reconnect, and revocation are now one browser workflow.
+    The combined local gate passes 609 workspace/nine harness tests, with the
+    prior 214 PostgreSQL tests covering unchanged backend code. Fresh review
+    found no actionable defects and reran all 124 web tests. Both widths pass
+    24 turns, all three choices, reload and exact replay in
+    `test-results/spectator-complete-ui`; desktop rendering was inspected.
+    Input fixtures pass in `test-results/spectator-complete-ui-fixtures`.
+    The reviewed delivery-pool/result-ordering repair, final integrated review,
+    and exact-head CI remain before merge.
+
+### Host spectator link creation
+
+- [ ] Add visible host creation, copying, and hiding of private spectator links.
+  - Scope: Reuse the serialized, idempotent host-command flow. Keep secrets in
+    component memory and URL fragments only; never persist them in browser
+    storage. Show a selectable URL when clipboard access is unavailable.
+    Refresh clears claimed/revoked links; hiding is explicitly not revocation.
+    Retain a successfully created link if only the metadata refresh fails.
+    The separate observer screen/transport must pass before release advertising.
+  - Validation plan: Unit tests cover creation/copy, failed-response retry keys,
+    refresh failures, claimed-link clearing, hide, clipboard denial, and stale
+    game responses. Desktop/tablet checks issue through visible host controls,
+    verify private fragment URLs, and prove reload does not recover the secret.
+    Run full local/database/browser gates, fresh independent review, exact-head
+    CI, and final thread checks. Owner: ChrisTitusTech.
+  - Initial validation: 114 web tests, typecheck, and lint pass. No game rules,
+    terrain, source assets, deployment, or migration changes are included.
+  - Validation: Full local gate passes 587 workspace/nine harness tests; the
+    prior 199 PostgreSQL tests cover unchanged server code. Independent review
+    found no actionable defects and reran 114 web tests. Desktop/tablet full
+    games, pending-result reload, replay, host-issued fragment URLs, secret
+    clearing on reload, revocations, and input fixtures pass in
+    `test-results/spectator-link-create` and its `-fixtures` directory. Desktop
+    covered retreat/loss; tablet loss/advance. Exact-head CI and final thread
+    checks remain before merge. CodeRabbit is limit-skipped as authorized.
 
 ## Phase 0 completion gate
 
