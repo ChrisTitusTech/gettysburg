@@ -6,7 +6,11 @@ import {
   type Side,
 } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
-import { InMemoryGameService, type StoredAction } from "./game-service.js";
+import {
+  canonicalHostManagementCommandHash,
+  InMemoryGameService,
+  type StoredAction,
+} from "./game-service.js";
 import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
 
 function fixture() {
@@ -103,6 +107,46 @@ describe("deterministic mandatory action replay", () => {
       summary: "union invitation revoked",
     });
     expect(() => f.replay(wrongSide)).toThrow(/invalid management event/);
+    const unavailable = structuredClone(actions);
+    const retargeted = {
+      command_id: unavailable[2]!.commandId!,
+      command_name: "revokeInvitation" as const,
+      payload: { lookup_id: f.created.invitation.lookup_id },
+      schema: COMMAND_SCHEMA_VERSION,
+      game_id: f.created.gameId,
+      expected_version: f.state().version,
+    } as const;
+    Object.assign(unavailable[2]!, {
+      payload: retargeted.payload,
+      canonicalRequestHash: canonicalHostManagementCommandHash(retargeted),
+    });
+    expect(() => f.replay(unavailable)).toThrow(/invitation was not available/);
+    const snapshot = f.service.exportSnapshot();
+    const invitations = snapshot.invitations.map(
+      ([, invitation]) => invitation,
+    );
+    for (const patch of [
+      { activeAfterSequence: 3 },
+      { revokedAtSequence: 2 },
+      { claimedAt: Date.now() },
+      { revokedAt: null },
+      { expiresAt: 0 },
+    ]) {
+      const evidence = invitations.map((invitation) =>
+        invitation.lookupId === issue.invitation!.lookup_id
+          ? { ...invitation, ...patch }
+          : invitation,
+      );
+      expect(() =>
+        replayMandatoryActions(
+          f.created.gameId,
+          actions,
+          snapshot.seatBindings,
+          undefined,
+          { hosts: snapshot.hostBindings, invitations: evidence },
+        ),
+      ).toThrow(/invitation was not available/);
+    }
     for (const patch of [
       { commandName: "deleteGame" },
       { payload: null },
