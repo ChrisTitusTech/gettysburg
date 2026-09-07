@@ -768,7 +768,10 @@ observer in one authorized snapshot read, including session expiry and deletion.
 The PostgreSQL read holds a shared canonical-row lock through the synchronous
 send callback, ordering that send before any concurrent revocation commit.
 Returning a permission result and sending later is insufficient. Initial
-snapshot delivery uses the same lock contract. Failed reads never fall back to
+snapshot delivery and room-creation existence checks use the same cancellable
+read contract. The room deadline does not impose a connection checkout timeout
+on unrelated authentication, HTTP reads, or state-changing transactions.
+Failed reads never fall back to
 cached spectator access and close affected observer sockets with retryable code
 4002, so a fresh join must reauthorize and load current state. These checks
 protect against delayed revocation notifications. Retries do not republish a
@@ -808,7 +811,8 @@ All browser host commands share a serial queue through response application,
 so spectator revocation cannot overlap a seat invitation or game deletion and
 apply an older host response afterward. Failed commands do not poison the queue.
 
-Link creation and the spectator browser interface remain separate delivery gates. A spectator
+Link creation and the spectator browser interface remain separate delivery
+gates. A spectator
 invitation cannot claim a player seat. Do not advertise usable live spectators
 until those gates and desktop/tablet acceptance pass.
 

@@ -66,9 +66,13 @@ postgres("PostgreSQL durability", () => {
     await administration.end();
   });
 
-  it.each([false, true])(
-    "orders delivery before revocation or cancels its read lock (cancel=%s)",
-    async (cancel) => {
+  it.each([
+    { cancel: false, creation: false },
+    { cancel: true, creation: false },
+    { cancel: true, creation: true },
+  ])(
+    "orders revocation with cancellable room reads (cancel=$cancel, creation=$creation)",
+    async ({ cancel, creation }) => {
       const reader = new PostgresGameService({
         connectionString: connectionString!,
         pepper,
@@ -113,12 +117,18 @@ postgres("PostgreSQL durability", () => {
           order.push("deliver");
         });
         held = holdNextDeliveryRead();
-        delivery = reader
-          .deliverAuthorizedSpectators([observerAuth], send, controller.signal)
-          .then(
-            () => undefined,
-            (error: unknown) => error,
-          );
+        delivery = (
+          creation
+            ? reader.verifyRoomGame(host.gameId, controller.signal)
+            : reader.deliverAuthorizedSpectators(
+                [observerAuth],
+                send,
+                controller.signal,
+              )
+        ).then(
+          () => undefined,
+          (error: unknown) => error,
+        );
         await held.locked;
         revoke = writer
           .executeHostCommand(authorization, {

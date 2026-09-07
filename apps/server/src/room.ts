@@ -199,8 +199,8 @@ export function createGettysburgRoom(
         );
       activeRooms.set(this.#gameId, this);
       try {
-        await withinDeliveryDeadline(() =>
-          gameService.getGameState(this.#gameId),
+        await withinDeliveryDeadline((signal) =>
+          gameService.verifyRoomGame(this.#gameId, signal),
         );
       } catch (error) {
         if (activeRooms.get(this.#gameId) === this)
