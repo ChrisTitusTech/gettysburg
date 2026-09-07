@@ -12,7 +12,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are merged through PR #40 | Final release/browser-device acceptance; no new VPS rollout yet |
-| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, and notification service worker are merged through PR #49; encrypted key-recovery wiring merged in PR #51 | Browser consent UI, Home Screen metadata/icons, actual VPS key recovery, and real provider/device acceptance |
+| Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, and encrypted key-recovery wiring are merged through PRs #49-51 | Home Screen acceptance, actual VPS key recovery, and real provider/device acceptance |
 | Phase 4 release | Original presentation approved; supplied scans remain private | Accessibility/browser/security/performance evidence, backup/restore/migration/rollback/reboot, measured VPS capacity, and approved release rollout |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
@@ -44,6 +44,7 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #47 serial worker | `3e2ac8d` | `34115202590` / `34115202638` | `695822e` |
 | #48 optional startup | `d7c0d4c` | `34117338015` / `34117337993` | `2afd7ef` |
 | #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
+| #50 browser consent UI | `f9d5efd` | `34122292052` / `34122292041` | `88f96fc` |
 | #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
 
 ## Remaining-phase execution: 2026-09-06
@@ -1892,6 +1893,14 @@ Hosted review identified the missing WCAG 2.2 tags required by SPEC.md. Add
 2.2 A/AA to the retained 2.0/2.1 baseline and a regression assertion preventing
 that omission. The two-layout WCAG 2.2 rerun finds no automated violations;
 contrast remains incomplete. This supersedes the earlier narrower tag coverage.
+After integrating the merged consent UI, the full local gate passes 752
+workspace/22 harness tests. Both 24-turn games, protected consent, reload,
+replay, spectators, and input checks pass in
+`test-results/accessibility-wcag22-consent` and its `-fixtures` directory.
+Both games exercise loss/advance; the earlier run also exercised retreat.
+Fresh independent review found no actionable regressions and reran all 159 web
+tests plus the accessibility-baseline regression. Exact-head CI is required
+after publishing this hosted-review repair.
 
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
