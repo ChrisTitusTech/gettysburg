@@ -275,8 +275,8 @@ controls.
 In progress. The owner approved original presentation and selected replay,
 private spectators, and opt-in browser push. Dependency hardening has begun.
 Private spectator transport and browser workflows are merged through PR #40.
-Push foundations through encrypted provider transport are merged through PR #46;
-worker/startup and browser opt-in wiring are not yet a completed notification
+Push foundations through the serial worker are merged through PR #47;
+startup and browser opt-in wiring are not yet a completed notification
 feature. The hardened local image has passing severity-bounded scan and browser
 evidence; this is not a new VPS deployment or release approval.
 Existing staging, backup, restore, and browser evidence do not replace the

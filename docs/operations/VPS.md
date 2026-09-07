@@ -245,7 +245,9 @@ Phase 2 should implement these steps as a reviewed script or runbook, not as
 unrecorded shell history:
 
 1. Fetch the exact reviewed revision into `/srv/gettysburg/src`.
-2. Build or pull an immutable image and record its digest.
+2. Build an immutable image, scan that exact ID, and record its digest. The
+   deployment script refuses scanner/checksum errors or HIGH/CRITICAL findings
+   before entering maintenance or changing service files.
 3. Back up PostgreSQL and persistent state before a migration.
 4. Put Caddy in maintenance mode and stop the old application so no old-ruleset
    writes can race the candidate or make rollback unsafe.
@@ -269,6 +271,8 @@ The reviewed repository entry points are:
 ```bash
 # Root: refuse a dirty checkout, build the exact HEAD, back up an existing
 # database, install rootless Quadlets, validate Caddy, and verify readiness.
+# First provision an official verified Trivy binary, then export its absolute
+# path and SHA-256 as GETTYSBURG_TRIVY_BIN and GETTYSBURG_TRIVY_SHA256.
 scripts/vps-deploy.sh
 
 # Gettysburg service account: create an age-encrypted PostgreSQL dump and
@@ -312,6 +316,26 @@ image ID, scan date, and unresolved findings in `TASKS.md`. Rebuild and rescan
 the final merged release image; a previous candidate scan does not attest to
 later source or dependency changes. This local candidate is not the deployed
 VPS image recorded above.
+
+The deployment scanner must be provisioned from an official release whose
+archive checksum/signature has been verified before extraction or execution.
+Record that provenance in `TASKS.md`; then compute the extracted binary's
+SHA-256 and provide it through `GETTYSBURG_TRIVY_SHA256`, with its absolute path
+in `GETTYSBURG_TRIVY_BIN` (default `/usr/local/bin/trivy`). The service account
+must be able to execute it. The local verified Trivy 0.74.0 binary has SHA-256
+`d89bcc6510a267f11b773398cbf1be5520ce39f9e8b6633178c4487f05b7d791`;
+do not assume another platform/release has the same binary checksum.
+
+`scripts/scan-container.sh IMAGE_ID /absolute/report.json` exports that exact
+local Podman image to a task-owned Docker archive and scans OS/library packages
+with a ten-minute limit, current database updates, and no ignore file/config or
+inherited Trivy overrides. It checks the binary checksum before executing it.
+The deploy script invokes it before its service-changing rollback trap, retains
+the JSON report, scanner version, and checksum beside rollback metadata, and
+installs the same image ID into the Quadlet without rebuilding. A failed scan
+does not stop the running application. The root deployment sequence and scanner
+provisioning still require the approved VPS rollout gate; local helper tests
+do not claim an actual remote deployment.
 
 Secrets are created
 outside Git under `/srv/gettysburg/.config/gettysburg/` with mode 0600. The

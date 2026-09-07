@@ -17,7 +17,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
     "smoke": "node scripts/smoke.mjs",
-    "test": "node --test scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
+    "test": "node --test scripts/browser-cleanup.test.mjs scripts/browser-command-pacing.test.mjs scripts/scan-container.test.mjs && pnpm --filter @gettysburg/game build && pnpm --filter @gettysburg/content build && pnpm -r test",
     "typecheck": "pnpm -r typecheck"
   },
   "devDependencies": {

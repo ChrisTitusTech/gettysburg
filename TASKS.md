@@ -1884,6 +1884,22 @@ validation remain separate gates.
 
 ### Container vulnerability closeout (release gate open)
 
+Hosted review identified that a later VPS rebuild was not covered by a local
+candidate scan. The deployment now scans its exact newly built image ID before
+maintenance, unit/secret installation, or the service-changing rollback trap.
+It requires a verified scanner binary checksum, scans OS/library HIGH/CRITICAL
+findings with fresh database updates and no ignore/config/environment overrides,
+and preserves the report/version/checksum with rollout metadata. No rebuild
+occurs between scanning and installing that immutable ID. Bash syntax,
+ShellCheck, shfmt, four controlled helper tests, and the full local gate
+(719 workspace/13 harness tests) pass. The actual helper scans image `3120b0d`
+successfully with isolated scanner configuration; report:
+`/tmp/gettysburg-scanner.K2VSLN/deploy-helper-isolated.json`. Fresh independent
+review found no actionable defects and reran the four helper/shell checks.
+Exact-head CI follows. VPS provisioning/rollout remains unattempted and
+approval-gated; no production service or secret changed.
+PLAN/ROADMAP now distinguish the merged worker from open startup/browser work.
+
 Merged worker integration passes the full gate (719 workspace/nine harness
 tests). Image `3120b0d4a36277199abd42ed06e061c72084d88c9d836f113b9a619c78965978`
 passes non-root container smoke and HIGH/CRITICAL scanning with zero findings

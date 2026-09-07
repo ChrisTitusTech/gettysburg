@@ -48,9 +48,9 @@ open; automated play does not establish agreement with the physical rules.
 Legacy tabletop saves remain resumable but lack interpreted replay. Private
 spectator claims, HTTP/replay access, host grant management, live transport,
 private host links, and the observer screen are merged through PR #40. Browser
-push targeting, protected consent, durable outbox/receipts, and provider transport
-are merged through PR #46; worker/startup and browser permission wiring remain
-separate delivery work. Phase 4 operational/release gates remain open.
+push targeting, protected consent, durable outbox/receipts, provider transport,
+and serial worker are merged through PR #47; startup and browser permission
+wiring remain separate delivery work. Phase 4 operational/release gates remain open.
 
 Phases 0 and 1 are complete: the owner selected mandatory Scenario Five scope
 and approved the original presentation for public release on 2026-09-06.

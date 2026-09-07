@@ -19,6 +19,7 @@ candidate_revision=""
 candidate_image_id=""
 candidate_exposed=false
 candidate_migration_started=false
+candidate_scan_directory=""
 previous_caddy=""
 service_uid=""
 readonly -a quadlet_files=(
@@ -178,11 +179,30 @@ if [[ -n "$(git -C "${source_root}" status --porcelain=v1 --untracked-files=all)
 fi
 
 candidate_revision="$(git -C "${source_root}" rev-parse --verify HEAD)"
+# Build and scan before installing units/secrets, entering maintenance, or
+# enabling the rollback trap (which can stop the previously running services).
+candidate_scan_directory="$(run_user mktemp -d)"
+trap 'run_user rm -rf -- "${candidate_scan_directory}"' EXIT
+run_user podman build \
+	--label "org.opencontainers.image.revision=${candidate_revision}" \
+	--tag "localhost/gettysburg:${candidate_revision}" \
+	--file "${source_root}/Containerfile" \
+	"${source_root}"
+candidate_image_id="$(run_user podman image inspect \
+	--format '{{.Id}}' "localhost/gettysburg:${candidate_revision}")"
+run_user bash "${source_root}/scripts/scan-container.sh" \
+	"${candidate_image_id}" "${candidate_scan_directory}/image-scan.json"
+
 install -d -o "${service_user}" -g "${service_user}" -m 0700 \
 	"${quadlet_root}" "${systemd_root}" "${secret_root}" "${rollback_root}"
 install -d -o "${service_user}" -g "${service_user}" -m 0755 \
 	"${readiness_root}"
 install -d -m 0700 "${rollback_root}/quadlet" "${rollback_root}/systemd"
+install -o "${service_user}" -g "${service_user}" -m 0600 \
+	"${candidate_scan_directory}/image-scan.json" \
+	"${candidate_scan_directory}/image-scan.json.scanner-version" "${rollback_root}/"
+printf '%s\n' "${GETTYSBURG_TRIVY_SHA256}" >"${rollback_root}/scanner-sha256"
+chmod 0600 "${rollback_root}/scanner-sha256"
 
 for filename in "${quadlet_files[@]}"; do
 	if [[ -f "${quadlet_root}/${filename}" ]]; then
@@ -257,14 +277,6 @@ else
 	printf 'GETTYSBURG_OFFHOST_LEDGER_WATERMARK_FILE=/run/gettysburg-readiness/offhost-ledger-watermark\n' \
 		>>"${secret_root}/app.env"
 fi
-
-run_user podman build \
-	--label "org.opencontainers.image.revision=${candidate_revision}" \
-	--tag "localhost/gettysburg:${candidate_revision}" \
-	--file "${source_root}/Containerfile" \
-	"${source_root}"
-candidate_image_id="$(run_user podman image inspect \
-	--format '{{.Id}}' "localhost/gettysburg:${candidate_revision}")"
 
 printf '%s {\n\trespond "Deployment in progress" 503\n}\n' \
 	"${public_origin#https://}" >"${maintenance_caddy}"
