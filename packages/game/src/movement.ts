@@ -133,6 +133,55 @@ export function normalMovementRoute(
     !isHexCoordinate(destination)
   )
     return null;
+  const { costs, previous } = searchMovement(
+    state,
+    side,
+    kinds,
+    edges,
+    origin,
+    Infinity,
+    destination,
+  );
+  const cost = costs.get(destination);
+  if (cost === undefined) return null;
+  const path = [destination];
+  let parent = previous.get(destination);
+  while (parent !== undefined) {
+    path.push(parent);
+    parent = previous.get(parent);
+  }
+  return { path: path.reverse(), cost };
+}
+
+/** Reachable hexes and exact costs, including the origin at zero. The caller
+ * still validates legal endpoint stacks and activation, as with routes. */
+export function normalMovementRange(
+  state: GameState,
+  side: Side,
+  kinds: readonly UnitKind[],
+  edges: MovementEdges,
+  origin: HexCoordinate,
+  budget: number,
+): ReadonlyMap<HexCoordinate, number> {
+  if (
+    kinds.length === 0 ||
+    !isHexCoordinate(origin) ||
+    !Number.isFinite(budget) ||
+    budget < 0
+  )
+    return new Map();
+  return searchMovement(state, side, kinds, edges, origin, budget).costs;
+}
+
+function searchMovement(
+  state: GameState,
+  side: Side,
+  kinds: readonly UnitKind[],
+  edges: MovementEdges,
+  origin: HexCoordinate,
+  budget: number,
+  destination?: HexCoordinate,
+) {
   const step = stepCalculator(state, side, kinds, edges);
   const costs = new Map<HexCoordinate, number>([[origin, 0]]);
   const previous = new Map<HexCoordinate, HexCoordinate>();
@@ -148,15 +197,7 @@ export function normalMovementRoute(
         cheapest = cost;
       }
     }
-    if (current === destination) {
-      const path = [destination];
-      let parent = previous.get(destination);
-      while (parent !== undefined) {
-        path.push(parent);
-        parent = previous.get(parent);
-      }
-      return { path: path.reverse(), cost: cheapest };
-    }
+    if (current === destination) break;
     frontier.delete(current);
     visited.add(current);
     for (const neighbor of adjacentHexes(current)) {
@@ -164,11 +205,11 @@ export function normalMovementRoute(
       const move = step(current, neighbor);
       if (move === null) continue;
       const cost = cheapest + move.cost;
-      if (cost >= (costs.get(neighbor) ?? Infinity)) continue;
+      if (cost > budget || cost >= (costs.get(neighbor) ?? Infinity)) continue;
       costs.set(neighbor, cost);
       previous.set(neighbor, current);
       frontier.add(neighbor);
     }
   }
-  return null;
+  return { costs, previous };
 }
