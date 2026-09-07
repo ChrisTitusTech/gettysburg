@@ -1906,6 +1906,57 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+PR #44 second review follow-up: lease-bounded private completion receipts retain
+consent identity after decision pruning or replacement by newer reminder work.
+A matching provider-gone outcome retires only unchanged consent; stale tokens,
+expired receipts, opt-out, and replacement subscriptions remain protected.
+Receipts survive canonical snapshot restart but are excluded from game/recovery
+exports. Full local gates pass 655 workspace/nine harness tests and 275 real
+PostgreSQL tests. Fresh independent review found no actionable defects and
+reran 251 server tests/typecheck. The database regression now also advances the
+recipient's decision before applying its gone outcome. Existing full-game and
+fixture evidence covers unchanged UI/protocol behavior; exact-head CI follows.
+
+PR #44 review follow-up: persisted work now carries a deterministic fingerprint
+of its originating required decisions. Pruning rejects it when the same seat
+advances to a different decision, even if that seat still has an action to take.
+Routine progress within the same decision keeps its reminder. Old optional
+outbox records without fingerprints fail closed; game saves remain resumable.
+Full local gates pass 649 workspace/nine harness tests and all 272 PostgreSQL
+tests. Fresh independent review found no actionable defects and reran 248 server
+tests. Existing desktop/tablet full-game and fixture evidence covers unchanged
+browser and room behavior; new exact-head CI must rerun the integrated gates.
+
+- [ ] Persist notification work atomically with accepted gameplay commands.
+  - Integrated closeout: full local gates pass 647 workspace/nine harness
+    tests, all 270 PostgreSQL tests pass, and fresh independent review passes
+    246 server tests without actionable findings. Subscription and transport
+    connection-reuse changes are integrated. Existing full desktop/tablet
+    outbox browser/input evidence covers unchanged UI/protocol behavior.
+    Publish a separate ready-for-review PR; exact-head CI/final threads and
+    dependency merges remain required before this increment is merged.
+  - Scope: One pending reminder per consented binding, coalesced to its newest
+    required decision; 24-hour maximum lifetime capped by consent expiry.
+    Internal delivery claims use expiring leases, bounded retries, and fresh
+    binding/session/game/consent authorization. Opt-out, recovery, completion,
+    and deletion remove pending work. No provider calls in this increment.
+  - Validation plan: Duplicate-command, rollback, restart, concurrent claim,
+    expired lease, stale acknowledgement, retry exhaustion, and retention tests;
+    complete local/database/browser gates, fresh independent review, and
+    exact-head CI before merge. Owner: ChrisTitusTech. Browser/device delivery
+    remains a separate release gate.
+
+  - Validation: Full local gates pass 647 workspace/nine harness tests, all
+    269 PostgreSQL tests, and fresh independent review with 10 focused outbox
+    tests/typechecking and no actionable findings. PostgreSQL proves atomic
+    command/outbox rollback, restart, exact-command deduplication, and competing
+    worker claims. Desktop/tablet full games cover all three choices, pending
+    reload, exact replay, and input fixtures in `test-results/push-outbox-atomic`
+    and its `-fixtures` directory. No provider requests or worker loop run yet.
+    A readonly-array fixture cast initially failed typechecking and was corrected
+    before all gates passed. Integrate the reviewed transport connection-reuse
+    fix and subscription base, then require exact-head CI/final threads.
+
 Integration evidence: PR #41 head `19ba6e8` passed Application `34102616922`
 and Documentation `34102617045`. With the reviewed transport handshake repair,
 the full local gate passes 608 workspace/nine harness tests and all 227

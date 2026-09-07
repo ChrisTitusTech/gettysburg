@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 import { Pool, type PoolClient } from "pg";
 import { DeliverySlots } from "./delivery-slots.js";
+import type { PushDeliveryOutcome } from "./push-outbox.js";
 
 import {
   InMemoryGameService,
@@ -19,6 +20,7 @@ import {
   type HostManagementCommitOptions,
   type SpectatorGrantSummary,
   type PushSubscriptionStatus,
+  type PushDelivery,
   type GameServiceSnapshot,
   type HostAuthorization,
   type HostManagementResult,
@@ -41,6 +43,12 @@ const migrationsDirectory = fileURLToPath(
 );
 
 export interface GameService {
+  claimPushDelivery(): Promise<PushDelivery | undefined>;
+  finishPushDelivery(
+    id: string,
+    leaseToken: string,
+    outcome: PushDeliveryOutcome,
+  ): Promise<void>;
   setPushSubscription(
     credential: string | undefined,
     gameId: string,
@@ -175,6 +183,16 @@ export interface GameService {
 }
 
 export class InMemoryAsyncGameService implements GameService {
+  async claimPushDelivery(): Promise<PushDelivery | undefined> {
+    return this.service.claimPushDelivery();
+  }
+  async finishPushDelivery(
+    id: string,
+    leaseToken: string,
+    outcome: PushDeliveryOutcome,
+  ): Promise<void> {
+    this.service.finishPushDelivery(id, leaseToken, outcome);
+  }
   constructor(readonly service = new InMemoryGameService()) {}
   async setPushSubscription(
     credential: string | undefined,
@@ -341,6 +359,18 @@ export class InMemoryAsyncGameService implements GameService {
 }
 
 export class PostgresGameService implements GameService {
+  async claimPushDelivery(): Promise<PushDelivery | undefined> {
+    return this.#mutate((service) => service.claimPushDelivery());
+  }
+  async finishPushDelivery(
+    id: string,
+    leaseToken: string,
+    outcome: PushDeliveryOutcome,
+  ): Promise<void> {
+    return this.#mutate((service) =>
+      service.finishPushDelivery(id, leaseToken, outcome),
+    );
+  }
   async setPushSubscription(
     credential: string | undefined,
     gameId: string,

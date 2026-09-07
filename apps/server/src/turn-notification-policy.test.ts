@@ -5,7 +5,10 @@ import {
   type PendingCombatChoice,
 } from "@gettysburg/game";
 import { describe, expect, it } from "vitest";
-import { turnNotificationIntents } from "./turn-notification-policy.js";
+import {
+  turnDecisionFingerprint,
+  turnNotificationIntents,
+} from "./turn-notification-policy.js";
 
 const initial = createMandatoryInitialState(
   "11111111-1111-4111-8111-111111111111",
@@ -38,6 +41,20 @@ const expected = (state: GameState, side = "confederate") => [
 ];
 
 describe("turn notification intents", () => {
+  it("distinguishes consecutive decisions without invalidating routine progress", () => {
+    const fingerprint = turnDecisionFingerprint(initial, "union");
+    expect(fingerprint).not.toBeNull();
+    expect(turnDecisionFingerprint(next(initial, {}), "union")).toBe(
+      fingerprint,
+    );
+    expect(
+      turnDecisionFingerprint(next(initial, { phase: "combat" }), "union"),
+    ).not.toBe(fingerprint);
+    expect(
+      turnDecisionFingerprint(next(initial, { turn: 2 }), "union"),
+    ).not.toBe(fingerprint);
+    expect(turnDecisionFingerprint(initial, "confederate")).toBeNull();
+  });
   it("targets the newly active opponent, not routine moves or the acting seat", () => {
     const after = next(initial, { turn: 2, active_side: "confederate" });
     expect(turnNotificationIntents(initial, after, "union")).toEqual(
