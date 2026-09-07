@@ -43,6 +43,58 @@ async function withServer(
 }
 
 describe("service health", () => {
+  it("exposes spectator grant metadata only to the host using one authorized read", async () => {
+    const service = new InMemoryAsyncGameService();
+    const host = await service.createGame("union");
+    const guest = await service.claimInvitation({
+      lookupId: host.invitation.lookup_id,
+      secret: host.invitation.secret,
+    });
+    const result = await service.executeHostCommand(
+      await service.authenticateHost(host.credential, host.gameId),
+      {
+        command_id: randomUUID(),
+        command_name: "issueSpectatorInvitation",
+        payload: {},
+        expected_version: 0,
+        game_id: host.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+      },
+    );
+    if (!result.ok || !result.invitation) throw new Error("Missing invitation");
+    const read = vi.spyOn(service, "getSpectatorGrants");
+    const separateAuth = vi.spyOn(service, "authenticateHost");
+    await withServer(
+      true,
+      async (origin) => {
+        const get = (credential?: string) =>
+          fetch(`${origin}/api/games/${host.gameId}/spectator-grants`, {
+            headers:
+              credential === undefined
+                ? {}
+                : { cookie: `__Host-gettysburg-session=${credential}` },
+          });
+        const response = await get(host.credential);
+        expect(response.status).toBe(200);
+        const body = (await response.json()) as {
+          grants: Record<string, unknown>[];
+        };
+        expect(body.grants).toHaveLength(1);
+        expect(Object.keys(body.grants[0]!).sort()).toEqual([
+          "invitation_expires_at",
+          "lookup_id",
+          "status",
+        ]);
+        expect(body.grants[0]!.lookup_id).toBe(result.invitation!.lookup_id);
+        expect(JSON.stringify(body)).not.toContain(result.invitation!.secret);
+        expect(read).toHaveBeenCalledOnce();
+        expect(separateAuth).not.toHaveBeenCalled();
+        expect((await get(guest.credential)).status).toBe(401);
+        expect((await get()).status).toBe(401);
+      },
+      service,
+    );
+  });
   it("bounds an exact spectator retry cookie by its original server session expiry", async () => {
     let now = Date.now();
     const clock = vi.spyOn(Date, "now").mockImplementation(() => now);

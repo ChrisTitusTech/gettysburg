@@ -753,6 +753,14 @@ no compatibility inference is made for unreleased development spectator grants.
 PostgreSQL's session mirror retains canonical observer-only sessions through
 unrelated mutations and repairs missing mirror rows on subsequent mutations.
 
+`GET /api/games/:gameId/spectator-grants` exposes host-only outstanding-grant
+metadata from one authorized snapshot read. Each entry contains only its lookup
+ID, invited/claimed status, and invitation expiry timestamp. Unclaimed expired
+and revoked grants are omitted; claimed grants remain listed after invitation
+expiry so the host can revoke them. Claimed does not imply a connected or
+currently authorized observer. No bearer secrets, session IDs, or binding IDs
+are returned. This read never renews sessions or changes state.
+
 Live room authorization, immediate socket revocation, host grant-list controls,
 and the spectator browser interface remain separate delivery gates. A spectator
 invitation cannot claim a player seat. Do not advertise usable live spectators

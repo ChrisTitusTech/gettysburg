@@ -1341,6 +1341,26 @@ validation remain separate gates.
 
 ### Phase 4
 
+- [ ] Add the host-only spectator grant-list API.
+  - Scope: One authorized snapshot read returns outstanding invitation IDs,
+    invited/claimed status, and invitation expiry, without secrets or identities.
+    Expired unclaimed and revoked grants disappear; claimed grants remain
+    revocable beyond invitation expiry. Read-only; no session renewal.
+  - Validation plan: Host/seat/observer/cross-game authorization, projection,
+    expiry/revocation/deletion, unchanged snapshots, HTTP response shape, and
+    PostgreSQL restart coverage. Run full local/database/browser gates, fresh
+    independent review, exact-head CI, and hosted thread checks before merge.
+    Host browser controls and spectator UI remain separate work. Owner:
+    ChrisTitusTech. No migration or VPS change is part of this increment.
+  - Validation: Frozen install, format, lint, typecheck, 578 workspace/nine
+    harness tests, build, smoke, Markdown, and whitespace pass. All 199 isolated
+    PostgreSQL tests pass. Desktop/tablet enforced games, pending-result reload,
+    exact replay, and input fixtures pass in `test-results/spectator-grant-list`
+    and its `-fixtures` directory; desktop exercised all three pending choices.
+    Fresh independent review found no actionable defects and reran 183 server
+    tests; its 16 PostgreSQL skips are covered above. Exact-head CI and hosted
+    thread checks remain before merge. CodeRabbit is limit-skipped as authorized.
+
 - [ ] Repair spectator authorization, session mirrors, and retry-cookie lifetime.
   - Scope: Three late PR #34 findings arrived after its separate merge check
     reported zero threads. Ordinary observer reads now require unique claimed
