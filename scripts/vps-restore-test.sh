@@ -6,6 +6,8 @@ readonly identity_file="${GETTYSBURG_BACKUP_AGE_IDENTITY_FILE:-/srv/gettysburg/.
 readonly suffix="${RANDOM}-$$"
 readonly container_name="gettysburg-restore-test-${suffix}"
 readonly volume_name="gettysburg-restore-test-${suffix}"
+script_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly script_directory
 temporary_directory=""
 
 cleanup() {
@@ -50,6 +52,26 @@ temporary_directory="$(mktemp -d)"
 readonly dump_plaintext="${temporary_directory}/gettysburg.dump"
 readonly ledger_plaintext="${temporary_directory}/deletion-ledger.json"
 readonly pepper_plaintext="${temporary_directory}/credential-pepper"
+readonly vapid_plaintext="${temporary_directory}/push-vapid.json"
+if [[ -f "${backup_directory}/push-vapid-present" ]]; then
+	vapid_present="$(<"${backup_directory}/push-vapid-present")"
+	case "${vapid_present}" in
+	1)
+		age --decrypt --identity "${identity_file}" --output "${vapid_plaintext}" \
+			"${backup_directory}/push-vapid.json.age"
+		chmod 0600 "${vapid_plaintext}"
+		node "${script_directory}/verify-vapid-backup.mjs" "${vapid_plaintext}"
+		;;
+	0) test ! -e "${backup_directory}/push-vapid.json.age" ;;
+	*)
+		printf 'Invalid push-key presence marker.\n' >&2
+		exit 1
+		;;
+	esac
+else
+	# Historical backups before push support have neither optional artifact.
+	test ! -e "${backup_directory}/push-vapid.json.age"
+fi
 age --decrypt --identity "${identity_file}" \
 	--output "${dump_plaintext}" "${dump_file}"
 age --decrypt --identity "${identity_file}" \
