@@ -32,6 +32,7 @@ import {
 import { Board } from "./Board";
 import { ReplayViewer } from "./ReplayViewer";
 import { SpectatorHostControls } from "./SpectatorHostControls";
+import { createSerialOperations } from "./serial-operations";
 import { invitationUrl, type SecretGrantFragment } from "./invitation";
 import { leaveOpenRoom } from "./room-lifecycle";
 import { TabletopControls } from "./TabletopControls";
@@ -116,6 +117,7 @@ export function App({
   const roomReference = useRef<Room | null>(null);
   const eventCursorReference = useRef<EventCursor | null>(null);
   const hostCommandIdsReference = useRef(new Map<string, string>());
+  const hostOperationsReference = useRef(createSerialOperations());
   const creationIdReference = useRef(crypto.randomUUID());
   const creationCredentialReference = useRef(createBrowserCredential());
   const invitationClaimIdReference = useRef(crypto.randomUUID());
@@ -370,7 +372,17 @@ export function App({
     };
   }, [activeGame?.game_id, activeGame?.seat, enterGame, reconnectAttempt]);
 
-  async function executeHostCommand(
+  function executeHostCommand(
+    operationKey: string,
+    commandName: Parameters<typeof sendHostCommand>[2],
+    payload: Record<string, unknown>,
+  ) {
+    return hostOperationsReference.current(() =>
+      runHostCommand(operationKey, commandName, payload),
+    );
+  }
+
+  async function runHostCommand(
     operationKey: string,
     commandName: Parameters<typeof sendHostCommand>[2],
     payload: Record<string, unknown>,

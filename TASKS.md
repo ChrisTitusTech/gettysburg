@@ -1370,6 +1370,21 @@ validation remain separate gates.
     `-fixtures` directory. Rendered tablet controls were inspected without
     clipping. Fresh independent review found no actionable regressions and
     reran all 109 web tests. Exact-head CI and hosted threads remain before merge.
+  - Hosted review found that the spectator panel's local busy state allowed
+    overlapping seat-invitation/deletion host operations and stale resume
+    responses. All application host commands now share a serial operation queue
+    through their post-command response application. Failures reject normally
+    without blocking later requested operations. Focused delayed-response and
+    failure-recovery regressions accompany this repair; full validation and
+    fresh independent review are required before publishing and resolving it.
+    Repair validation passes the full local gate (584 workspace/nine harness
+    tests), with the prior 199 PostgreSQL checks covering unchanged server
+    code. Desktop/tablet full games exercise all pending choices, reload/exact
+    replay, host grant controls, and input fixtures in
+    `test-results/spectator-host-serialization` and its `-fixtures` directory.
+    Fresh independent review found no actionable regressions and reran 111 web
+    tests. Publish the repair, resolve the hosted thread, and verify exact-head
+    CI before merge; no release or deployment gate is waived.
 
 - [x] Add the host-only spectator grant-list API.
   - Scope: One authorized snapshot read returns outstanding invitation IDs,

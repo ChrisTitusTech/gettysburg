@@ -768,6 +768,9 @@ existing audited revocation command and reuses the application's host-command
 authorization/retry flow. Races are rejected by the server and remain retryable
 through visible refresh/revoke controls. Link creation and the observer screen
 remain separate UI delivery gates; this panel never displays bearer secrets.
+All browser host commands share a serial queue through response application,
+so spectator revocation cannot overlap a seat invitation or game deletion and
+apply an older host response afterward. Failed commands do not poison the queue.
 
 Live room authorization, immediate socket revocation, link creation,
 and the spectator browser interface remain separate delivery gates. A spectator
