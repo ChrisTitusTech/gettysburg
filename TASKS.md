@@ -504,6 +504,15 @@ validation remain separate gates.
     built-in review found no actionable defects. Exact-head CI remains a
     pre-merge gate; CodeRabbit is limited and skipped per owner direction.
     No phase or deployment completion is claimed.
+    The restart test now also crosses a real seat recovery so replay must use
+    the persisted old/new binding chronology added by the verifier's follow-up.
+    The combined stack passes frozen install, format, lint, typecheck, 519
+    default tests plus six harness tests, build, smoke, Markdown lint, and all
+    155 PostgreSQL server tests. Both browser suites pass again in
+    `test-results/authorized-replay-chronology` and
+    `test-results/authorized-replay-chronology-fixtures`. Fresh independent
+    follow-up review found no actionable defects. Exact-head CI remains
+    pre-merge; old totals above record the initial API.
 - [ ] Enable mandatory new games and complete representative acceptance.
   - Scope: New games use `gettysburg-mandatory-v4` with the complete pinned
     `gettysburg-mandatory-board-v1` opening. Weighted terrain/route movement,

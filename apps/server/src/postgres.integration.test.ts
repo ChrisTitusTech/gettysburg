@@ -244,6 +244,17 @@ postgres("PostgreSQL durability", () => {
         destination: "P3",
       });
       const paid = await first.getGameState(created.gameId);
+      const recovery = await first.issueSeatRecovery(
+        created.gameId,
+        "union",
+        "test operator",
+      );
+      credentials.union = (
+        await first.claimSeatRecovery({
+          lookupId: recovery.lookup_id,
+          secret: recovery.secret,
+        })
+      ).credential;
       await act("union", "moveUnit", { unit_id: "u-devin", destination: "S3" });
       await act("union", "endPhase");
       await act("confederate", "enterReinforcement", {
@@ -284,7 +295,7 @@ postgres("PostgreSQL durability", () => {
         (await restarted.getReplay(created.credential, created.gameId, 1))
           .state,
       ).toEqual(paid);
-      expect(await restarted.getActions(created.gameId)).toHaveLength(8);
+      expect(await restarted.getActions(created.gameId)).toHaveLength(9);
     } finally {
       if (restarted) await restarted.close();
       if (!firstClosed) await first.close();

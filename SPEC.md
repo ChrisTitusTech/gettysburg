@@ -649,6 +649,8 @@ history in one service read. The no-store response contains only `state`,
 `sequence`, and `latest_sequence`; it never exposes historical bindings, recovery
 identities, invitation secrets, or raw actions. It verifies the requested prefix
 from pinned content and compares the latest prefix with the saved state.
+Seat activation/retirement sequence bounds are retained in the canonical service
+snapshot; missing chronology fails replay closed and is not inferred from time.
 Malformed/out-of-range cursors return `replay_cursor_invalid`; corrupt histories
 or requested prefixes beyond 10,000 actions return generic `replay_unavailable`.
 Only the mandatory pair currently has a registered interpreted-replay handler.
