@@ -1336,7 +1336,11 @@ function advanceAfterCombat(
     }
     if (
       state.ruleset_version === MANDATORY_RULESET_VERSION &&
-      (state.terrain === undefined ||
+      (state.terrain?.[destination] === undefined ||
+        !movers.some(
+          (unit) =>
+            unit.kind !== "general" && combat.attackers.includes(unit.id),
+        ) ||
         hexDistance(source, destination) !== 1 ||
         terrainMovementCost(
           state,
@@ -1347,7 +1351,7 @@ function advanceAfterCombat(
       return failure(
         state,
         "invalid_hex",
-        "Advance to an adjacent vacated hex that every selected counter can enter.",
+        "Advance a victorious combat counter, optionally with its general, to an adjacent vacated hex with known passable terrain.",
       );
     if (!sourceStacksRemainValid(state, movers, destination)) {
       return failure(

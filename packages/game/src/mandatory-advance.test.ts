@@ -108,6 +108,22 @@ function advance(
 }
 
 describe("mandatory artillery-safe advance", () => {
+  it("requires a victorious combat attacker, not a general-only selection", () => {
+    const current = {
+      ...state("clear", false),
+      units: { a: unit("a", "infantry"), g: unit("g", "general") },
+    };
+    expect(advance(current, ["g"]).ok).toBe(false);
+    expect(advance(current, ["a", "g"]).ok).toBe(true);
+    expect(
+      advance({ ...current, ruleset_version: RULESET_VERSION }, ["g"]).ok,
+    ).toBe(true);
+  });
+
+  it("rejects a missing destination entry even when the terrain map exists", () => {
+    expect(advance({ ...state(), terrain: {} }).ok).toBe(false);
+  });
+
   it("rejects wooded rough hills, including roads, but allows declining", () => {
     const current = {
       ...state(),
