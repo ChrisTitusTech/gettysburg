@@ -25,8 +25,8 @@ format, lint, typecheck, 584 workspace/nine harness tests, build, smoke, and
 Markdown/diff checks pass. The unchanged runtime retains PR #38's 199-test
 PostgreSQL and desktop/tablet evidence; no fresh database or browser run is
 claimed for this documentation update. Fresh independent review found no
-actionable defects; exact-head CI and final threads remain before merging the
-status reconciliation.
+actionable defects. PR #42 head `5461aaa` passed Application `34105452083` and
+Documentation `34105452277`, had no unresolved threads, and merged as `3c61850`.
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1677,6 +1677,26 @@ validation remain separate gates.
     Documentation `34104207648`, but is not merge-ready due to this repaired
     local-review finding. Publish this fix and verify fresh exact-head CI and
     final hosted threads before merge. CodeRabbit limits remain skipped.
+  - Head `d8d7b08` passed Application `34105404428` and Documentation
+    `34105404387`, but the final premerge query found a new actionable checkout
+    cancellation thread (`PRRT_kwDOT4urvs6f27VB`); no merge was performed.
+    An abortable FIFO admission queue now owns both delivery-pool slots, removing
+    abandoned queued work before pg-pool checkout. An already-started connection
+    attempt stays bounded by its timeout; if it returns after cancellation, it
+    is released healthy without a query. Unit tests cover immediate cancellation,
+    FIFO, pre-abort, and duplicate release. A PostgreSQL regression holds two
+    real delivery reads, cancels three waiters without any additional pool
+    checkout, then proves the next live request proceeds. Repeat full, database,
+    browser, independent-review, and exact-head CI gates before resolving/merging.
+    Validation passes the complete local gate after merging PR #42's status
+    reconciliation (602 workspace/nine harness tests), all 222 PostgreSQL
+    tests, and fresh independent review (201 server tests/typecheck; database
+    skips covered separately). Desktop/tablet full 24-turn games, pending-result
+    reload, exact replay, and input fixtures pass in
+    `test-results/spectator-abortable-checkout` and its `-fixtures` directory.
+    Both runs exercised loss/advance; earlier handshake runs covered retreat
+    at both widths. Publish the repair, resolve the latest checkout thread,
+    and verify exact-head CI/final threads before merge.
 - [x] Add private read-only spectator claims and revocable HTTP/replay access.
   - Scope: Separate observer bindings, exact UUID claim retries, secure cookies,
     public-only state/events, current-access replay checks, and audited host

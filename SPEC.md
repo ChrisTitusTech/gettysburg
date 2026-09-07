@@ -783,6 +783,11 @@ handshake wait, then reauthorizes and sends under the same database read lock.
 Delayed acknowledgement across session expiry or an unnotified revocation
 closes the observer without a snapshot. A pending handshake does not hold the
 room delivery queue or a database connection.
+An abortable two-slot admission queue owns delivery-pool capacity. A disconnected
+or replaced join is removed immediately before it can request a pool connection;
+live waiters retain FIFO order. At most two connection establishments can remain
+in flight, each bounded by the connect timeout. If one completes after abort,
+no query is issued and the unused healthy connection returns to the pool.
 Failed reads never fall back to
 cached spectator access and close affected observer sockets with retryable code
 4002, so a fresh join must reauthorize and load current state. These checks

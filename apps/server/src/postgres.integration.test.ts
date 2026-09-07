@@ -10,7 +10,7 @@ import { PostgresGameService } from "./postgres-store.js";
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
 
-function holdNextDeliveryRead() {
+function holdNextDeliveryRead(count = 1) {
   let release!: () => void;
   let captured!: () => void;
   const barrier = new Promise<void>((resolve) => {
@@ -19,20 +19,21 @@ function holdNextDeliveryRead() {
   const locked = new Promise<void>((resolve) => {
     captured = resolve;
   });
-  let held = false;
+  let remaining = count;
+  let lockedCount = 0;
   const original = PgClient.prototype.query;
   const spy = vi
     .spyOn(PgClient.prototype, "query")
     .mockImplementation(function (this: PgClient, ...args: unknown[]) {
       const result: unknown = Reflect.apply(original, this, args);
       if (
-        !held &&
+        remaining > 0 &&
         args[0] ===
           "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
       ) {
-        held = true;
+        remaining--;
         return Promise.resolve(result).then(async (value) => {
-          captured();
+          if (++lockedCount === count) captured();
           await barrier;
           return value;
         });
@@ -102,7 +103,8 @@ postgres("PostgreSQL durability", () => {
           .verifyRoomGame(host.gameId, controller.signal)
           .catch((error: unknown) => error),
       );
-      expect(deliveryPool!.waitingCount).toBe(3);
+      await Promise.resolve();
+      expect(deliveryPool!.waitingCount).toBe(2);
       controllers.forEach((controller) => controller.abort());
       // Ordinary reads and writes remain available even with every delivery
       // connection held and cancelled callers awaiting checkout expiry.
@@ -115,6 +117,51 @@ postgres("PostgreSQL durability", () => {
     } finally {
       capture.mockRestore();
       for (const client of clients) client.release();
+      await service.close();
+    }
+  });
+
+  it("removes cancelled room reads before they can enter the delivery pool", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let held: ReturnType<typeof holdNextDeliveryRead> | undefined;
+    let active: Promise<void>[] = [];
+    let live: Promise<void> | undefined;
+    let checkout: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      held = holdNextDeliveryRead(2);
+      active = [0, 1].map(() =>
+        service.verifyRoomGame(host.gameId, new AbortController().signal),
+      );
+      await held.locked;
+      checkout = vi.spyOn(Pool.prototype, "connect");
+      const controllers = [0, 1, 2].map(() => new AbortController());
+      const abandoned = controllers.map((controller) =>
+        service
+          .verifyRoomGame(host.gameId, controller.signal)
+          .catch((error: unknown) => error),
+      );
+      controllers.forEach((controller) => controller.abort());
+      for (const result of await Promise.all(abandoned))
+        expect(result).toBeInstanceOf(Error);
+      expect(checkout).not.toHaveBeenCalled();
+      live = service.verifyRoomGame(host.gameId, new AbortController().signal);
+      await Promise.resolve();
+      expect(checkout).not.toHaveBeenCalled();
+      held.release();
+      await Promise.all(active);
+      await live;
+      expect(checkout).toHaveBeenCalledOnce();
+    } finally {
+      held?.release();
+      await Promise.all(active);
+      await live;
+      checkout?.mockRestore();
+      held?.restore();
       await service.close();
     }
   });
