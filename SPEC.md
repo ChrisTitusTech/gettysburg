@@ -1031,6 +1031,12 @@ commit only once.
 - Secrets live outside Git in rootless service environment files with mode 0600.
 - Dependencies, container images, and migrations are reviewed before production
   deployment.
+- The application uses matching digest-pinned Node 24 Alpine build/runtime
+  stages, minimum fixed OpenSSL package versions, and no runtime Node package
+  managers. Alpine security packages come from its moving stable repository;
+  rebuilds are not bit-for-bit reproducible and need a fresh image scan.
+  Scan the final immutable application image, including OS and Node packages,
+  before release; a clean workspace dependency audit alone is insufficient.
 - Browser push dispatch pins a validated public provider address while retaining
   TLS hostname verification, rejects redirects, and bounds DNS/TLS/response
   headers by a total deadline no longer than its durable lease. Provider bodies,
@@ -1052,6 +1058,19 @@ its matching P-256 pair during isolated/off-host restore checks. No plaintext
 signing key survives off-host backup acceptance. Only the canonical application
 volume key path is supported by these scripts; missing configured keys must
 fail backup rather than silently producing an incomplete recovery set.
+
+The notification-only service worker never intercepts requests or caches game
+or session responses. It accepts bounded, schema-validated opaque game/event IDs,
+displays generic text, and opens only a constructed same-origin game route;
+normal session authorization still controls access. Stable delivery-ID tags and
+`renotify: false` coalesce retries into one existing notification card. Every
+valid push calls the display API as required by browsers; a retry after dismissal
+can reappear, so exactly-once delivery is not promised. No delivery metadata is
+cached. Registration and provider subscription require the
+separate explicit opt-in workflow. Browser behavior follows the
+[push event API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/push_event)
+and [notification click API](https://developer.mozilla.org/en-US/docs/Web/API/ServiceWorkerGlobalScope/notificationclick_event),
+including [WebKit's visible-notification requirement](https://webkit.org/blog/12945/meet-web-push/).
 
 - Support current stable Chrome/Chromium, Firefox, and Safari releases.
 - A board interaction should provide visual feedback within 100 ms on supported
