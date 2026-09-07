@@ -2019,6 +2019,18 @@ tests), independent review, and a two-CPU isolated WebKit probe (20 samples,
 `test-results/zoom-confirmation-diagnostics.json` and
 `test-results/webkit-profile-diagnostics-performance.json`. This does not
 explain away or replace the hosted failure; CI must rerun on the published head.
+The second hosted WebKit run on `32a38d5` also failed in job `101772865267`
+(`34131626489`): desktop p95 166 ms, all 20 samples above 100 ms. The first
+confirmation frame was usually 10-14 ms; the following frame added roughly
+120 ms. Local two-page, foregrounded-page, hidden-label, and hidden-board
+controls still showed similar frame scheduling delays to the original local
+probe, without reproducing the hosted magnitude. These observations do not
+identify an application renderer defect or justify removing artwork/labels.
+No such speculative change was retained. PR #55 remains blocked, not merge-ready.
+
+| Remaining performance gate | Responsible owner | Attempted result | Reason and follow-up |
+| --- | --- | --- | --- |
+| Hosted zoom budget | Engineering; ChrisTitusTech for acceptance policy | Two WebKit heads failed the unchanged 100 ms check despite passing local probes; exact failed jobs above | Continue diagnosis or explicitly approve reporting shared-CI frame timings separately from a strict, calibrated desktop-hardware release benchmark; do not silently turn off the assertion or claim Phase 4 performance acceptance |
 
 ### Browser-engine acceptance increment
 
