@@ -900,7 +900,7 @@ export function App({
             </button>
           </>
         ) : null}
-        {activeGame.seat === null ? null : (
+        {activeGame.seat === null || replayOpen ? null : (
           <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
             Surrender seat
           </button>

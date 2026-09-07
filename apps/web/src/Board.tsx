@@ -295,7 +295,7 @@ export function Board({
       const choice = combat.pending_choice;
       if (
         choice?.kind === "retreat" &&
-        choice.side === seat &&
+        (readOnly || choice.side === seat) &&
         choice.unit_ids.includes(unitId)
       ) {
         return {
@@ -316,7 +316,7 @@ export function Board({
       const choice = combat.pending_choice;
       if (
         choice?.kind === "advance" &&
-        choice.side === seat &&
+        (readOnly || choice.side === seat) &&
         choice.eligible_unit_ids.includes(unitId)
       ) {
         return {
@@ -714,7 +714,8 @@ export function Board({
     const target = event.target as Element;
     if (target.closest(".counter") !== null) return;
     if (target.closest(".advance-decline-target") !== null) return;
-    if (selectedUnitId !== null && target.closest(".hex") !== null) return;
+    if (!readOnly && selectedUnitId !== null && target.closest(".hex") !== null)
+      return;
     event.currentTarget.setPointerCapture?.(event.pointerId);
     dragStart.current = {
       clientX: event.clientX,

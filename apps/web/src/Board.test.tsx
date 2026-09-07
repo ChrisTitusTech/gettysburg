@@ -92,6 +92,106 @@ function prepareBoardPointer(
   return prepareBoardPoint(container, coordinateToPoint(coordinate));
 }
 
+it("keeps replay hexes pannable after inspecting a counter", () => {
+  const onMove = vi.fn();
+  const { container } = render(
+    <Board readOnly seat="union" state={state} onMove={onMove} />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: /Confederate fixture counter, F5, selectable/,
+    }),
+  );
+  const { svg } = prepareBoardPointer(container, "J5");
+  const before = svg.getAttribute("viewBox");
+  fireEvent.pointerDown(container.querySelector('[data-coordinate="J5"]')!, {
+    button: 0,
+    pointerId: 1,
+    clientX: 500,
+    clientY: 300,
+  });
+  fireEvent.pointerMove(svg, { pointerId: 1, clientX: 560, clientY: 330 });
+  fireEvent.pointerUp(svg, { pointerId: 1 });
+  expect(svg.getAttribute("viewBox")).not.toBe(before);
+  expect(onMove).not.toHaveBeenCalled();
+});
+
+it.each(["union", "confederate"] as const)(
+  "marks %s retreat and advance choices in read-only history",
+  (side) => {
+    const unitId = `fixture-${side}-1`;
+    const combatId = "22222222-2222-4222-8222-222222222222";
+    const recorded: GameState = {
+      ...state,
+      phase: "combat",
+      combats: {
+        [combatId]: {
+          id: combatId,
+          attackers: ["fixture-confederate-1"],
+          defenders: ["fixture-union-1"],
+          attacker_loss_allocated: true,
+          defender_loss_allocated: true,
+          attacker_retreated: false,
+          defender_retreated: false,
+          confirmation: null,
+          rolls: { attacker: 6, defender: 3 },
+          status: "pending_choice",
+          pending_choice: { kind: "retreat", side, unit_ids: [unitId] },
+        },
+      },
+    };
+    const onRetreat = vi.fn();
+    const onAdvance = vi.fn();
+    const { container, rerender } = render(
+      <Board
+        readOnly
+        seat="union"
+        state={recorded}
+        onMove={vi.fn()}
+        onRetreat={onRetreat}
+        onAdvance={onAdvance}
+      />,
+    );
+    expect(container.querySelector(`[data-unit-id="${unitId}"]`)).toHaveClass(
+      "retreat-required",
+    );
+    const advance: GameState = {
+      ...recorded,
+      combats: {
+        [combatId]: {
+          ...recorded.combats[combatId]!,
+          pending_choice: {
+            kind: "advance",
+            side,
+            eligible_unit_ids: [unitId],
+            destination_hexes: ["G5"],
+          },
+        },
+      },
+    };
+    rerender(
+      <Board
+        readOnly
+        seat="union"
+        state={advance}
+        onMove={vi.fn()}
+        onRetreat={onRetreat}
+        onAdvance={onAdvance}
+      />,
+    );
+    expect(container.querySelector(`[data-unit-id="${unitId}"]`)).toHaveClass(
+      "advance-eligible",
+    );
+    fireEvent.click(container.querySelector(`[data-unit-id="${unitId}"]`)!);
+    fireEvent.click(container.querySelector('[data-coordinate="G5"]')!);
+    expect(onRetreat).not.toHaveBeenCalled();
+    expect(onAdvance).not.toHaveBeenCalled();
+    expect(
+      container.querySelector(".advance-decline-target"),
+    ).not.toBeInTheDocument();
+  },
+);
+
 function prepareBoardPoint(
   container: HTMLElement,
   target: { readonly x: number; readonly y: number },

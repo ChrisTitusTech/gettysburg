@@ -501,6 +501,20 @@ validation remain separate gates.
     Fresh independent local Codex review found no actionable regressions and
     reran all 93 client tests. Exact-head CI and parent PR repairs remain before
     merge. CodeRabbit is skipped under the owner's limited-plan instruction.
+    Hosted review found that counter selection blocked subsequent map panning,
+    surrender remained visible during replay, and Confederate pending choices
+    lacked markers. Replay now preserves the pan surface after inspection,
+    hides surrender until returning to live play, and marks both sides' recorded
+    retreat/advance choices without enabling commands. Three component tests
+    pass (96 client tests); desktop/tablet browser coverage now checks panning
+    after inspection and surrender visibility. The full local gate passes with
+    536 workspace tests plus six harness tests and all 163 PostgreSQL tests.
+    Desktop/tablet two-session replay, panning, surrender visibility, and
+    no-contact 24-turn checks pass in `test-results/replay-viewer-interactions`;
+    isolated input fixtures pass in `test-results/replay-viewer-interactions-fixtures`.
+    Both rendered replay views were inspected. Fresh independent local review
+    found no actionable regressions and reran all 96 client tests. Exact-head CI
+    and review-thread resolution remain before merge.
 - [ ] Expose authorized replay snapshots, then finish replay delivery.
   - Scope: Add a read-only replay endpoint with a strict optional event-sequence
     cursor and current host/seat authorization checked in the same database

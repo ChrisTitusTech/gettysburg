@@ -341,6 +341,12 @@ async function runScenario(browser, origin, options) {
       name: "Read-only game replay",
     });
     await viewer.getByText(/Viewing event 0 of/).waitFor();
+    assert.equal(
+      await unionPage
+        .getByRole("button", { name: "Surrender seat", exact: true })
+        .count(),
+      0,
+    );
     await viewer
       .getByRole("button", { name: /Wadsworth, D3, selectable/ })
       .click();
@@ -348,6 +354,40 @@ async function runScenario(browser, origin, options) {
     await viewer
       .getByText("Read-only history; no commands are sent.")
       .waitFor();
+    const replayBoard = viewer.locator(".board-svg");
+    const beforePan = await replayBoard.getAttribute("viewBox");
+    await viewer.locator('[data-coordinate="J5"]').scrollIntoViewIfNeeded();
+    const panStart = await viewer
+      .locator('[data-coordinate="J5"]')
+      .boundingBox();
+    assert(panStart);
+    const start = {
+      x: panStart.x + panStart.width / 2,
+      y: panStart.y + panStart.height / 2,
+    };
+    if (options.label === "tablet") {
+      const touch = await unionPage.context().newCDPSession(unionPage);
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [start],
+      });
+      for (let step = 1; step <= 5; step++)
+        await touch.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: start.x + step * 12, y: start.y + step * 6 }],
+        });
+      await touch.send("Input.dispatchTouchEvent", {
+        type: "touchEnd",
+        touchPoints: [],
+      });
+      await touch.detach();
+    } else {
+      await unionPage.mouse.move(start.x, start.y);
+      await unionPage.mouse.down();
+      await unionPage.mouse.move(start.x + 60, start.y + 30, { steps: 5 });
+      await unionPage.mouse.up();
+    }
+    assert.notEqual(await replayBoard.getAttribute("viewBox"), beforePan);
     await viewer
       .getByRole("button", { name: "Next event", exact: true })
       .click();
@@ -380,6 +420,9 @@ async function runScenario(browser, origin, options) {
       .click();
     await waitForVersion(unionPage, liveVersion);
     await waitForVersion(confederatePage, liveVersion);
+    await unionPage
+      .getByRole("button", { name: "Surrender seat", exact: true })
+      .waitFor();
     const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;
     cleanupHostPage.once("dialog", (dialog) => dialog.accept());
     await cleanupHostPage
