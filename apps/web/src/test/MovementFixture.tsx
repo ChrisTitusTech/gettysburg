@@ -6,6 +6,7 @@ import {
   gameplayCommandSchema,
   reduceGameplayCommand,
   type GameState,
+  type GameplayCommandName,
   type HexCoordinate,
   type UnitState,
 } from "@gettysburg/game";
@@ -15,14 +16,20 @@ import { Board } from "../Board";
 import "../styles.css";
 
 export type MovementFixtureName =
-  "roads" | "woods" | "activation" | "bonus" | "continuation";
+  | "roads"
+  | "woods"
+  | "activation"
+  | "bonus"
+  | "continuation"
+  | "group"
+  | "exit";
 function initialState(name: MovementFixtureName): GameState {
   const accompanied = name === "bonus" || name === "continuation";
   const a: UnitState = {
     id: "a",
     label: "Fixture infantry",
     side: "confederate",
-    location: "F5",
+    location: name === "exit" ? "A2" : "F5",
     kind: "infantry",
     combat: 3,
     movement: 1,
@@ -61,32 +68,35 @@ function initialState(name: MovementFixtureName): GameState {
       railroads: [],
       streams: [],
     },
-    units: accompanied
-      ? {
-          a,
-          g: {
-            ...a,
-            id: "g",
-            label: "Fixture general",
-            kind: "general",
-            combat: null,
-            movement: 5,
-          },
-          ...(name === "continuation"
-            ? {
-                b: {
-                  ...a,
-                  id: "b",
-                  label: "Stationary friend",
-                  movement_spent: 0,
-                },
-              }
-            : {}),
-        }
-      : { a },
+    units:
+      accompanied || name === "group"
+        ? {
+            a,
+            g: {
+              ...a,
+              id: "g",
+              label: "Fixture general",
+              kind: "general",
+              combat: null,
+              movement: 5,
+            },
+            ...(name === "continuation" || name === "group"
+              ? {
+                  b: {
+                    ...a,
+                    id: "b",
+                    label: "Stationary friend",
+                    movement_spent: name === "group" ? 1 : 0,
+                    movement: 1,
+                  },
+                }
+              : {}),
+          }
+        : { a },
     normal_movement: {
       active_unit_ids: accompanied ? ["a", "g"] : [],
-      closed_unit_ids: name === "activation" ? ["a"] : [],
+      closed_unit_ids:
+        name === "activation" ? ["a"] : name === "group" ? ["b"] : [],
       bonus_unit_ids: accompanied ? ["a"] : [],
     },
     victory: { confederate: 0, union: 0, status: "in-progress" },
@@ -95,21 +105,17 @@ function initialState(name: MovementFixtureName): GameState {
 function MovementFixture({ name }: { readonly name: MovementFixtureName }) {
   const [state, setState] = useState(() => initialState(name));
   const [error, setError] = useState<string>();
-  function move(unitIds: readonly string[], destination: HexCoordinate) {
+  function dispatch(
+    command_name: GameplayCommandName,
+    payload: Record<string, unknown>,
+  ) {
     const command = gameplayCommandSchema.parse({
       schema: COMMAND_SCHEMA_VERSION,
       command_id: crypto.randomUUID(),
       game_id: state.game_id,
       expected_version: state.version,
-      ...(unitIds.length === 1
-        ? {
-            command_name: "moveUnit",
-            payload: { unit_id: unitIds[0], destination },
-          }
-        : {
-            command_name: "moveStack",
-            payload: { unit_ids: [...unitIds], destination },
-          }),
+      command_name,
+      payload,
     });
     const result = reduceGameplayCommand(state, "confederate", command);
     if (result.ok) {
@@ -117,16 +123,27 @@ function MovementFixture({ name }: { readonly name: MovementFixtureName }) {
       setError(undefined);
     } else setError(result.failure.message);
   }
+  function move(unitIds: readonly string[], destination: HexCoordinate) {
+    if (unitIds.length === 1)
+      dispatch("moveUnit", { unit_id: unitIds[0], destination });
+    else dispatch("moveStack", { unit_ids: [...unitIds], destination });
+  }
   return (
     <main>
       <h1>Movement test fixture - not a live game</h1>
       <output aria-label="Fixture state">
         v{state.version}:{" "}
         {Object.values(state.units)
-          .map((unit) => `${unit.id}=${unit.location}`)
+          .map((unit) => `${unit.id}=${unit.location ?? unit.status}`)
           .join(", ")}
       </output>
-      <Board state={state} seat="confederate" onMove={move} error={error} />
+      <Board
+        state={state}
+        seat="confederate"
+        onMove={move}
+        error={error}
+        onExit={(unit_ids) => dispatch("exitBoard", { unit_ids })}
+      />
     </main>
   );
 }

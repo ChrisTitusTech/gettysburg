@@ -34,8 +34,10 @@ import {
 
 import { BoardTerrain, presentationTerrain } from "./BoardTerrain";
 import { previewMandatoryMovement } from "./movement-preview";
+import { MovementControls } from "./MovementControls";
 
 interface BoardProps {
+  readonly onExit?: (unitIds: readonly string[]) => void;
   readonly onAdvance?: (
     combatId: string,
     unitIds: readonly string[],
@@ -113,6 +115,7 @@ export function Board({
   error,
   onAdvance = () => undefined,
   onMove,
+  onExit = () => undefined,
   onRetreat = () => undefined,
   seat,
   state,
@@ -120,6 +123,10 @@ export function Board({
   const mandatory = state.ruleset_version === MANDATORY_RULESET_VERSION;
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
+  const [selectedGroup, setSelectedGroup] = useState<{
+    readonly source: HexCoordinate;
+    readonly ids: readonly string[];
+  } | null>(null);
   const [singleCounterMode, setSingleCounterMode] = useState(false);
   const [zoom, setZoom] = useState(DEFAULT_ZOOM);
   const [pan, setPan] = useState<Pan>({ x: 0, y: 0 });
@@ -256,6 +263,18 @@ export function Board({
       )
     )
       return [...activeIds];
+    if (
+      mandatory &&
+      selectedGroup?.source === unit.location &&
+      selectedGroup.ids.includes(unitId) &&
+      selectedGroup.ids.every(
+        (id) =>
+          state.units[id]?.location === unit.location &&
+          state.units[id]?.status === "deployed" &&
+          state.units[id]?.side === seat,
+      )
+    )
+      return [...selectedGroup.ids];
     return deployedUnits
       .filter(
         (candidate) =>
@@ -1168,6 +1187,30 @@ export function Board({
               : "Drag a stack to move it together. Hold Ctrl or turn on One counter before dragging to move only one counter. Combat retreats, advances, and declined advances are also resolved on the board.")}
         </p>
       </aside>
+      {mandatory &&
+      selectedUnit?.location &&
+      selectedUnit.side === seat &&
+      state.phase === "movement" &&
+      state.active_side === seat ? (
+        <MovementControls
+          key={`${state.game_id}:${state.version}:${selectedUnit.location}`}
+          state={state}
+          seat={seat}
+          source={selectedUnit.location}
+          ids={selectedIds()}
+          disabled={disabled}
+          onExit={onExit}
+          onSelect={(ids) => {
+            setSelectedGroup({ source: selectedUnit.location!, ids });
+            setSelectedUnitId(ids[0]!);
+            setSelectedSingle(false);
+            setSingleCounterMode(false);
+            setMovementNotice(
+              "Group selected; no movement has been committed.",
+            );
+          }}
+        />
+      ) : null}
     </section>
   );
 }
