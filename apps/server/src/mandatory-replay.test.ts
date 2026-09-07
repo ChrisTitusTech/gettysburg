@@ -243,6 +243,20 @@ describe("deterministic mandatory action replay", () => {
     expect(() => unrelated.replay(actions)).toThrow(/recovery audit evidence/);
     const snapshot = f.service.exportSnapshot();
     const recoveries = snapshot.recoveryGrants.map(([, value]) => value);
+    const invalidBoundary = snapshot.seatBindings.map((binding) =>
+      binding.id === recoveries[0]!.oldBindingId
+        ? { ...binding, activeAfterSequence: 99 }
+        : binding,
+    );
+    expect(() =>
+      replayMandatoryActions(
+        f.created.gameId,
+        actions,
+        invalidBoundary,
+        undefined,
+        { hosts: snapshot.hostBindings, invitations: [], recoveries },
+      ),
+    ).toThrow(/binding rotation/);
     for (const patch of [
       { auditSequence: 2 },
       { operatorIdentity: "different operator" },
@@ -453,6 +467,27 @@ describe("deterministic mandatory action replay", () => {
     expect(() => f.replay(corrupt)).toThrow(
       /binding was not active at this sequence/,
     );
+  });
+
+  it("requires a surrendered seat to retire at the accepted command boundary", () => {
+    const f = fixture();
+    f.act("union", "surrenderSeat");
+    expect(f.replay()).toEqual(f.state());
+    const snapshot = f.service.exportSnapshot();
+    const actions = f.service.getActions(f.created.gameId);
+    for (const retirement of [undefined, 3]) {
+      const bindings = structuredClone(snapshot.seatBindings);
+      const actor = bindings.find(
+        (binding) => binding.id === actions[0]!.authorizingId,
+      )!;
+      if (retirement === undefined) {
+        actor.revokedAt = null;
+        Reflect.deleteProperty(actor, "inactiveFromSequence");
+      } else actor.inactiveFromSequence = retirement;
+      expect(() =>
+        replayMandatoryActions(f.created.gameId, actions, bindings),
+      ).toThrow(/surrender did not retire its binding/);
+    }
   });
 
   it("rejects duplicated operator request IDs across separate recoveries", () => {
