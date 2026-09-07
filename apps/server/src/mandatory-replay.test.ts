@@ -62,6 +62,38 @@ function fixture() {
 }
 
 describe("deterministic mandatory action replay", () => {
+  it("rejects a replacement action attributed to the surrendered binding", () => {
+    const f = fixture();
+    f.act("union", "surrenderSeat");
+    const issued = f.service.executeHostCommand(
+      f.service.authenticateHost(f.created.credential, f.created.gameId),
+      {
+        command_id: randomUUID(),
+        command_name: "issueInvitation",
+        payload: { seat: "union" },
+        schema: COMMAND_SCHEMA_VERSION,
+        game_id: f.created.gameId,
+        expected_version: f.state().version,
+      },
+    );
+    if (!issued.ok || !issued.invitation) throw new Error("Missing invitation");
+    f.credentials.union = f.service.claimInvitation({
+      lookupId: issued.invitation.lookup_id,
+      secret: issued.invitation.secret,
+    }).credential;
+    f.act("union", "moveUnit", { unit_id: "u-devin", destination: "P7" });
+    const actions = f.service.getActions(f.created.gameId);
+    expect(f.replay(actions)).toEqual(f.state());
+    const corrupt = structuredClone(actions);
+    Object.assign(corrupt.at(-1)!, {
+      authorizingId: actions[0]!.authorizingId,
+      authorizingVersion: actions[0]!.authorizingVersion,
+    });
+    expect(() => f.replay(corrupt)).toThrow(
+      /surrendered binding cannot act again/,
+    );
+  });
+
   it("rejects duplicated operator request IDs across separate recoveries", () => {
     const f = fixture();
     for (let step = 0; step < 2; step++) {
@@ -77,6 +109,9 @@ describe("deterministic mandatory action replay", () => {
     }
     const actions = f.service.getActions(f.created.gameId);
     expect(f.replay(actions)).toEqual(f.state());
+    expect(() =>
+      f.replay([{ ...actions[0]!, operatorRequestId: "invalid" }]),
+    ).toThrow(/invalid audit metadata/);
     expect(() =>
       f.replay([
         actions[0]!,
@@ -103,6 +138,36 @@ describe("deterministic mandatory action replay", () => {
       expect(() => f.replay(actions)).toThrow(/gameplay summary mismatch/);
     },
   );
+
+  it("validates management IDs and rejects events after terminal deletion", () => {
+    const f = fixture();
+    const bindings = f.service.exportSnapshot().seatBindings;
+    const result = f.service.executeHostCommand(
+      f.service.authenticateHost(f.created.credential, f.created.gameId),
+      {
+        command_id: randomUUID(),
+        command_name: "deleteGame",
+        payload: { confirm: true },
+        schema: COMMAND_SCHEMA_VERSION,
+        game_id: f.created.gameId,
+        expected_version: 0,
+      },
+    );
+    expect(result.ok).toBe(true);
+    const actions = f.service.getActions(f.created.gameId);
+    const replay = (input: readonly StoredAction[]) =>
+      replayMandatoryActions(f.created.gameId, input, bindings);
+    expect(replay(actions).event_sequence).toBe(1);
+    expect(() => replay([{ ...actions[0]!, commandId: "invalid" }])).toThrow(
+      /invalid management metadata/,
+    );
+    expect(() => replay([{ ...actions[0]!, authorizingVersion: 0 }])).toThrow(
+      /invalid authorization version/,
+    );
+    expect(() => replay([...actions, { ...actions[0]!, sequence: 2 }])).toThrow(
+      /action after game deletion/,
+    );
+  });
 
   it("replays the complete no-contact 24-turn transition sequence", () => {
     const f = fixture();
@@ -164,6 +229,17 @@ describe("deterministic mandatory action replay", () => {
     const actions = f.service.getActions(f.created.gameId);
     for (let run = 0; run < 3; run++)
       expect(f.replay(actions)).toEqual(f.state());
+    const invalidId = structuredClone(actions);
+    const idResult = invalidId.at(-1)!.result!;
+    if (!idResult.ok || !("state" in idResult))
+      throw new Error("Missing result");
+    const combat = Object.values(idResult.state.combats)[0]!;
+    Object.assign(idResult.state, {
+      combats: { invalid: { ...combat, id: "invalid" } },
+    });
+    expect(() => f.replay(invalidId)).toThrow(
+      /invalid automatic combat identifier/,
+    );
     const replayed = f.replay(actions);
     Object.assign(Object.values(replayed.combats)[0]!.rolls!, { attacker: 0 });
     expect(f.replay(actions)).toEqual(f.state());

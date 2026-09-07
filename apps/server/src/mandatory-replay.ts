@@ -23,6 +23,10 @@ export class ReplayError extends Error {
 const equal = (a: unknown, b: unknown) => canonicalize(a) === canonicalize(b);
 const sameIds = (a: readonly string[], b: readonly string[]) =>
   equal([...a].sort(), [...b].sort());
+const generatedId =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const storedCommandId =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function randomInputs(
   state: GameState,
@@ -65,6 +69,11 @@ function randomInputs(
           "missing or ambiguous skirmish dice",
         );
       const dice = matches[0]!.rolls!;
+      if (!generatedId.test(matches[0]!.id))
+        throw new ReplayError(
+          state.event_sequence + 1,
+          "invalid automatic combat identifier",
+        );
       return {
         combat_id: matches[0]!.id,
         dice: { attacker: dice.attacker, defender: dice.defender },
@@ -86,6 +95,8 @@ export function replayMandatoryActions(
   let state = createMandatoryInitialState(gameId);
   const commandIds = new Set<string>();
   const operatorRequestIds = new Set<string>();
+  const surrenderedBindings = new Set<string>();
+  let deleted = false;
   let sequence = 0;
   try {
     for (const action of actions) {
@@ -93,6 +104,12 @@ export function replayMandatoryActions(
       const assertReplay = (valid: boolean, reason: string) => {
         if (!valid) throw new ReplayError(sequence, reason);
       };
+      assertReplay(!deleted, "action after game deletion");
+      assertReplay(
+        Number.isSafeInteger(action.authorizingVersion) &&
+          action.authorizingVersion > 0,
+        "invalid authorization version",
+      );
       assertReplay(action.sequence === sequence, "sequence gap or duplicate");
       assertReplay(
         action.rulesetVersion === state.ruleset_version &&
@@ -120,7 +137,9 @@ export function replayMandatoryActions(
                 action.commandName ?? "",
               ) &&
               action.canonicalizationVersion === COMMAND_SCHEMA_VERSION &&
-              typeof action.commandId === "string",
+              typeof action.commandId === "string" &&
+              storedCommandId.test(action.commandId) &&
+              action.operatorRequestId === null,
             "invalid management metadata",
           );
           assertReplay(
@@ -128,12 +147,14 @@ export function replayMandatoryActions(
             "duplicate command identifier",
           );
           commandIds.add(action.commandId!);
+          deleted = action.commandName === "deleteGame";
         } else {
           assertReplay(
             action.authorizingType === "operator" &&
               action.commandName === null &&
               action.commandId === null &&
               typeof action.operatorRequestId === "string" &&
+              generatedId.test(action.operatorRequestId) &&
               action.canonicalizationVersion === null &&
               action.canonicalRequestHash === null,
             "invalid audit metadata",
@@ -166,6 +187,11 @@ export function replayMandatoryActions(
       assertReplay(
         actor[0]!.side === "union" || actor[0]!.side === "confederate",
         "invalid historical side",
+      );
+      const bindingKey = JSON.stringify([actor[0]!.id, actor[0]!.version]);
+      assertReplay(
+        !surrenderedBindings.has(bindingKey),
+        "surrendered binding cannot act again",
       );
       assertReplay(
         action.canonicalizationVersion === COMMAND_SCHEMA_VERSION,
@@ -213,6 +239,7 @@ export function replayMandatoryActions(
         "event metadata mismatch",
       );
       if (command.command_name === "surrenderSeat") {
+        surrenderedBindings.add(bindingKey);
         assertReplay(
           result.event.summary === `${actor[0]!.side} seat surrendered`,
           "gameplay summary mismatch",
