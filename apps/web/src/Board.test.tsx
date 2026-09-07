@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { BOARD_VIEW_BOX, coordinateToPoint } from "@gettysburg/content";
 import {
   adjacentHexes,
+  MANDATORY_RULESET_VERSION,
   type GameState,
   type HexCoordinate,
 } from "@gettysburg/game";
@@ -100,6 +101,140 @@ function prepareBoardPoint(
 }
 
 describe("Board", () => {
+  it("does not submit a drag that became disabled before release", () => {
+    const onMove = vi.fn();
+    const { container, rerender } = render(
+      <Board onMove={onMove} seat="confederate" state={state} />,
+    );
+    const point = prepareBoardPointer(container, "G5");
+    fireEvent.pointerDown(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+      { button: 0, pointerId: 1 },
+    );
+    fireEvent.pointerMove(point.svg, {
+      pointerId: 1,
+      clientX: point.clientX,
+      clientY: point.clientY,
+    });
+    rerender(
+      <Board disabled onMove={onMove} seat="confederate" state={state} />,
+    );
+    fireEvent.pointerUp(point.svg, { pointerId: 1 });
+    expect(onMove).not.toHaveBeenCalled();
+    expect(
+      screen.getByText("Waiting for the authoritative server."),
+    ).toBeInTheDocument();
+  });
+
+  it("uses half-point road costs for mandatory click movement", async () => {
+    const onMove = vi.fn();
+    const mandatory: GameState = {
+      ...state,
+      ruleset_version: MANDATORY_RULESET_VERSION,
+      terrain: {},
+      movement_edges: {
+        roads: [
+          ["F5", "F4"],
+          ["F4", "F3"],
+        ],
+        railroads: [],
+        streams: [],
+      },
+      units: {
+        ...state.units,
+        "fixture-confederate-1": {
+          ...state.units["fixture-confederate-1"]!,
+          movement_spent: 4,
+        },
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={mandatory} />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+    );
+    fireEvent.click(container.querySelector('[data-coordinate="F3"]')!);
+    expect(onMove).toHaveBeenCalledWith(["fixture-confederate-1"], "F3");
+    expect(
+      screen.getByText("Submitting 1 movement point to F3."),
+    ).toBeInTheDocument();
+  });
+
+  it("rejects mandatory clicks whose terrain cost exceeds the remaining budget", async () => {
+    const onMove = vi.fn();
+    const mandatory: GameState = {
+      ...state,
+      ruleset_version: MANDATORY_RULESET_VERSION,
+      terrain: {
+        F4: {
+          kind: "woods",
+          woods: true,
+          defense: 2,
+          hill_defense: 0,
+          forest_region: null,
+          hill_region: null,
+        },
+      },
+      movement_edges: { roads: [], railroads: [], streams: [] },
+      units: {
+        ...state.units,
+        "fixture-confederate-1": {
+          ...state.units["fixture-confederate-1"]!,
+          movement_spent: 4,
+        },
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={mandatory} />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+    );
+    fireEvent.click(container.querySelector('[data-coordinate="F4"]')!);
+    expect(onMove).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/F4 requires 2 movement; this group has 1 remaining/),
+    ).toBeInTheDocument();
+  });
+
+  it("does not let keyboard movement reopen a finished mandatory activation", () => {
+    const onMove = vi.fn();
+    const mandatory: GameState = {
+      ...state,
+      ruleset_version: MANDATORY_RULESET_VERSION,
+      terrain: {},
+      movement_edges: { roads: [], railroads: [], streams: [] },
+      normal_movement: {
+        active_unit_ids: [],
+        closed_unit_ids: ["fixture-confederate-1"],
+        bonus_unit_ids: [],
+      },
+    };
+    const { container } = render(
+      <Board onMove={onMove} seat="confederate" state={mandatory} />,
+    );
+    fireEvent.keyDown(
+      screen.getByRole("button", {
+        name: /Confederate fixture counter, F5, selectable/,
+      }),
+      { key: "Enter" },
+    );
+    fireEvent.keyDown(container.querySelector('[data-coordinate="F4"]')!, {
+      key: "Enter",
+    });
+    expect(onMove).not.toHaveBeenCalled();
+    expect(
+      screen.getByText(/That unit\/stack move has ended/),
+    ).toBeInTheDocument();
+  });
+
   it("selects only the acting seat and sends pointer move intent", async () => {
     const onMove = vi.fn();
     const { container } = render(

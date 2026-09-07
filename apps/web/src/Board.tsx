@@ -14,6 +14,8 @@ import {
   currentCombatValue,
   hexDistance,
   movementPath,
+  MANDATORY_RULESET_VERSION,
+  planNormalMove,
   shortestHexPath,
   type GameState,
   type HexCoordinate,
@@ -28,6 +30,7 @@ import {
 } from "react";
 
 import { BoardTerrain, presentationTerrain } from "./BoardTerrain";
+import { previewMandatoryMovement } from "./movement-preview";
 
 interface BoardProps {
   readonly onAdvance?: (
@@ -110,6 +113,7 @@ export function Board({
   seat,
   state,
 }: BoardProps) {
+  const mandatory = state.ruleset_version === MANDATORY_RULESET_VERSION;
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
   const [singleCounterMode, setSingleCounterMode] = useState(false);
@@ -318,11 +322,18 @@ export function Board({
       state.active_side === seat &&
       state.phase === "movement" &&
       !disabled &&
-      movementRemaining(unitId) > 0
+      (mandatory || movementRemaining(unitId) > 0)
     );
   }
 
   function movementAllowance(unitIds: readonly string[]): number {
+    if (mandatory) {
+      const movers = unitIds.flatMap((id) =>
+        state.units[id] ? [state.units[id]!] : [],
+      );
+      const plan = planNormalMove(state.normal_movement, movers);
+      return plan.ok && movers.length === unitIds.length ? plan.allowance : 0;
+    }
     return unitIds.reduce(
       (remaining, id) => Math.min(remaining, movementRemaining(id)),
       Number.POSITIVE_INFINITY,
@@ -330,7 +341,11 @@ export function Board({
   }
 
   function canMoveStack(unitIds: readonly string[]): boolean {
-    return unitIds.length > 0 && unitIds.every(canMoveUnit);
+    return (
+      unitIds.length > 0 &&
+      unitIds.every(canMoveUnit) &&
+      movementAllowance(unitIds) > 0
+    );
   }
 
   function moveSelected(target: HexCoordinate) {
@@ -366,6 +381,18 @@ export function Board({
       return;
     }
     const unitIds = selectedIds();
+    if (mandatory) {
+      const preview = previewMandatoryMovement(state, seat, unitIds, target);
+      if (!preview.ok) {
+        setMovementNotice(preview.message);
+        return;
+      }
+      setMovementNotice(
+        `Submitting ${preview.route.cost} movement point${preview.route.cost === 1 ? "" : "s"} to ${target}.`,
+      );
+      onMove(unitIds, target);
+      return;
+    }
     if (!canMoveStack(unitIds)) {
       setMovementNotice("This counter cannot move during the current phase.");
       return;
@@ -480,7 +507,7 @@ export function Board({
         ? `Retreating ${unitIds.length} stacked counter${unitIds.length === 1 ? "" : "s"} together. Drag to the first empty hex.`
         : advance !== null
           ? `Advancing ${unitIds.length === 1 ? unit.label : `${unitIds.length} stacked counters`}. Drop on a highlighted vacated hex, or in the Decline advance tray.`
-          : `Moving ${unitIds.length === 1 ? unit.label : `${unitIds.length} stacked counters`}. Drag up to ${movementAllowance(unitIds)} hexes; hold Ctrl before dragging to move only one counter.`,
+          : `Moving ${unitIds.length === 1 ? unit.label : `${unitIds.length} stacked counters`}. Drag up to ${movementAllowance(unitIds)} ${mandatory ? "movement points" : "hexes"}; hold Ctrl before dragging to move only one counter.`,
     );
     svgReference.current?.setPointerCapture?.(event.pointerId);
   }
@@ -495,12 +522,28 @@ export function Board({
     cancelUnitDrag();
     const target = drag?.path.at(-1);
     if (drag === null || target === undefined) return;
+    if (disabled) {
+      setMovementNotice("Waiting for the authoritative server.");
+      return;
+    }
     if (drag.mode === "advance" && drag.decline) {
       setMovementNotice("Submitting declined advance.");
       onAdvance(drag.combatId!, drag.unitIds, null);
       return;
     }
     if (drag.path.length <= 1) return;
+    if (mandatory && drag.mode === "movement") {
+      const preview = previewMandatoryMovement(
+        state,
+        seat,
+        drag.unitIds,
+        target,
+      );
+      if (!preview.ok) {
+        setMovementNotice(preview.message);
+        return;
+      }
+    }
     setMovementNotice(
       drag.mode === "movement"
         ? `Submitting ${drag.unitIds.length === 1 ? "counter" : "stack"} movement to ${target}.`
@@ -587,6 +630,25 @@ export function Board({
       }
       const target = pointToCoordinate(point);
       if (target === null) return;
+      if (mandatory && unitMove.mode === "movement") {
+        const preview = previewMandatoryMovement(
+          state,
+          seat,
+          unitMove.unitIds,
+          target,
+          true,
+        );
+        const path = preview.ok ? preview.route.path : [unit.location];
+        const drag = { ...unitMove, decline: false, path } satisfies UnitDrag;
+        unitDragReference.current = drag;
+        setUnitDrag(drag);
+        setMovementNotice(
+          preview.ok
+            ? `${unitMove.unitIds.length === 1 ? unit.label : `${unitMove.unitIds.length}-counter stack`}: ${preview.route.cost} of ${preview.allowance} movement points to ${path.at(-1)}.`
+            : preview.message,
+        );
+        return;
+      }
       const path =
         unitMove.mode === "retreat"
           ? retreatPath(unit.location, target, unitMove.unitIds)
@@ -654,7 +716,11 @@ export function Board({
     <section className="board-workspace" aria-labelledby="board-heading">
       <div className="board-heading-row">
         <div>
-          <p className="eyebrow">Original rules-light tabletop board</p>
+          <p className="eyebrow">
+            {mandatory
+              ? "Original mandatory-rules board"
+              : "Original rules-light tabletop board"}
+          </p>
           <h2 id="board-heading">A-W / 1-11 field</h2>
         </div>
         <div className="zoom-controls" aria-label="Board controls">
@@ -693,7 +759,7 @@ export function Board({
       <div className="board-frame">
         <svg
           ref={svgReference}
-          aria-label="Interactive rules-light hex board. Drag to pan, use the controls to zoom, and select your counter before choosing a destination."
+          aria-label={`Interactive ${mandatory ? "mandatory-rules" : "rules-light"} hex board. Drag to pan, use the controls to zoom, and select your counter before choosing a destination.`}
           className="board-svg"
           onPointerCancel={() => {
             dragStart.current = null;
