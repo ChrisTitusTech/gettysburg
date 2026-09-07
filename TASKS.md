@@ -46,6 +46,7 @@ below retain earlier evidence and pending steps, superseded by this rollup.
 | #49 notification service worker | `045ff71` | `34117882085` / `34117882065` | `2f4ad7b` |
 | #50 browser consent UI | `f9d5efd` | `34122292052` / `34122292041` | `88f96fc` |
 | #51 encrypted key recovery | `2e1e3b1` | `34120687382` / `34120687380` | `01d3dc3` |
+| #52 Home Screen metadata | `54ee652` | `34123054048` / `34123054108` | `6790e3a` |
 
 ## Remaining-phase execution: 2026-09-06
 
@@ -1901,6 +1902,12 @@ Both games exercise loss/advance; the earlier run also exercised retreat.
 Fresh independent review found no actionable regressions and reran all 159 web
 tests plus the accessibility-baseline regression. Exact-head CI is required
 after publishing this hosted-review repair.
+The subsequent Home Screen integration passes the full local gate (753
+workspace/22 harness tests), both 24-turn games with all three combat choices,
+consent/replay/observer checks, and input fixtures in
+`test-results/accessibility-home-screen` and its `-fixtures` directory. Fresh
+independent review is clean and reran the baseline assertion and 38 focused web
+tests. PR #52 is merged; real Home Screen installation remains manual.
 
 Pin axe-core Playwright 4.13.0 and run WCAG 2 A/AA and 2.1 A/AA checks against
 the lobby, both live player views, and inspected replay at desktop and tablet
