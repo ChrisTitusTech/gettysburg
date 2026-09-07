@@ -56,6 +56,33 @@ export interface ReplayResponse {
   readonly latest_sequence: number;
 }
 
+export type SpectatorResponse = Pick<
+  SessionResponse,
+  "game_id" | "state" | "action_log"
+>;
+export function claimSpectatorInvitation(
+  lookupId: string,
+  secret: string,
+  claimId: string,
+): Promise<SpectatorResponse> {
+  return jsonRequest(
+    `/api/spectator-invitations/${encodeURIComponent(lookupId)}/claim`,
+    {
+      method: "POST",
+      body: JSON.stringify({ claim_id: claimId, secret }),
+    },
+  );
+}
+export function resumeSpectator(
+  gameId: string,
+  signal?: AbortSignal,
+): Promise<SpectatorResponse> {
+  return jsonRequest(
+    `/api/games/${encodeURIComponent(gameId)}/spectator`,
+    signal === undefined ? undefined : { signal },
+  );
+}
+
 export function getReplay(
   gameId: string,
   sequence?: number,

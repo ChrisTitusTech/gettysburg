@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 import { COMMAND_SCHEMA_VERSION } from "../packages/game/dist/index.js";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 
-// Issuance and claim are API fixture setup until the separate observer UI ships.
-// Listing, refresh, reload, and both revocations use visible host controls.
+// Issuance is API fixture setup until the separate host link-creation UI ships.
+// Claim, observation, replay, reload, and revocations use visible controls.
 export async function checkSpectatorManagement(
   browser,
   origin,
@@ -68,21 +68,56 @@ export async function checkSpectatorManagement(
       .getByRole("button", { name: "Refresh spectator grants" })
       .click();
     await panel.getByText(unclaimed.lookup_id, { exact: true }).waitFor();
-    await observer.goto(origin);
-    await observer.evaluate(async (invitation) => {
-      const response = await fetch(
-        `/api/spectator-invitations/${invitation.lookup_id}/claim`,
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            claim_id: crypto.randomUUID(),
-            secret: invitation.secret,
-          }),
-        },
-      );
-      if (!response.ok) throw new Error("Spectator fixture claim failed");
-    }, claimed);
+    await observer.goto(
+      `${origin}/observe/join/${claimed.lookup_id}#${claimed.secret}`,
+    );
+    await observer
+      .getByRole("button", { name: "Claim spectator access" })
+      .waitFor();
+    assert.equal(new URL(observer.url()).hash, "");
+    await observer
+      .getByRole("button", { name: "Claim spectator access" })
+      .click();
+    await observer.getByText("connected", { exact: true }).waitFor();
+    await observer.context().setOffline(true);
+    await observer.getByText("disconnected", { exact: true }).waitFor();
+    assert.equal(await observer.getByLabel(/^Read-only live board/).count(), 0);
+    await observer.context().setOffline(false);
+    await observer.getByRole("button", { name: "Reconnect spectator" }).click();
+    await observer.getByText("connected", { exact: true }).waitFor();
+    await observer.getByLabel(/^Read-only live board/).waitFor();
+    assert.equal(
+      await observer.getByRole("region", { name: "Game lifecycle" }).count(),
+      0,
+    );
+    await observer.reload();
+    await observer.getByText("connected", { exact: true }).waitFor();
+    await observer
+      .getByRole("button", { name: /Wadsworth, D3, selectable/ })
+      .click();
+    await observer
+      .getByText("Read-only live board; no commands are sent.")
+      .waitFor();
+    await host
+      .getByRole("button", { name: "End movement phase", exact: true })
+      .click();
+    await observer.getByText(/State v1\. Event 3\./).waitFor();
+    await observer
+      .getByRole("button", { name: "View replay", exact: true })
+      .click();
+    await observer
+      .getByRole("region", { name: "Read-only game replay" })
+      .waitFor();
+    await observer
+      .getByRole("button", { name: "Latest event", exact: true })
+      .click();
+    await observer
+      .getByRole("button", { name: "Return to live observation" })
+      .click();
+    await observer.screenshot({
+      path: resolve(evidence, `${options.label}-live-observer.png`),
+      fullPage: true,
+    });
     const observerStatus = (path) =>
       observer.evaluate(async (path) => (await fetch(path)).status, path);
     assert.equal(await observerStatus(`/api/games/${gameId}/spectator`), 200);
@@ -109,6 +144,11 @@ export async function checkSpectatorManagement(
       })
       .click();
     await panel.getByText("No outstanding spectator grants.").waitFor();
+    await observer
+      .getByRole("alert")
+      .filter({ hasText: "Spectator access ended" })
+      .waitFor();
+    assert.equal(await observer.getByLabel(/^Read-only live board/).count(), 0);
     assert.equal(await observerStatus(`/api/games/${gameId}/spectator`), 401);
     assert.equal(await observerStatus(`/api/games/${gameId}/replay`), 401);
     const saved = await host.evaluate(async (gameId) => {
@@ -116,12 +156,13 @@ export async function checkSpectatorManagement(
       if (!response.ok) throw new Error("Host read-back failed");
       return response.json();
     }, gameId);
-    assert.equal(saved.state.version, 0);
+    assert.equal(saved.state.version, 1);
     assert.deepEqual(
       saved.action_log.map((event) => event.command_name),
       [
         "issueSpectatorInvitation",
         "issueSpectatorInvitation",
+        "endPhase",
         "revokeSpectatorInvitation",
         "revokeSpectatorAccess",
       ],

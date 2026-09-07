@@ -816,6 +816,22 @@ gates. A spectator
 invitation cannot claim a player seat. Do not advertise usable live spectators
 until those gates and desktop/tablet acceptance pass.
 
+### Observer browser
+
+The private observer route is separate from the player lobby and never changes
+the saved player-game preference. `/observe/join/:lookupId#secret` consumes and
+removes the secret fragment before rendering. Claim retries reuse one request
+UUID; successful claims replace that route with `/observe/game/:gameId`, which
+can be bookmarked and reloaded using the existing secure browser session.
+
+The screen explicitly requests the spectator room role. It exposes pan, zoom,
+counter inspection, public scores/actions, and read-only replay, but no gameplay
+or host command controls. Snapshot/event chronology never moves backward;
+detected gaps trigger a fresh authorized HTTP read. Disconnect, revocation,
+deletion, or failed current-access verification clears the board and replay.
+An explicit reconnect repeats authorization and loads the latest state. Private
+link creation remains a separate host UI gate until implemented and verified.
+
 ### Core records
 
 The precise schema is a Phase 1 deliverable, but it must represent:
