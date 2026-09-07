@@ -6,9 +6,12 @@ import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 // Browser permission/provider APIs are controlled; consent routes and seat
 // authorization are real. Run only with delivery disabled, never real providers.
 export async function checkPushConsent(browser, origin, evidence, options) {
-  const response = await fetch(`${origin}/api/push-config`, {
-    signal: AbortSignal.timeout(15_000),
-  });
+  const response = await fetch(
+    `${options.configOrigin ?? origin}/api/push-config`,
+    {
+      signal: AbortSignal.timeout(15_000),
+    },
+  );
   assert.equal(response.status, 200, "Push configuration must be available");
   const config = await response.json();
   if (config.enabled === true) {
@@ -22,8 +25,14 @@ export async function checkPushConsent(browser, origin, evidence, options) {
     false,
     "Synthetic consent fixture requires disabled provider delivery",
   );
-  const hostContext = await browser.newContext({ viewport: options.viewport });
-  const guestContext = await browser.newContext({ viewport: options.viewport });
+  const hostContext = await browser.newContext({
+    ...options.contextOptions,
+    viewport: options.viewport,
+  });
+  const guestContext = await browser.newContext({
+    ...options.contextOptions,
+    viewport: options.viewport,
+  });
   try {
     for (const context of [hostContext, guestContext]) {
       const keys = createECDH("prime256v1");

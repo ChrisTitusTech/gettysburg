@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 
 // Checks served metadata, not an OS install or real push-provider enrollment.
-export async function checkHomeScreen(browser, origin) {
-  const context = await browser.newContext();
+export async function checkHomeScreen(browser, origin, contextOptions = {}) {
+  const context = await browser.newContext(contextOptions);
   try {
     const page = await context.newPage();
     await page.goto(origin);

@@ -1924,6 +1924,43 @@ browser code. Exact-head Application, Documentation, Firefox, and WebKit CI
 must all pass before merge. No native Safari/iPad or live provider result is
 claimed; WebKit's local missing-library failure remains recorded.
 
+Hosted WebKit run `34123315585` failed on reconnect with 401 responses because
+its plain-HTTP loopback fixture did not retain the production Secure cookie.
+Keep Secure cookies unchanged; local WebKit now uses a task-owned, loopback-only
+HTTPS proxy with an ephemeral OpenSSL certificate. Browser certificate exceptions
+apply only to that fixture, never a configured external origin. Protected HTTP
+headers, request bodies, cookie attributes, WebSocket upgrades, and cleanup have
+regression coverage. Readiness and the separate Chromium notification-worker
+fixture use the loopback backend; consent writes still use the HTTPS browser.
+No global TLS verification or system trust configuration is weakened.
+
+The installed Playwright 1.62.1 Ubuntu container provides WebKit 26.5 without
+installing missing workstation libraries. Its first HTTPS run passed reconnect
+but exposed the SDK's caught Node-only WebSocket constructor probe and
+Playwright's screenshot-only empty stylesheet probe. Pin a reviewed pnpm patch
+for SDK 0.17.43 to select the valid browser constructor directly, retaining the
+Node fallback; a browser regression requires exactly one valid call. Screenshot
+checks classify only WebKit's exact known CSP diagnostic during capture, with
+scope/engine/message/cleanup regression coverage. The production CSP remains
+unchanged; application errors and CSP failures outside capture still fail.
+The patched dependency is included in frozen installs and container builds.
+Rerun full local gates, all three full-game engines, PostgreSQL, input fixtures,
+independent review, and all exact-head CI jobs before merge. Actual Safari/iPad,
+screen-reader, provider, and VPS acceptance remain open.
+The repaired WebKit 26.5 run passes both full 24-turn games, consent, reconnect,
+exact replay, spectators, and durable cleanup in `test-results/webkit-https-fixed`.
+Desktop covers all three combat choices; tablet-width keyboard/mouse covers
+loss/advance. The tablet rendering was visually inspected. Firefox 153.0 and
+Chromium 151.0 reruns also pass both full games with all three choices at both
+widths in `test-results/firefox-transport-fixed` and
+`test-results/chromium-transport-fixed`. Chromium additionally exercises the
+HTTPS fixture and real tablet touch. All 329 PostgreSQL tests pass after the SDK
+patch. The task-owned WebKit container was stopped and removed after validation.
+Full local gates pass 755 workspace/24 harness tests, and Chromium input fixtures
+pass in `test-results/transport-fixed-fixtures`. Fresh independent review found
+no actionable regressions and reran five focused regression tests. Exact-head
+CI still must replace the failed WebKit run before this increment can merge.
+
 ### Container vulnerability closeout (release gate open)
 
 Integrated startup and notification-worker code from merged PRs #48/#49 passes
