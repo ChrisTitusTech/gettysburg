@@ -39,6 +39,9 @@ describe("read-only replay viewer", () => {
       <ReplayViewer gameId={gameId} latestSequence={2} load={load} />,
     );
     await screen.findByText(/Viewing event 0 of 2/);
+    expect(
+      screen.getByRole("group", { name: "Replay navigation" }),
+    ).toBeVisible();
     await user.click(
       screen.getByRole("button", { name: /Wadsworth, D3, selectable/ }),
     );

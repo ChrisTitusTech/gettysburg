@@ -49,8 +49,10 @@ Legacy tabletop saves remain resumable but lack interpreted replay. Private
 spectator claims, HTTP/replay access, host grant management, live transport,
 private host links, and the observer screen are merged through PR #40. Browser
 push targeting, protected consent, durable dispatch, optional startup, and the
-notification service worker are merged through PR #49; browser permission UI,
-key backup/restore, and device acceptance remain separate delivery work.
+notification service worker are merged through PR #49; encrypted key-recovery
+wiring is merged in PR #51; browser permission UI is merged in PR #50.
+Home Screen acceptance, actual
+key restore on the VPS, and device acceptance remain separate delivery work.
 Phase 4 operational/release gates remain open.
 
 Phases 0 and 1 are complete: the owner selected mandatory Scenario Five scope
