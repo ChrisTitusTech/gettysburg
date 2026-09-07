@@ -1046,6 +1046,13 @@ counter, and explanatory assets.
 
 ## Performance and compatibility
 
+The VPS backup contract encrypts a persistent push signing key separately from
+the database and credential pepper, records whether it was present, and verifies
+its matching P-256 pair during isolated/off-host restore checks. No plaintext
+signing key survives off-host backup acceptance. Only the canonical application
+volume key path is supported by these scripts; missing configured keys must
+fail backup rather than silently producing an incomplete recovery set.
+
 - Support current stable Chrome/Chromium, Firefox, and Safari releases.
 - A board interaction should provide visual feedback within 100 ms on supported
   desktop hardware; accepted network commands should normally appear to both

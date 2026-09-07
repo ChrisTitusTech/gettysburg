@@ -4,6 +4,8 @@ set -Eeuo pipefail
 readonly ssh_host="${GETTYSBURG_SSH_HOST:-gettysburg}"
 readonly configured_backup_root="${GETTYSBURG_OFFHOST_BACKUP_ROOT:-${XDG_STATE_HOME:-${HOME}/.local/state}/gettysburg/offhost-backups}"
 readonly identity_file="${GETTYSBURG_BACKUP_AGE_IDENTITY_FILE:-${HOME}/.config/gettysburg/backup-age-identity}"
+script_directory="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly script_directory
 multiplex_directory=""
 staging_directory=""
 
@@ -103,6 +105,26 @@ scp -q -r -o "ControlPath=${control_path}" \
 	sha256sum --check --strict SHA256SUMS
 )
 readonly ledger_plaintext="${staging_directory}/deletion-ledger.json"
+readonly vapid_plaintext="${staging_directory}/push-vapid.json"
+if [[ -f "${staging_directory}/push-vapid-present" ]]; then
+	vapid_present="$(<"${staging_directory}/push-vapid-present")"
+	case "${vapid_present}" in
+	1)
+		age --decrypt --identity "${identity_file}" --output "${vapid_plaintext}" \
+			"${staging_directory}/push-vapid.json.age"
+		chmod 0600 "${vapid_plaintext}"
+		node "${script_directory}/verify-vapid-backup.mjs" "${vapid_plaintext}"
+		rm -- "${vapid_plaintext}"
+		;;
+	0) test ! -e "${staging_directory}/push-vapid.json.age" ;;
+	*)
+		printf 'Invalid push-key presence marker.\n' >&2
+		exit 1
+		;;
+	esac
+else
+	test ! -e "${staging_directory}/push-vapid.json.age"
+fi
 age --decrypt --identity "${identity_file}" \
 	--output "${ledger_plaintext}" \
 	"${staging_directory}/deletion-ledger.json.age"

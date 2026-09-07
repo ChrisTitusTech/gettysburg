@@ -391,8 +391,24 @@ new file only and never prints private key material or overwrites existing keys.
 It was validated against a temporary protected file; no VPS key was generated.
 Set `GETTYSBURG_PUSH_VAPID_FILE=/var/lib/gettysburg/push-vapid.json` in the protected
 application environment only after the browser opt-in/service-worker gates and
-encrypted on/off-host key-backup/restore coverage are ready. The current backup
-automation has not yet been extended for this new file. Keep that gate open.
+encrypted on/off-host key-backup/restore coverage are ready. Backup automation
+now encrypts the canonical volume file as `push-vapid.json.age`, even if push
+is currently disabled. It records a checksum-covered `push-vapid-present` marker
+and refuses a missing configured key, symlink, unsafe permissions, or a configured
+path outside `/var/lib/gettysburg/push-vapid.json`. Arbitrary application loader
+paths are not supported by this VPS backup contract.
+
+The isolated restore test and off-host copy decrypt the optional key only into
+protected temporary storage and validate its owner-only permissions, canonical
+contact, and matching P-256 pair without printing private material. Off-host
+verification removes plaintext before atomically accepting the directory and
+acknowledging the deletion watermark. Historical backups without a key/marker
+remain readable; do not use those to recover a push-enabled installation while
+claiming existing subscriptions remain valid. Recover the matching encrypted
+key to the canonical volume path with application ownership and mode 0600,
+then validate configured startup before exposing the service. Actual VPS/off-host
+restore and enablement remain owner-gated; local controlled tests do not close
+that operational acceptance gate.
 
 Restarting with the same file preserves the public key. Missing or invalid
 configured files fail startup; omitting the variable disables the worker. Do not

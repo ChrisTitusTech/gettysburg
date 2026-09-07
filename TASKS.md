@@ -2010,6 +2010,19 @@ threads are required before merge; this foundation still sends no notifications.
 
 ### Browser push foundation
 
+Encrypted push-key backup is the next operations increment. Back up the canonical
+volume key with age plus a checksum-covered presence marker, fail if a configured
+key is absent/noncanonical/unsafe, and validate its protected matching P-256
+configuration in isolated and off-host restore checks. Keep plaintext only in
+protected temporary storage and remove it before accepting an off-host copy.
+Five local tests exercise the actual backup script with controlled container/UID
+boundaries and real age encryption/decryption, unchanged-byte recovery, malformed
+keys, disabled push, missing keys, symlinks, and partial-backup cleanup. Shell
+syntax/ShellCheck/shfmt and lint pass after replacing an errexit-bypassing `!`
+check with explicit failure. CI installs age for these tests. Full local gates,
+independent review, and exact-head CI remain. Actual VPS/on-off-host recovery and
+push enablement remain unattempted owner gates; no remote data or keys changed.
+
 Optional push startup configuration is the next small increment. An explicit
 `GETTYSBURG_PUSH_VAPID_FILE` enables the worker only after migrations/readiness;
 without it, push stays disabled. The loader requires an owned regular 0600 file,
