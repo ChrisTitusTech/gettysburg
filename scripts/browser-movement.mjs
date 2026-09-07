@@ -159,6 +159,48 @@ try {
       await fixture("continuation");
       await selectTarget("F3");
       await state().filter({ hasText: "v1: a=F3, g=F3, b=F5" }).waitFor();
+
+      async function retreat(kind) {
+        await page.goto(origin);
+        await page.evaluate(async (selected) => {
+          const { mountRetreatFixture } =
+            await import("/src/test/RetreatFixture.tsx");
+          mountRetreatFixture(selected);
+        }, kind);
+        await page
+          .getByRole("heading", {
+            name: "Retreat test fixture - not a live game",
+          })
+          .waitFor();
+      }
+      async function choose(label) {
+        const button = page.getByRole("button", { name: label, exact: true });
+        if (hasTouch) await button.tap();
+        else await button.press("Enter");
+      }
+      await retreat("chain");
+      await choose("Next F4");
+      await choose("Next F3");
+      assert.equal(await state().innerText(), "v0: a=F5, steps=2");
+      await page
+        .getByRole("region", { name: "Retreat from F5" })
+        .screenshot({ path: resolve(evidence, `${name}-retreat-route.png`) });
+      await choose("Confirm retreat to F3");
+      await state().filter({ hasText: "v1: a=F3, steps=2" }).waitFor();
+
+      await retreat("trapped");
+      await page
+        .getByRole("combobox", { name: "Extra loss at F5" })
+        .selectOption("a");
+      await choose("Confirm one extra loss and hold");
+      await state().filter({ hasText: "v1: a=F5, steps=1" }).waitFor();
+
+      await retreat("edge");
+      await page
+        .getByRole("region", { name: "Retreat from A2" })
+        .screenshot({ path: resolve(evidence, `${name}-retreat-edge.png`) });
+      await choose("Confirm permanent retreat off board");
+      await state().filter({ hasText: "v1: a=exited, steps=2" }).waitFor();
       assert.deepEqual(issues, []);
     } finally {
       await context.close();
@@ -170,7 +212,7 @@ try {
     "The browser deadline must not expire",
   );
   console.log(
-    `Mandatory movement mouse/keyboard/touch checks passed: ${evidence}`,
+    `Mandatory movement/retreat mouse/keyboard/touch checks passed: ${evidence}`,
   );
 } finally {
   clearTimeout(timeout);

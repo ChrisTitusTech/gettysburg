@@ -397,6 +397,38 @@ summary {
   gap: 0.5rem;
 }
 
+.mandatory-retreat {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 1rem 0;
+}
+
+.mandatory-retreat p {
+  max-width: 70ch;
+  margin: 0;
+}
+
+.mandatory-retreat > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mandatory-retreat select {
+  min-height: 44px;
+  padding: 0.55rem;
+  border: 1px solid #81765f;
+  color: #f8f1e4;
+  background: #0f1711;
+}
+
+.mandatory-retreat output {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: #f1ca76;
+}
+
 .check-field input {
   min-height: auto;
 }

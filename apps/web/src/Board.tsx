@@ -16,6 +16,9 @@ import {
   movementPath,
   MANDATORY_RULESET_VERSION,
   planNormalMove,
+  prepareForcedRetreat,
+  suggestedRetreat,
+  validateRetreatPath,
   shortestHexPath,
   type GameState,
   type HexCoordinate,
@@ -371,10 +374,25 @@ export function Board({
     if (retreat !== null) {
       const path = retreatPath(selectedUnit.location, target, retreat.unitIds);
       if (path.length <= 1) {
-        setMovementNotice("Choose a connected path to the first empty hex.");
+        setMovementNotice(
+          mandatory
+            ? "Use the retreat controls to choose legal steps, an edge exit, or a trapped loss."
+            : "Choose a connected path to the first empty hex.",
+        );
         return;
       }
       const destination = path.at(-1)!;
+      if (
+        mandatory &&
+        !prepareForcedRetreat(
+          state,
+          seat,
+          retreat.combatId,
+          retreat.unitIds,
+          path,
+        ).ok
+      )
+        return;
       setMovementNotice(
         `Submitting ${retreat.unitIds.length}-counter retreat to ${destination}.`,
       );
@@ -545,6 +563,19 @@ export function Board({
       return;
     }
     if (drag.path.length <= 1) return;
+    if (mandatory && drag.mode === "retreat") {
+      const preview = prepareForcedRetreat(
+        state,
+        seat,
+        drag.combatId!,
+        drag.unitIds,
+        drag.path,
+      );
+      if (!preview.ok) {
+        setMovementNotice(preview.message);
+        return;
+      }
+    }
     if (mandatory && drag.mode === "movement") {
       const preview = previewMandatoryMovement(
         state,
@@ -578,6 +609,16 @@ export function Board({
     target: HexCoordinate,
     unitIds: readonly string[],
   ): readonly HexCoordinate[] {
+    if (mandatory) {
+      const direct = [source, target];
+      if (validateRetreatPath(state, unitIds, direct)) return direct;
+      const suggested = suggestedRetreat(state, unitIds);
+      return suggested !== null &&
+        !suggested.exit &&
+        suggested.path.at(-1) === target
+        ? suggested.path
+        : [source];
+    }
     const moving = new Set(unitIds);
     const frontier: HexCoordinate[] = [source];
     const previous = new Map<HexCoordinate, HexCoordinate | null>([
