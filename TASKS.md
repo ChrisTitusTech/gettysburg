@@ -1953,6 +1953,30 @@ The corrected Firefox 153 run passes both layouts too. Evidence directories are
 desktop/tablet p95 values are 31.7/31.7 ms Chromium, 49.0/35.0 ms WebKit, and
 15.0/15.0 ms Firefox. All six single-flow session observations are within their
 declared targets. This remains local evidence, not physical-device/VPS acceptance.
+The shared live-audit/surrender readiness repairs pass all local gates (755
+workspace/30 harness tests) and both Chromium layouts in
+`test-results/performance-controls-ready`. Fresh independent review is clean
+and reran five focused tests; the earlier four-test performance review was also
+clean. Application runtime code is unchanged by these fixture repairs.
+
+Local candidate image
+`d894f236995ec57a97895331141b69f40f90c406085ca8da417a721bc0a8fa21`
+was built from `f195e526afbeb6983639e584a36c3a0cb883b4de`; subsequent changes
+are fixture/documentation integration, not application runtime changes. The
+verified Trivy 0.74.0 binary refreshed its database and found no HIGH/CRITICAL
+issues across 18 Alpine and 361 Node packages. Raw evidence is retained in
+`/tmp/gettysburg-scanner.K2VSLN/browser-performance-image.json`. That exact image
+passed both full 24-turn Chromium games, WCAG checks, protected consent, reload,
+exact replay, spectators, and performance observations in
+`test-results/candidate-image-browser`. Tablet covers all three combat choices;
+desktop covers loss/retreat. The isolated container ran as UID 1000 with a
+read-only root filesystem, dropped capabilities, and the explicit Quadlet
+readiness command; PostgreSQL readiness and clean exit were verified. Its
+temporary application/database containers, state volume, and network were
+removed, preserving the image and evidence. This is not VPS deployment,
+backup/restore/reboot acceptance, or a public capacity claim. The OCI build's
+ignored embedded HEALTHCHECK warning is addressed by the explicitly configured
+runtime health command, as in the deployed Quadlet.
 
 ### Browser-engine acceptance increment
 
