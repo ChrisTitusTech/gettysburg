@@ -1974,6 +1974,13 @@ workspace/25 harness tests. Independent review caught a whitespace-only final
 patch context line; remove it and refresh the pnpm patch hash without changing
 patched runtime code. Frozen install, all local gates, event-range whitespace,
 and a fresh five-test independent review pass. No actionable findings remain.
+Hosted review subsequently found default pull-request checkout was testing the
+synthetic merge rather than the reviewed head. Pin both browser and Application
+checkout to the explicit PR head SHA, matching Documentation's existing policy;
+push events use their own SHA. Rerun exact-head CI before resolving that thread
+and merging. Earlier CI associations are not proof of an exact-head checkout.
+The workflow-only repair passes all local gates (755 workspace/25 harness
+tests) and fresh independent review; the validated browser runtime is unchanged.
 
 ### Accessibility audit increment
 
