@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@colyseus/core": "0.17.42",
+    "@colyseus/core": "0.18.10",
     "@colyseus/ws-transport": "0.17.13",
     "@gettysburg/content": "workspace:*",
     "@gettysburg/game": "workspace:*",
