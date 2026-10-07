@@ -6,6 +6,12 @@ export interface CreationAdmission {
   status(): "available" | "busy" | "unavailable";
 }
 
+export class CreationAdmissionError extends Error {
+  constructor(readonly capacity: "busy" | "unavailable") {
+    super("Game creation admission denied");
+  }
+}
+
 interface ResourceSample {
   readonly cpuTotal: number;
   readonly cpuIdle: number;
@@ -50,6 +56,7 @@ export class HostCreationAdmission implements CreationAdmission {
   #previous: ResourceSample | undefined;
   #status: ReturnType<CreationAdmission["status"]> = "unavailable";
   #sampledAt = -Infinity;
+  #diagnostic: string | undefined;
 
   constructor(
     private readonly readSample = () =>
@@ -58,7 +65,15 @@ export class HostCreationAdmission implements CreationAdmission {
         readFileSync("/proc/meminfo", "utf8"),
       ),
     private readonly now = () => performance.now(),
+    private readonly report = (message: string) =>
+      console.error(`Game creation capacity: ${message}`),
   ) {}
+
+  #reportUnavailable(reason: string): void {
+    if (this.#diagnostic === reason) return;
+    this.#diagnostic = reason;
+    this.report(reason);
+  }
 
   sample(): void {
     try {
@@ -71,19 +86,32 @@ export class HostCreationAdmission implements CreationAdmission {
       // Require two valid samples, including after a counter reset or failure.
       if (!previous || total <= 0 || idle < 0 || idle > total) {
         this.#status = "unavailable";
+        if (previous)
+          this.#reportUnavailable("host CPU counters stopped or reset");
         return;
       }
       const cpuUsed = (total - idle) / total;
       this.#status =
         cpuUsed >= 0.9 || current.memoryUsed >= 0.9 ? "busy" : "available";
+      if (this.#diagnostic !== undefined) {
+        this.#diagnostic = undefined;
+        this.report("host telemetry recovered");
+      }
     } catch {
       this.#previous = undefined;
       this.#status = "unavailable";
+      this.#reportUnavailable("host telemetry read or parse failed");
     }
   }
 
   status(): ReturnType<CreationAdmission["status"]> {
-    return this.now() - this.#sampledAt > 5_000 ? "unavailable" : this.#status;
+    if (this.now() - this.#sampledAt > 5_000) {
+      // Keep a more specific read/parse failure instead of alternating messages.
+      if (this.#diagnostic === undefined)
+        this.#reportUnavailable("host telemetry is stale");
+      return "unavailable";
+    }
+    return this.#status;
   }
 }
 

@@ -1071,7 +1071,11 @@ commit only once.
   creation resumes automatically. Unavailable or over-five-second-old telemetry
   returns `503 creation_capacity_unavailable`, not a fabricated utilization.
   The production entry point starts the sampler before listening and stops it
-  during shutdown. This is admission protection, not a capacity certification;
+  during shutdown. Admission runs under the database mutation lock immediately
+  before a genuinely new creation; authenticated retries of committed creations
+  bypass it. Telemetry failure/recovery is logged once per diagnostic transition
+  without raw counters, paths, or exception contents.
+  This is admission protection, not a capacity certification;
   disk utilization, cgroup limits, and workload forecasting are not measured.
 - Invitation attempts, general HTTP endpoints, replay, push, and WebSocket
   message volume retain their independent abuse limits, including on creation

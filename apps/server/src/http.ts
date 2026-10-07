@@ -15,7 +15,10 @@ import express, {
 import { ServiceError, type ServiceErrorCode } from "./game-service.js";
 import { publicActionLog } from "./public-action-log.js";
 import { isCanonicalCredential } from "./credentials.js";
-import type { CreationAdmission } from "./creation-admission.js";
+import {
+  CreationAdmissionError,
+  type CreationAdmission,
+} from "./creation-admission.js";
 import type { GameEventBus } from "./event-bus.js";
 import {
   InMemoryAsyncGameService,
@@ -383,22 +386,6 @@ export function configureHttpApplication(
         typeof suppliedCreationId === "string"
           ? suppliedCreationId
           : randomUUID();
-      const admission = options.creationAdmission?.status() ?? "available";
-      if (admission !== "available") {
-        response.setHeader("Retry-After", "5");
-        response.status(admission === "busy" ? 429 : 503).json({
-          error:
-            admission === "busy"
-              ? "creation_capacity_exceeded"
-              : "creation_capacity_unavailable",
-          message:
-            admission === "busy"
-              ? "The server is busy (90% CPU or memory usage). Please try hosting again shortly."
-              : "Server capacity is being checked. Please try hosting again shortly.",
-        });
-        return;
-      }
-
       const result = await gameService.createGame(
         seat,
         readSessionCredential(request),
@@ -406,6 +393,11 @@ export function configureHttpApplication(
         typeof suppliedCreationCredential === "string"
           ? suppliedCreationCredential
           : undefined,
+        () => {
+          const admission = options.creationAdmission?.status() ?? "available";
+          if (admission !== "available")
+            throw new CreationAdmissionError(admission);
+        },
       );
       setSessionCookie(response, result.credential, result.sessionExpiresAt);
       response.status(201).json({
@@ -775,6 +767,20 @@ export function configureHttpApplication(
       next: NextFunction,
     ) => {
       void next;
+      if (error instanceof CreationAdmissionError) {
+        response.setHeader("Retry-After", "5");
+        response.status(error.capacity === "busy" ? 429 : 503).json({
+          error:
+            error.capacity === "busy"
+              ? "creation_capacity_exceeded"
+              : "creation_capacity_unavailable",
+          message:
+            error.capacity === "busy"
+              ? "The server is busy (90% CPU or memory usage). Please try hosting again shortly."
+              : "Server capacity is being checked. Please try hosting again shortly.",
+        });
+        return;
+      }
       if (error instanceof ServiceError) {
         response.status(errorStatus(error.code)).json({
           error: error.code,

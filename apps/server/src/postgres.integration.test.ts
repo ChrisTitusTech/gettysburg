@@ -13,6 +13,7 @@ import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
+import { CreationAdmissionError } from "./creation-admission.js";
 import {
   InMemoryGameService,
   type GameServiceSnapshot,
@@ -110,6 +111,75 @@ postgres("PostgreSQL durability", () => {
 
   afterAll(async () => {
     await administration.end();
+  });
+
+  it("rechecks creation capacity after queued database work and still recovers committed retries", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    await service.migrate();
+    const originalId = randomUUID();
+    const credential = randomBytes(32).toString("base64url");
+    const original = await service.createGame(
+      "union",
+      undefined,
+      originalId,
+      credential,
+    );
+    const blocker = await administration.connect();
+    let busy = false;
+    const gate = vi.fn(() => {
+      if (busy) throw new CreationAdmissionError("busy");
+    });
+    try {
+      await blocker.query("BEGIN");
+      await blocker.query(
+        "SELECT snapshot FROM service_state WHERE singleton=true FOR UPDATE",
+      );
+      const pending = service.createGame(
+        "union",
+        undefined,
+        randomUUID(),
+        randomBytes(32).toString("base64url"),
+        gate,
+      );
+      // Attach rejection handling before releasing the writer lock.
+      const outcome = pending.then(
+        () => "created",
+        (error: unknown) => error,
+      );
+      const deadline = Date.now() + 5_000;
+      let waiting = false;
+      while (!waiting && Date.now() < deadline) {
+        const rows = await administration.query(
+          "SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%FOR UPDATE%' AND pid <> pg_backend_pid()",
+        );
+        waiting = rows.rowCount !== 0;
+        if (!waiting) await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      expect(waiting).toBe(true);
+      expect(gate).not.toHaveBeenCalled();
+      busy = true;
+      await blocker.query("ROLLBACK");
+      expect(await outcome).toBeInstanceOf(CreationAdmissionError);
+      expect(gate).toHaveBeenCalledOnce();
+      expect(
+        await service.createGame(
+          "union",
+          undefined,
+          originalId,
+          credential,
+          gate,
+        ),
+      ).toEqual(original);
+      expect(gate).toHaveBeenCalledOnce();
+      expect((await service.getActions(original.gameId)).length).toBe(0);
+    } finally {
+      await blocker.query("ROLLBACK");
+      blocker.release();
+      await service.close();
+    }
   });
 
   it("migrates populated legacy snapshots without losing histories, credentials, or retries", async () => {

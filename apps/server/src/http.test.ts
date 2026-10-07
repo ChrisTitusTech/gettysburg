@@ -472,7 +472,8 @@ describe("HTTP game lifecycle", () => {
                 ? "creation_capacity_exceeded"
                 : "creation_capacity_unavailable",
           });
-          expect(create).not.toHaveBeenCalled();
+          expect(create).toHaveBeenCalledOnce();
+          expect(service.service.exportSnapshot().games).toHaveLength(1);
           const saved = await fetch(`${origin}/api/games/${existing.gameId}`, {
             headers: {
               cookie: `__Host-gettysburg-session=${existing.credential}`,
@@ -484,7 +485,51 @@ describe("HTTP game lifecycle", () => {
           const accepted = await fetch(`${origin}/api/games`, request);
           expect(accepted.status).toBe(201);
           await accepted.arrayBuffer();
-          expect(create).toHaveBeenCalledOnce();
+          expect(create).toHaveBeenCalledTimes(2);
+          expect(service.service.exportSnapshot().games).toHaveLength(2);
+        },
+        service,
+        { status: () => status },
+      );
+    },
+  );
+
+  it.each(["busy", "unavailable"] as const)(
+    "recovers a committed creation response while capacity is %s",
+    async (pressure) => {
+      const service = new InMemoryAsyncGameService();
+      let status: ReturnType<CreationAdmission["status"]> = "available";
+      await withServer(
+        true,
+        async (origin) => {
+          const input = {
+            seat: "union",
+            creation_id: randomUUID(),
+            creation_credential: randomBytes(32).toString("base64url"),
+          };
+          const post = (body = input) =>
+            fetch(`${origin}/api/games`, {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify(body),
+            });
+          const initial = await post();
+          expect(initial.status).toBe(201);
+          const saved = await initial.json();
+          status = pressure;
+          const retry = await post();
+          expect(retry.status).toBe(201);
+          expect(await retry.json()).toEqual(saved);
+          const forged = await post({
+            ...input,
+            creation_credential: randomBytes(32).toString("base64url"),
+          });
+          expect(forged.status).toBe(401);
+          await forged.arrayBuffer();
+          const another = await post({ ...input, creation_id: randomUUID() });
+          expect(another.status).toBe(pressure === "busy" ? 429 : 503);
+          await another.arrayBuffer();
+          expect(service.service.exportSnapshot().games).toHaveLength(1);
         },
         service,
         { status: () => status },
