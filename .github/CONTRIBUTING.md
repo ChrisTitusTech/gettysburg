@@ -24,6 +24,16 @@ Follow the README's database, browser, and container checks when changing those
 boundaries. Report skipped checks and failures. Do not deploy to the VPS as part
 of a contribution.
 
+## Patched dependency maintenance
+
+`@colyseus/sdk` has a version-specific browser WebSocket patch recorded in
+`pnpm-workspace.yaml`. Routine version bumps require a maintainer to port or
+remove the patch, regenerate the lockfile, and run the documented browser gates.
+Dependabot skips only routine SemVer upgrades for this package; security updates
+and vulnerability alerts remain enabled. Address an SDK advisory promptly even
+when its automated update needs manual patch work. Other dependencies continue
+to receive automated version updates.
+
 ## Secrets, privacy, and assets
 
 Use synthetic test data and sanitized configuration examples. Never commit
