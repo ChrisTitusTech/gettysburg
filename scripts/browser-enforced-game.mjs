@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { expect } from "@playwright/test";
 import { deleteAcceptanceGame } from "./browser-cleanup.mjs";
 import { createCommandPacer } from "./browser-command-pacing.mjs";
+import { observeAdmissionDiagnostics } from "./browser-admission.mjs";
 import {
   captureScreenshot,
   isScreenshotDiagnostic,
@@ -31,9 +32,11 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
   }, 480_000);
   const issues = [];
   for (const page of Object.values(pages)) {
+    const admissionDiagnostic = observeAdmissionDiagnostics(page);
     page.on("pageerror", (error) => issues.push(error.message));
     page.on("console", (message) => {
-      if (isScreenshotDiagnostic(page, message)) return;
+      if (isScreenshotDiagnostic(page, message) || admissionDiagnostic(message))
+        return;
       if (["error", "warning"].includes(message.type()))
         issues.push(`${message.type()}: ${message.text()}`);
     });

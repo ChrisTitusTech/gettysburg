@@ -13,6 +13,10 @@ import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { PostgresGameService } from "./postgres-store.js";
+import {
+  InMemoryGameService,
+  type GameServiceSnapshot,
+} from "./game-service.js";
 
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
@@ -35,8 +39,8 @@ function holdNextDeliveryRead(count = 1) {
       const result: unknown = Reflect.apply(original, this, args);
       if (
         remaining > 0 &&
-        args[0] ===
-          "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
+        typeof args[0] === "string" &&
+        args[0].endsWith("FROM service_state WHERE singleton = true FOR SHARE")
       ) {
         remaining--;
         return Promise.resolve(result).then(async (value) => {
@@ -436,6 +440,197 @@ postgres("PostgreSQL durability", () => {
       expect(connections.size).toBe(2);
     } finally {
       query?.mockRestore();
+      await service.close();
+    }
+  });
+
+  it("preserves retired games and other active consent during projected gameplay writes", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await service.migrate();
+      const active = await service.createGame("union");
+      const other = await service.createGame("union");
+      const retired = await service.createGame("union");
+      const retiredAuthorization = await service.authenticate(
+        retired.credential,
+        retired.gameId,
+      );
+      const key = createECDH("prime256v1");
+      key.generateKeys();
+      await service.setPushSubscription(other.credential, other.gameId, {
+        endpoint: "https://fcm.googleapis.com/fcm/send/projected-write-test",
+        expirationTime: null,
+        keys: {
+          p256dh: key.getPublicKey().toString("base64url"),
+          auth: randomBytes(16).toString("base64url"),
+        },
+      });
+      expect(
+        (
+          await service.executeHostCommand(
+            await service.authenticateHost(retired.credential, retired.gameId),
+            {
+              command_id: randomUUID(),
+              command_name: "deleteGame",
+              expected_version: 0,
+              game_id: retired.gameId,
+              payload: { confirm: true },
+              schema: COMMAND_SCHEMA_VERSION,
+            },
+          )
+        ).ok,
+      ).toBe(true);
+      const before = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      const command = {
+        command_id: randomUUID(),
+        command_name: "moveStack",
+        expected_version: 0,
+        game_id: active.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+        payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+      };
+      const authorization = await service.authenticate(
+        active.credential,
+        active.gameId,
+      );
+      const accepted = await service.executeCommand(authorization, command);
+      expect(accepted.ok).toBe(true);
+      expect(await service.executeCommand(authorization, command)).toEqual(
+        accepted,
+      );
+      const after = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      expect(after.games.map(([id]) => id)).toEqual(
+        before.games.map(([id]) => id),
+      );
+      expect(after.games.filter(([id]) => id !== active.gameId)).toEqual(
+        before.games.filter(([id]) => id !== active.gameId),
+      );
+      expect(after.deletionLedger).toEqual(before.deletionLedger);
+      expect(
+        await service.getPushSubscriptionStatus(other.credential, other.gameId),
+      ).toMatchObject({ enabled: true });
+      const retiredCommand = {
+        ...command,
+        command_id: randomUUID(),
+        game_id: retired.gameId,
+      };
+      await expect(
+        service.executeCommand(retiredAuthorization, retiredCommand),
+      ).rejects.toMatchObject({ code: "unauthorized" });
+      expect(() =>
+        new InMemoryGameService({ snapshot: after, pepper }).executeCommand(
+          retiredAuthorization,
+          retiredCommand,
+        ),
+      ).toThrow("Seat binding is no longer active.");
+      const mirrored = (
+        await administration.query("SELECT state FROM games WHERE id = $1", [
+          active.gameId,
+        ])
+      ).rows[0].state;
+      expect(mirrored).toEqual(await service.getGameState(active.gameId));
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("projects only the requested game for reads without changing retained data", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    let poolQuery: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      const other = await service.createGame("confederate");
+      const originalSnapshot = (
+        await administration.query(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0].snapshot;
+      const seen: string[][] = [];
+      const originalPoolQuery = Pool.prototype.query;
+      poolQuery = vi
+        .spyOn(Pool.prototype, "query")
+        .mockImplementation(function (this: Pool, ...args: unknown[]) {
+          const result: unknown = Reflect.apply(originalPoolQuery, this, args);
+          if (
+            typeof args[0] === "string" &&
+            args[0].startsWith("SELECT jsonb_set(snapshot")
+          ) {
+            return Promise.resolve(result).then((value) => {
+              const rows = (
+                value as { rows: { snapshot: GameServiceSnapshot }[] }
+              ).rows;
+              seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+              return value;
+            });
+          }
+          return result;
+        } as Pool["query"]);
+      const original = PgClient.prototype.query;
+      query = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          const result: unknown = Reflect.apply(original, this, args);
+          if (
+            typeof args[0] === "string" &&
+            args[0].startsWith("SELECT jsonb_set(snapshot")
+          ) {
+            return Promise.resolve(result).then((value) => {
+              const rows = (
+                value as { rows: { snapshot: GameServiceSnapshot }[] }
+              ).rows;
+              seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+              return value;
+            });
+          }
+          return result;
+        } as PgClient["query"]);
+      const authorization = await service.authenticate(
+        host.credential,
+        host.gameId,
+      );
+      await service.verifyRoomGame(host.gameId, new AbortController().signal);
+      await service.deliverAuthorizedState(
+        authorization,
+        (state) => {
+          expect(state.game_id).toBe(host.gameId);
+        },
+        new AbortController().signal,
+      );
+      expect(
+        (await service.getGameView(host.credential, host.gameId)).state.game_id,
+      ).toBe(host.gameId);
+      await expect(
+        service.authenticate(other.credential, host.gameId),
+      ).rejects.toMatchObject({ code: "unauthorized" });
+      expect(seen).toHaveLength(5);
+      for (const ids of seen) expect(ids).toEqual([host.gameId]);
+      await service.getDeletionLedger();
+      expect(seen.at(-1)).toEqual([]);
+      const after = (
+        await administration.query(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0].snapshot;
+      expect(after).toEqual(originalSnapshot);
+    } finally {
+      query?.mockRestore();
+      poolQuery?.mockRestore();
       await service.close();
     }
   });
@@ -919,9 +1114,8 @@ postgres("PostgreSQL durability", () => {
           state: created.state,
         });
         expect(query).toHaveBeenCalledTimes(1);
-        expect(query.mock.calls[0]![0]).toBe(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
-        );
+        expect(query.mock.calls[0]![0]).toContain("SELECT jsonb_set(snapshot");
+        expect(query.mock.calls[0]![1]).toEqual([[created.gameId]]);
       } finally {
         query.mockRestore();
       }
@@ -1510,6 +1704,80 @@ postgres("PostgreSQL durability", () => {
       ledger_count: "2",
       related_count: "0",
     });
+  });
+
+  it("checks only active games for readiness without rewriting retained records", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const active = await service.createGame("union");
+      const retired = await service.createGame("confederate");
+      const snapshot = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          "SELECT snapshot FROM service_state WHERE singleton = true",
+        )
+      ).rows[0]!.snapshot;
+      const record = snapshot.games.find(([id]) => id === retired.gameId)![1];
+      const retained = {
+        ...snapshot,
+        games: snapshot.games.map(([id, game]) => [
+          id,
+          id === retired.gameId
+            ? {
+                ...record,
+                deletedAt: Date.now(),
+                state: { ...record.state, ruleset_version: "missing-v99" },
+              }
+            : game,
+        ]),
+      };
+      await administration.query(
+        "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+        [JSON.stringify(retained)],
+      );
+      const seen: string[][] = [];
+      const original = Pool.prototype.query;
+      query = vi.spyOn(Pool.prototype, "query").mockImplementation(function (
+        this: Pool,
+        ...args: unknown[]
+      ) {
+        const result: unknown = Reflect.apply(original, this, args);
+        if (typeof args[0] === "string" && args[0].includes("AS count")) {
+          return Promise.resolve(result).then((value) => {
+            const rows = (
+              value as { rows: { snapshot: GameServiceSnapshot }[] }
+            ).rows;
+            seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+            return value;
+          });
+        }
+        return result;
+      } as Pool["query"]);
+      expect(await service.isReady()).toBe(true);
+      expect(seen).toEqual([
+        snapshot.games
+          .filter(
+            ([id, game]) => id !== retired.gameId && game.deletedAt == null,
+          )
+          .map(([id]) => id),
+      ]);
+      expect(seen[0]).toContain(active.gameId);
+      expect(seen[0]).not.toContain(retired.gameId);
+      expect(
+        (
+          await administration.query(
+            "SELECT snapshot FROM service_state WHERE singleton = true",
+          )
+        ).rows[0].snapshot,
+      ).toEqual(retained);
+    } finally {
+      query?.mockRestore();
+      await service.close();
+    }
   });
 
   it("fails PostgreSQL readiness for an unavailable saved version pair", async () => {
