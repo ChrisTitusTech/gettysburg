@@ -704,6 +704,10 @@ function gameVersionHandler(state: GameState): GameVersionHandler | undefined {
   return handler?.accepts?.(state) === false ? undefined : handler;
 }
 
+export function isSavedGameVersionAvailable(state: GameState): boolean {
+  return gameVersionHandler(state) !== undefined;
+}
+
 function canonicalCommand(command: {
   readonly command_name: string;
   readonly payload: unknown;
@@ -1126,7 +1130,7 @@ export class InMemoryGameService {
   isVersionRegistryReady(): boolean {
     return [...this.#games.values()].every(
       (game) =>
-        game.deletedAt !== null || gameVersionHandler(game.state) !== undefined,
+        game.deletedAt !== null || isSavedGameVersionAvailable(game.state),
     );
   }
 

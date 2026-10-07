@@ -28,7 +28,31 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Current repair rollout: 2026-09-07
+## Current deployment and pending persistence repair: 2026-10-06
+
+Merged `cabb03c` is deployed as immutable image
+`536b97fc0ac5625c9b3171cdd42e30273e11af6fc67b693bb9ab57b59e165558`.
+The clean VPS checkout is on `main`. Encrypted final backup `20261007T025516Z`
+passed isolated restore and off-host verification. Protected rollout evidence is
+`/home/titus/.local/state/gettysburg/acceptance/20261006-rollout`; rollback files
+are in `/srv/gettysburg/backups/deploy-20261007T023541Z`.
+Public input latency remains unacceptable at 5.36-5.87 seconds despite healthy
+containers and readiness. Engineering is repairing shared JSON persistence.
+Push remains disabled; no host upgrade or reboot was performed.
+
+The owner authorized purging all existing development games after verified
+encrypted backup, then deploying the reviewed performance repair. Migration
+004 stores canonical records in `service_games`; `service_state` retains only
+global metadata. It preserves records when run against a populated database.
+An old image cannot read this new format. For rollback across this boundary,
+keep maintenance enabled, restore the matching pre-migration database and
+credential pepper using the restore procedure, and reconcile the latest
+off-host deletion ledger before reopening. Never merely switch the image back.
+Do not delete backups, credentials, database volumes, or ledger history during
+the authorized development-game purge. Record counts, receipts, and the new
+off-host watermark. `TASKS.md` tracks unfinished validation and rollout.
+
+## Historical repair rollout: 2026-09-07
 
 The owner authorized repair and reopening for acceptance. Reviewed PR #56 source
 `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as immutable image
