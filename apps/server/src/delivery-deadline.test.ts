@@ -17,7 +17,10 @@ describe("bounded room delivery", () => {
         await barrier;
         if (!signal.aborted) send();
       });
-      const failed = expect(pending).rejects.toThrow(/timed out/);
+      const failed = expect(pending).rejects.toMatchObject({
+        code: 503,
+        message: "Room delivery was cancelled or timed out.",
+      });
       await vi.advanceTimersByTimeAsync(ROOM_DELIVERY_TIMEOUT_MS);
       await failed;
       release();

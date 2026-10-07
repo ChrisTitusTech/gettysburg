@@ -6,7 +6,7 @@ import {
   Room as ClientRoom,
   Protocol,
 } from "@colyseus/sdk";
-import { matchMaker } from "@colyseus/core";
+import { matchMaker, ServerError } from "@colyseus/core";
 import {
   COMMAND_SCHEMA_VERSION,
   commandPayloadSchemas,
@@ -83,6 +83,69 @@ describe("Colyseus authoritative room", () => {
       server = undefined;
     }
   });
+
+  it.each([
+    { code: 503, dropError: false },
+    { code: 401, dropError: false },
+    { code: 503, dropError: true },
+  ])(
+    "reports admission $code correctly with missing error frame $dropError",
+    async ({ code, dropError }) => {
+      const service = new InMemoryAsyncGameService();
+      const host = await service.createGame("union");
+      vi.spyOn(service, "deliverAuthorizedState").mockRejectedValueOnce(
+        new ServerError(code, "Admission rejected"),
+      );
+      const port = await reservePort();
+      const origin = `http://127.0.0.1:${port}`;
+      server = createGettysburgServer({
+        gameService: service,
+        readiness: { isReady: () => true },
+        trustedWebSocketOrigin: origin,
+      });
+      await server.listen(port, "127.0.0.1");
+      const warnings = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const errors: number[] = [];
+      let closed = false;
+      const connect = ClientRoom.prototype.connect;
+      vi.spyOn(ClientRoom.prototype, "connect").mockImplementation(function (
+        this: ClientRoom,
+        ...args: Parameters<ClientRoom["connect"]>
+      ) {
+        connect.apply(this, args);
+        this.onError((errorCode) => errors.push(errorCode));
+        const onMessage = this.connection.events.onmessage;
+        this.connection.events.onmessage = (event) => {
+          if (dropError && new Uint8Array(event.data)[0] === Protocol.ERROR)
+            return;
+          onMessage?.(event);
+        };
+        const onClose = this.connection.events.onclose;
+        this.connection.events.onclose = (event) => {
+          onClose?.(event);
+          closed = true;
+        };
+      });
+      const client = new ColyseusClient(origin, {
+        headers: {
+          origin,
+          cookie: `__Host-gettysburg-session=${host.credential}`,
+        },
+      });
+      await expect(
+        client.joinOrCreate("game", { gameId: host.gameId }),
+      ).rejects.toMatchObject(
+        dropError ? { code: 4002 } : { code, message: "Admission rejected" },
+      );
+      await vi.waitFor(() => expect(closed).toBe(true));
+      expect(errors).toEqual([dropError ? 4002 : code]);
+      expect(
+        warnings.mock.calls.filter(([message]) =>
+          String(message).startsWith("Room connection was closed unexpectedly"),
+        ),
+      ).toHaveLength(dropError ? 1 : 0);
+    },
+  );
 
   it.each([
     "expiry",
@@ -433,9 +496,12 @@ describe("Colyseus authoritative room", () => {
     // room. A replacement creation must fail instead of splitting this game.
     await authoritativeRoom.lock();
     try {
-      await expect(connect(observers[0]!.credential, true)).rejects.toThrow(
-        /already has a room/,
-      );
+      await expect(
+        connect(observers[0]!.credential, true),
+      ).rejects.toMatchObject({
+        code: 503,
+        message: expect.stringMatching(/already has a room/),
+      });
       expect(
         (await matchMaker.query({ name: "game" })).map((room) => room.roomId),
       ).toEqual([hostRoom.roomId]);

@@ -1,6 +1,7 @@
 import {
   Room,
   ClientState,
+  ServerError,
   type AuthContext,
   type Client,
 } from "@colyseus/core";
@@ -226,7 +227,8 @@ export function createGettysburgRoom(
       // Matchmaking may try to create another room when overlapping reloads
       // fill the first. Reject that attempt instead of splitting gameplay.
       if (activeRooms.has(this.#gameId))
-        throw new Error(
+        throw new ServerError(
+          503,
           "This game already has a room. Retry joining when a slot is available.",
         );
       activeRooms.set(this.#gameId, this);
