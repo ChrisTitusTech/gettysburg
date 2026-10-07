@@ -14,16 +14,33 @@ review threads. The owner explicitly authorized the admin merge for the
 author/sole-code-owner self-approval deadlock; no protection settings changed.
 The independently reviewed workflow batch (#57/#60/#67) then merged through
 `fb883b1` with normal approval and all required exact-head checks passing.
+The compatible Colyseus batch (#63/#65) merged through `c34c0b2` after independent
+review and passing exact-head PostgreSQL, Chromium, Firefox, and WebKit CI.
 The October PR work does not redeploy the VPS or close the public tablet gate.
 
 The container PR replaces the unsuitable generic Node digest with the explicit
 `node:24-alpine` variant pinned to digest
 `ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1`.
-Runtime inspection identifies Node 24.21.0 / Alpine 3.24.2. An initial candidate
-with the development-security batch passes Trivy 0.75.0 HIGH/CRITICAL scanning
-including unfixed advisories. Rootless container smoke passes UID 1000:1000,
-PostgreSQL restart/resume, fail-closed readiness, and clean shutdown. The final
-integrated image must be rebuilt and rescanned after the remaining merges.
+Runtime inspection identifies Node 24.21.0 / Alpine 3.24.2. The integrated image
+`daf9e9d65ded676a217ca9a7fa7d62561df795e7b5f5a8cff0008a6d598e6af6`
+passes Trivy 0.75.0 scanning with zero HIGH/CRITICAL findings, including unfixed
+advisories, across 18 OS and 358 Node packages. Rootless container smoke passes
+UID 1000:1000, PostgreSQL restart/resume, fail-closed readiness, and clean shutdown.
+Protected logs and scan results are retained under
+`/home/titus/.local/state/gettysburg/acceptance/20261006-pr-closeout`.
+The same immutable image passes two-session Chromium 153.0.8010.12 acceptance
+at 1440x900 desktop and 1024x768 touch-tablet widths on the Fedora workstation.
+Both games complete turn 24 with retreat/advance/loss choices, pending-result
+reload, and exact replay. Connection, movement, reconnect, private spectators,
+replay management, synthetic notification checks, and automated accessibility
+checks pass; manual accessibility rules remain open. Both fit-board screenshots
+were visually inspected. Ignored rendered evidence is in
+`test-results/pr70-final-image`. Local report-mode timing meets its targets but
+does not replace calibrated performance or the failed public VPS tablet gate.
+Two earlier fixture attempts failed before browser execution (unsupported
+temporary-mount option, then missing matching Chromium); a disposable named
+volume and the matching Playwright browser resolved those environment issues.
+No live data or VPS services were changed.
 
 ## Source rollup: 2026-09-07
 
@@ -38,8 +55,9 @@ game rule is intentionally changed. Peer validation, frozen installation,
 formatting, lint, typechecking, 766 workspace/39 harness tests, build, and smoke
 pass. Independent Codex review found no actionable defects, including socket
 and browser-constructor regressions. The 29 PostgreSQL cases skipped locally
-need the isolated CI database. Exact-head PostgreSQL and full browser CI remain
-required before merge; engineering owns any failed gate. This is not a VPS rollout.
+passed using the isolated CI database on reviewed head `92a7797`. Application
+run `37559367677` and Firefox/WebKit run `37559367734`, plus Documentation,
+Security, and both CodeQL analyses passed before merge. This is not a VPS rollout.
 
 ### Repair deployed for owner testing; tablet timing gate remains failed
 
