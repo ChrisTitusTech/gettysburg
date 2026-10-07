@@ -37,14 +37,21 @@ authorized merge, deployment, and backed-up retirement of five old development
 games; those delivery actions completed on 2026-09-06.
 Current evidence and remaining gates are in `TASKS.md`.
 
-The newer source candidate enables mandatory Scenario Five for new games with
-the complete pinned terrain/edge bundle and shared rule previews. It does not
-change the last verified VPS revision above or reinterpret existing saves.
+The initial 2026-09-07 development rollout deployed `dc6b73b` through PR #55,
+enabling mandatory Scenario Five for new games with the complete pinned
+terrain/edge bundle and shared rule previews. It does not reinterpret existing
+saves or close the remaining owner/release acceptance gates.
+Public-browser acceptance exposed room connection timeouts. Reviewed repair
+candidate `1baebbd` is now deployed after exact-head CI and both retained-data
+VPS full games. Public readiness/two-client smoke and the desktop full game pass.
+Owner gameplay testing is available, but the public tablet full-game timing gate
+still fails near turn 24. PR #56 requires code-owner approval before merge.
+`TASKS.md` preserves the failed-run history and current evidence.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,
 reinforcement, combat choices, night, and victory enforcement are implemented
-for the pinned mandatory version. Representative owner adjudication remains
-open; automated play does not establish agreement with the physical rules.
+for the pinned mandatory version. The owner explicitly accepted the board and
+rules on 2026-10-06; this approval is separate from automated play evidence.
 Legacy tabletop saves remain resumable but lack interpreted replay. Private
 spectator claims, HTTP/replay access, host grant management, live transport,
 private host links, and the observer screen are merged through PR #40. Browser
@@ -151,14 +158,15 @@ is in `docs/operations/VPS.md`.
 
 - Use the approved original board/counter presentation with clearly marked
   reduced strength; supplied scans and copied wording stay private.
-- Complete movement-edge and gameplay acceptance for the approved per-hex
+- Preserve the owner-accepted movement edges and gameplay for the approved
   terrain transcription. Forest links use authorized best guesses. Use supplied
   rules and explicit owner decisions for terrain effects and numeric modifiers;
   terrain defense is enabled in the new development terrain ruleset.
 - Scenario Five mandatory rules only; optional rules and additional scenarios
   are excluded. See `docs/references/MANDATORY_RULES.md` for implementation scope.
 - Include replay, private spectators, and opt-in browser push notifications.
-- Complete owner gameplay acceptance and final release validation; new artwork
+- Complete final release validation; owner board/rules acceptance is recorded
+  on 2026-10-06. New artwork
   still requires separate provenance and approval.
 
 The locally supplied Battle Manual now answers the Scenario Five setup, turn,
