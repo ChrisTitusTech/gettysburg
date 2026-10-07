@@ -6,6 +6,31 @@ import {
 } from "./creation-admission.js";
 
 describe("host creation admission", () => {
+  it("reports telemetry failure once and recovery without raw counter/error contents", () => {
+    const report = vi.fn();
+    let sample = { cpuTotal: 1000, cpuIdle: 900, memoryUsed: 0.1 };
+    const read = vi.fn(() => sample);
+    const monitor = new HostCreationAdmission(read, () => 0, report);
+    read.mockImplementation(() => {
+      throw new Error("private details");
+    });
+    monitor.sample();
+    monitor.status();
+    monitor.sample();
+    monitor.status();
+    expect(report.mock.calls).toEqual([
+      ["host telemetry read or parse failed"],
+    ]);
+    read.mockImplementation(() => sample);
+    monitor.sample();
+    sample = { ...sample, cpuTotal: 2000, cpuIdle: 1800 };
+    monitor.sample();
+    expect(report.mock.calls).toEqual([
+      ["host telemetry read or parse failed"],
+      ["host telemetry recovered"],
+    ]);
+    expect(monitor.status()).toBe("available");
+  });
   it("uses available RAM and excludes double-counted guest CPU ticks", () => {
     expect(
       parseResourceSample(

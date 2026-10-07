@@ -155,6 +155,7 @@ export interface GameService {
     existingCredential?: string,
     creationId?: string,
     creationCredential?: string,
+    beforeCreate?: () => void,
   ): Promise<CreateGameResult>;
   executeCommand(
     authorization: GameAuthorization,
@@ -323,12 +324,14 @@ export class InMemoryAsyncGameService implements GameService {
     credential?: string,
     creationId?: string,
     creationCredential?: string,
+    beforeCreate?: () => void,
   ) {
     return this.service.createGame(
       side,
       credential,
       creationId,
       creationCredential,
+      beforeCreate,
     );
   }
   async executeCommand(
@@ -758,6 +761,7 @@ export class PostgresGameService implements GameService {
     existingCredential?: string,
     creationId?: string,
     creationCredential?: string,
+    beforeCreate?: () => void,
   ) {
     return this.#mutate(
       (service) =>
@@ -766,6 +770,7 @@ export class PostgresGameService implements GameService {
           existingCredential,
           creationId,
           creationCredential,
+          beforeCreate,
         ),
       [],
       creationId,

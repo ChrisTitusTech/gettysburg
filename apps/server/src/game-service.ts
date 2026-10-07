@@ -1312,6 +1312,7 @@ export class InMemoryGameService {
     existingCredential?: string,
     creationId: string = randomUUID(),
     creationCredential?: string,
+    beforeCreate?: () => void,
   ): CreateGameResult {
     const replay = [...this.#games.values()].find(
       (game) => game.creation?.creationId === creationId,
@@ -1386,6 +1387,9 @@ export class InMemoryGameService {
       };
     }
 
+    // Called under the persistence mutation lock, after authenticated retry
+    // lookup. Queued work rechecks current capacity, and retries remain usable.
+    beforeCreate?.();
     const session = this.#resolveOrCreateSession(
       existingCredential,
       creationCredential,

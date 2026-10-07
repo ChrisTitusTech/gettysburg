@@ -2,6 +2,14 @@
 
 ## Resource-aware game creation: 2026-10-06
 
+PR #75 merged as `80982f8` after exact-head CI and two independent local reviews,
+but three late hosted comments were not resolved before the admin merge.
+Engineering acknowledges this merge-order error. No deployment occurred; rollout
+is blocked until the follow-up fixes authenticated lost-response creation retries,
+rechecks admission under the database mutation lock for queued work, and reports
+telemetry failure/recovery without raw diagnostic data. Fresh review, PostgreSQL
+regressions, and exact-head CI are required before deploying either change.
+
 The owner confirmed that the 90% resource policy replaces game-creation quotas
 only; all other abuse protections remain. Engineering owns this separate repair.
 
