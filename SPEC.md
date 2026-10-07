@@ -1217,11 +1217,12 @@ accepted when:
 
 ## Remaining decisions and acceptance
 
-- Which remaining Battle Manual interpretations must be approved for complete
-  Phase 3 enforcement?
-- Complete gameplay acceptance of inferred movement edges and the painted-board
-  scenario adaptations; all 253 terrain rows are already approved.
-- Implement the owner-approved continuous-move UI: repeated drags of one
+The owner accepted the current board and mandatory rules on 2026-10-06.
+This closes physical-rule adjudication, not the technical release gates above.
+
+- Preserve the approved movement edges and painted-board scenario adaptations;
+  all 253 terrain rows and the current rule interpretation are accepted.
+- Preserve the implemented continuous-move UI: repeated drags of one
   unit/stack are allowed until a different unit moves; reconnect does not reset
   that boundary.
 - Complete final production-candidate validation and obtain release approval.

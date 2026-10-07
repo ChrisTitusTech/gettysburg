@@ -47,22 +47,23 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
 
 ## Owner gameplay acceptance
 
-Responsible owner: ChrisTitusTech. Engineering has automated complete 24-turn
-games, but that does not establish agreement with the physical rules.
+Responsible owner: ChrisTitusTech. The owner explicitly accepted the board and
+rules on 2026-10-06. The checks below record that approval, not a newly observed
+device session or a waiver of technical release gates.
 Use `docs/references/MANDATORY_RULES.md`, `TERRAIN_ADJUSTMENTS.md`, and
 `TERRAIN_CONNECTIONS.md` for the recorded interpretations and board coordinates.
 
-- [ ] Compare representative movement costs, road/stream crossings, reinforcement
+- [x] Compare representative movement costs, road/stream crossings, reinforcement
   entries, stacking, zones of control, and mandatory night withdrawals with the
   physical rules and approved adaptations.
-- [ ] Confirm repeated drags keep the same unit/stack's normal move active until
+- [x] Confirm repeated drags keep the same unit/stack's normal move active until
   another unit/group successfully moves; rejected commands must not end it.
-- [ ] Compare hill, woods, combined terrain, town, and connected-terrain combats.
+- [x] Compare hill, woods, combined terrain, town, and connected-terrain combats.
   Attackers in the defender's connected forest must cancel its woods component;
   hill and woods components cancel independently under the recorded rules.
-- [ ] Verify losses, retreat, advance, and the approved extra-loss/edge-exit
+- [x] Verify losses, retreat, advance, and the approved extra-loss/edge-exit
   treatment when terrain makes retreat impossible, including trapped artillery.
-- [ ] Verify reduced strength, turn/night sequence, objectives, and final victory
+- [x] Verify reduced strength, turn/night sequence, objectives, and final victory
   against the approved Scenario Five interpretation in a complete candidate game.
 - [ ] Decide whether interpreted replay of retired legacy tabletop games is
   required for this release or explicitly deferred. Existing saves retain their

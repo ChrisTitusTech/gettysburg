@@ -1,6 +1,15 @@
 # Gettysburg project tasks
 
-## Current source rollup: 2026-09-07
+## Owner acceptance and PR closeout: 2026-10-06
+
+ChrisTitusTech explicitly accepted the board and rules and authorized working
+through and merging the outstanding PRs. This closes owner adjudication of the
+current Scenario Five board and mandatory-rule interpretation. It does not
+waive the public tablet timing failure, retained-version replay scope decision,
+device/accessibility, push delivery/key recovery, capacity, rollback/reboot, or
+final production-release gates. Historical evidence below remains dated.
+
+## Source rollup: 2026-09-07
 
 ### Repair deployed for owner testing; tablet timing gate remains failed
 
@@ -393,7 +402,7 @@ and evidence; they do not supersede this current status or close owner gates.
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
 | Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd`; restart and final backup verified | Public tablet timing gate remains failed; owner gameplay testing is available |
-| Mandatory Scenario Five rules | Pinned content/version, movement, combat choices, reinforcement, night, scoring, and victory are implemented | Owner adjudication against the physical rules; Phase 3 not complete |
+| Mandatory Scenario Five rules | Implementation and owner board/rules acceptance complete (2026-10-06) | Public tablet timing and retained-version replay scope remain; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
 | Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |
 | Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
@@ -482,8 +491,8 @@ so it is excluded from this mandatory-rules release. The owner also approved the
 current original generated board, original counter symbols, and a clearly marked
 reduced-strength treatment for public release, keeping supplied scans private.
 Notifications will use opt-in browser push. Repeated drags remain one continuous
-unit/stack move until another unit moves. Owner gameplay acceptance and final
-release validation remain gates; engineering work continues through small PRs.
+unit/stack move until another unit moves. Board/rules acceptance was subsequently
+granted on 2026-10-06; final release validation remains open.
 The owner also approved applying the extra-loss/edge-exit rule when impassable
 terrain makes retreat impossible, including trapped artillery on this board.
 
@@ -526,7 +535,7 @@ terrain makes retreat impossible, including trapped artillery on this board.
 | Remaining gate | Responsible owner | Attempted result | Reason and follow-up |
 | --- | --- | --- | --- |
 | Owner terrain gameplay | ChrisTitusTech | Automated desktop/tablet flows and visual inspection passed | Manually play representative forest/hill/town combats and inspect R10/W7/W10 adaptations before release |
-| Complete Phase 3 | ChrisTitusTech | Mandatory enforcement, replay, and automated full games are now merged; phase not complete | Owner physical-rule adjudication and retained-version replay decision/coverage remain |
+| Complete Phase 3 | ChrisTitusTech | Mandatory enforcement, replay, automated games, and owner board/rules approval recorded; phase not complete | Public tablet timing and retained-version replay decision/coverage remain |
 
 This follow-up supersedes earlier terrain-unverified, fixed-M9, and 231-hex
 calibration statements below. The August operational entries are historical
@@ -1798,8 +1807,10 @@ validation remain separate gates.
 - [x] Complete automated 24-turn rules-enforced games at desktop/tablet widths,
   with pending-choice reload and exact replay. PR #29 records acceptance and
   pacing repairs; subsequent increments repeat the same browser gate.
-- [ ] Complete owner-adjudicated physical-rule acceptance and retained-version
-  replay coverage or an explicit scope decision. The prior asynchronous scope
+- [x] Complete owner-adjudicated board and physical-rule acceptance.
+  ChrisTitusTech explicitly accepted the board and rules on 2026-10-06.
+- [ ] Complete retained-version replay coverage or an explicit scope decision.
+  The prior asynchronous scope
   question is unanswered; legacy replay is not silently waived.
 
 ### Phase 4

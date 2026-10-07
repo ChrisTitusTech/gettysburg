@@ -206,8 +206,8 @@ approval are complete. The newer source candidate enables mandatory rules for
 new games, including weighted movement, reinforcement costs, retreat/advance,
 and night guidance, under its complete pinned version pair. Mandatory replay
 and its authorized browser controls are merged. Automated desktop/tablet games
-complete all 24 turns with pending-choice reload and exact replay; representative
-owner adjudication against the physical rules remains open. Legacy tabletop
+complete all 24 turns with pending-choice reload and exact replay. The owner
+accepted the board and rules on 2026-10-06. Legacy tabletop
 saves still resume without interpreted replay, so retained-version replay
 coverage needs implementation or an explicit scope decision. This source was
 deployed as `dc6b73b` on 2026-09-07, then held behind maintenance after browser
@@ -283,11 +283,11 @@ Private spectator transport and browser workflows are merged through PR #40.
 Push foundations through optional startup and the service worker are merged
 through PR #49, with browser consent merged in PR #50 and encrypted key-recovery
 wiring merged in PR #51. Home Screen and actual device/recovery acceptance remain.
-Container hardening merged in PR #45. The 2026-09-07 development rollout deploys
-`dc6b73b` through PR #55 with exact-image scanning and public readiness/WebSocket
-checks. It is not final release approval; push remains disabled pending setup.
-Subsequent public-browser room timeouts block acceptance and reopening traffic;
-the candidate/database are retained in maintenance for a reviewed repair.
+Container hardening merged in PR #45. After the initial `dc6b73b` rollout,
+reviewed repair `1baebbd` was deployed on 2026-09-07 with exact-image scanning,
+public readiness/WebSocket checks, restart recovery, and verified backups.
+The site reopened for owner testing; the public tablet timing gate remains
+failed near turn 24. This is not final release approval; push remains disabled.
 Existing staging, backup, restore, and browser evidence do not replace the
 remaining accessibility, security, capacity, reboot, and final acceptance gates.
 

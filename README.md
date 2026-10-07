@@ -26,7 +26,8 @@ weighted movement, continuous stack activation, reinforcement costs, connected
 terrain defense, retreat/advance, and mandatory night withdrawal. Existing saves
 retain their original rules. Dependency advisories were patched separately.
 Push remains disabled pending signing-key/provider setup. Retained-version replay,
-owner gameplay acceptance, and Phase 4 release gates remain open.
+and Phase 4 release gates remain open. The owner accepted the board and rules
+on 2026-10-06; that approval does not close the remaining technical gates.
 See `TASKS.md` for dated evidence; this is a development deployment, not a claim
 of production readiness.
 
@@ -59,7 +60,7 @@ production-shaped local container path. Reduced combat factors are owner-approve
 derived values: halve the full factor and round up, while a combat-one counter
 has one step and is eliminated by its first loss. All 253 owner-approved terrain
 records now feed rules and previews. Inferred movement/forest/hill connections
-and scenario adaptations remain explicit owner gameplay acceptance checks.
+and scenario adaptations are covered by the 2026-10-06 board/rules acceptance.
 
 ## Development
 

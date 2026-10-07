@@ -50,8 +50,8 @@ still fails near turn 24. PR #56 requires code-owner approval before merge.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,
 reinforcement, combat choices, night, and victory enforcement are implemented
-for the pinned mandatory version. Representative owner adjudication remains
-open; automated play does not establish agreement with the physical rules.
+for the pinned mandatory version. The owner explicitly accepted the board and
+rules on 2026-10-06; this approval is separate from automated play evidence.
 Legacy tabletop saves remain resumable but lack interpreted replay. Private
 spectator claims, HTTP/replay access, host grant management, live transport,
 private host links, and the observer screen are merged through PR #40. Browser
@@ -158,14 +158,15 @@ is in `docs/operations/VPS.md`.
 
 - Use the approved original board/counter presentation with clearly marked
   reduced strength; supplied scans and copied wording stay private.
-- Complete movement-edge and gameplay acceptance for the approved per-hex
+- Preserve the owner-accepted movement edges and gameplay for the approved
   terrain transcription. Forest links use authorized best guesses. Use supplied
   rules and explicit owner decisions for terrain effects and numeric modifiers;
   terrain defense is enabled in the new development terrain ruleset.
 - Scenario Five mandatory rules only; optional rules and additional scenarios
   are excluded. See `docs/references/MANDATORY_RULES.md` for implementation scope.
 - Include replay, private spectators, and opt-in browser push notifications.
-- Complete owner gameplay acceptance and final release validation; new artwork
+- Complete final release validation; owner board/rules acceptance is recorded
+  on 2026-10-06. New artwork
   still requires separate provenance and approval.
 
 The locally supplied Battle Manual now answers the Scenario Five setup, turn,
