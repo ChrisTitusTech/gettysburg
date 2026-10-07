@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   MANDATORY_RULESET_VERSION,
+  WHOLE_POINT_RULESET_VERSION,
   planNormalMove,
   prepareNormalMovement,
   type GameState,
@@ -54,6 +55,18 @@ function state(patch: Partial<GameState> = {}): GameState {
   };
 }
 describe("mandatory movement preview", () => {
+  it("uses one point per v5 road step in preview, overshoot clamping, and server validation", () => {
+    const current = state({ ruleset_version: WHOLE_POINT_RULESET_VERSION });
+    expect(
+      previewMandatoryMovement(current, "confederate", ["a"], "L4"),
+    ).toEqual(prepareNormalMovement(current, "confederate", ["a"], "L4"));
+    expect(
+      previewMandatoryMovement(current, "confederate", ["a"], "L4"),
+    ).toMatchObject({ ok: false, error: "movement_exceeded" });
+    expect(
+      previewMandatoryMovement(current, "confederate", ["a"], "L4", true),
+    ).toMatchObject({ ok: true, route: { cost: 1, path: ["L6", "L5"] } });
+  });
   it("submits the exact weighted validator preview", () => {
     const current = state();
     expect(

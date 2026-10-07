@@ -1,4 +1,7 @@
-import { createMandatoryInitialState } from "@gettysburg/content";
+import {
+  createMandatoryInitialState,
+  createWholePointInitialState,
+} from "@gettysburg/content";
 import type { GameState } from "@gettysburg/game";
 import canonicalize from "canonicalize";
 
@@ -34,15 +37,25 @@ function immutableContent(state: GameState) {
   };
 }
 
-const expectedContent = canonicalize(
-  immutableContent(createMandatoryInitialState("pinned")),
+const expectedContent = new Map(
+  [
+    createMandatoryInitialState("pinned"),
+    createWholePointInitialState("pinned"),
+  ].map((state) => [
+    `${state.ruleset_version}\u0000${state.content_revision}`,
+    canonicalize(immutableContent(state)),
+  ]),
 );
 
 /** Never fill missing mandatory data from today's defaults or run legacy
  * repairs. JSON object order is irrelevant (PostgreSQL jsonb reorders keys). */
 export function hasPinnedMandatoryContent(state: GameState): boolean {
   try {
-    if (canonicalize(immutableContent(state)) !== expectedContent) return false;
+    const expected = expectedContent.get(
+      `${state.ruleset_version}\u0000${state.content_revision}`,
+    );
+    if (!expected || canonicalize(immutableContent(state)) !== expected)
+      return false;
     const activation = state.normal_movement;
     if (!activation) return false;
     const knownUniqueIds = (ids: readonly string[]) =>

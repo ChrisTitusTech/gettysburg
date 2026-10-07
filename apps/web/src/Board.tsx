@@ -14,7 +14,7 @@ import {
   currentCombatValue,
   hexDistance,
   movementPath,
-  MANDATORY_RULESET_VERSION,
+  isMandatoryRuleset,
   planNormalMove,
   prepareForcedRetreat,
   suggestedRetreat,
@@ -130,7 +130,7 @@ export function Board({
     readOnlyMode === "live"
       ? "Read-only live board; no commands are sent."
       : "Read-only history; no commands are sent.";
-  const mandatory = state.ruleset_version === MANDATORY_RULESET_VERSION;
+  const mandatory = isMandatoryRuleset(state.ruleset_version);
   const [selectedUnitId, setSelectedUnitId] = useState<string | null>(null);
   const [selectedSingle, setSelectedSingle] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<{

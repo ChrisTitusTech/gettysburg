@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   createMandatoryInitialState,
+  createWholePointInitialState,
   SCENARIO_CONTENT_REVISION,
 } from "@gettysburg/content";
 import {
@@ -40,7 +41,7 @@ function restoredGame(
 describe("mandatory saved-version handler", () => {
   it("creates new games from the complete mandatory pinned opening", () => {
     const game = new InMemoryGameService().createGame("union");
-    expect(game.state).toEqual(createMandatoryInitialState(game.gameId));
+    expect(game.state).toEqual(createWholePointInitialState(game.gameId));
   });
 
   it("restores the exact state without legacy opening or combat-choice repairs", () => {

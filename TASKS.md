@@ -1,14 +1,57 @@
 # Gettysburg project tasks
 
+## Whole-point movement override: 2026-10-06
+
+The owner removed the 0.5 rule and explicitly requested the current testing game
+be updated too. Engineering owns this separate increment from capacity PR #75.
+
+- [x] Add immutable mandatory-v5 / mandatory-board-v2 for new games, with
+  1-point connected road/rail movement and entry. Preserve v4 constructors,
+  fingerprints, and replay. Shared browser/server rules recognize both versions.
+- [x] Add a maintenance-only, expected-version-checked, retry-safe operator
+  transition with an auditable sequence and deterministic replay boundary.
+  Preserve positions, casualties, activation, credentials, and previously spent
+  points. No public transition route, schema change, or save deletion.
+- [x] Local format, lint, typecheck, 812 workspace tests, 39 harness tests,
+  build, smoke, Markdown lint, and diff checks pass. All 33 isolated PostgreSQL
+  integration tests pass, including transition, restart, and exact replay.
+  Rootless container startup/restart/readiness/shutdown smoke passes.
+- [x] Two-session Chromium desktop and touch-tablet acceptance passes, including
+  both 24-turn games, combat choices, pending-result reload, and exact replay.
+  Whole-point preview/remaining-budget assertions and opening fixtures now match
+  the new rule. Evidence: ignored `test-results/whole-point-movement`.
+  An earlier spectator-setup timeout was not reproduced in the complete rerun;
+  setup now reports the creation HTTP status/error without invitation secrets.
+  Report-mode input timings were 119.1/131.4 ms, not calibrated capacity evidence.
+- [x] Independent Codex reviews of the complete implementation and final browser
+  harness changes found no actionable defects; the final reviewer independently
+  reran workspace tests, typechecking, and diff checks.
+- [ ] Exact-head CI and hosted review before merge. The owner authorized the
+  separate movement admin merge, combined deployment, and current-game update
+  on 2026-10-07. Hosted review found that a retry after later gameplay returned
+  the latest state; retries now replay the original transition sequence instead.
+  Regression coverage verifies stable results and unchanged live state both
+  in memory and after PostgreSQL restart. Fresh local gates and all 33 PostgreSQL
+  tests pass; final review/CI of this correction remain required.
+- [ ] Back up and deploy the reviewed image; apply the authorized transition
+  only to the identified current testing game and verify all old/new replay
+  cursors and unchanged game contents. Other saves keep their pinned versions.
+  Restoring an older image requires its compatible backup once v5 games exist.
+
+The earlier movement observation below is superseded by this explicit house-rule
+choice, not proof of a universal half-cost defect. Deployment remains pending.
+
 ## Resource-aware game creation: 2026-10-06
 
 PR #75 merged as `80982f8` after exact-head CI and two independent local reviews,
 but three late hosted comments were not resolved before the admin merge.
-Engineering acknowledges this merge-order error. No deployment occurred; rollout
-is blocked until the follow-up fixes authenticated lost-response creation retries,
-rechecks admission under the database mutation lock for queued work, and reports
-telemetry failure/recovery without raw diagnostic data. Fresh review, PostgreSQL
-regressions, and exact-head CI are required before deploying either change.
+Engineering acknowledges this merge-order error. Follow-up PR #76 merged as
+`e56809b` after independent Codex review, 783 workspace tests, 39 harness tests,
+32 isolated PostgreSQL tests, local browser checks, and all exact-head CI checks
+passed. It fixes authenticated lost-response creation retries, rechecks admission
+under the database mutation lock for queued work, and reports telemetry
+failure/recovery without raw diagnostic data. The three original review threads
+were resolved after the correction merged. Neither change is deployed yet.
 
 The owner confirmed that the 90% resource policy replaces game-creation quotas
 only; all other abuse protections remain. Engineering owns this separate repair.

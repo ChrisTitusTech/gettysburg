@@ -8,7 +8,7 @@ import type {
 import {
   automaticCombatResolution,
   currentCombatValue,
-  MANDATORY_RULESET_VERSION,
+  isMandatoryRuleset,
   mandatoryNightWithdrawals,
 } from "@gettysburg/game";
 import { type FormEvent, useMemo, useState } from "react";
@@ -190,7 +190,7 @@ function CombatCard({
         </form>
       ) : null}
       {choice?.kind === "retreat" && choice.side === seat ? (
-        state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+        isMandatoryRuleset(state.ruleset_version) ? (
           [...new Set(choice.unit_ids.map((id) => state.units[id]?.location))]
             .filter((hex) => hex !== null && hex !== undefined)
             .map((hex) => (
@@ -219,7 +219,7 @@ function CombatCard({
         )
       ) : null}
       {choice?.kind === "advance" && choice.side === seat ? (
-        state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+        isMandatoryRuleset(state.ruleset_version) ? (
           <AdvanceControls
             key={`${state.game_id}:${state.version}:${combat.id}`}
             combatId={combat.id}
@@ -256,7 +256,7 @@ export function TabletopControls({
   const active = state.active_side === seat && state.phase !== "completed";
   const nightWithdrawals = useMemo(
     () =>
-      state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      isMandatoryRuleset(state.ruleset_version) &&
       active &&
       state.night &&
       state.phase === "movement"
@@ -387,7 +387,7 @@ export function TabletopControls({
           </summary>
           {available.length === 0 ? (
             <p>No scheduled counters are available for this seat this turn.</p>
-          ) : state.ruleset_version === MANDATORY_RULESET_VERSION ? (
+          ) : isMandatoryRuleset(state.ruleset_version) ? (
             <ReinforcementControls
               key={`${state.game_id}:${state.version}:${seat}`}
               state={state}

@@ -4,9 +4,16 @@ import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
 export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
 export const RULESET_VERSION = "gettysburg-terrain-v3";
-// Selected for new games with the pinned mandatory content revision. Legacy
-// saves retain their own registered version; never silently reinterpret them.
+// Retained v4 saves keep half-point roads. New v5 games use whole-point roads;
+// an existing game changes only through an explicitly recorded transition.
 export const MANDATORY_RULESET_VERSION = "gettysburg-mandatory-v4";
+export const WHOLE_POINT_RULESET_VERSION = "gettysburg-mandatory-v5";
+export function isMandatoryRuleset(version: string): boolean {
+  return (
+    version === MANDATORY_RULESET_VERSION ||
+    version === WHOLE_POINT_RULESET_VERSION
+  );
+}
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";
 
 export type Side = "confederate" | "union";
@@ -490,7 +497,7 @@ export interface ManagementEvent {
 
 export interface AuditEvent {
   readonly command_id: string;
-  readonly command_name: "operatorRecovery";
+  readonly command_name: "operatorRecovery" | "adoptWholePointMovement";
   readonly event_sequence: number;
   readonly kind: "operator_audit";
   readonly state_version: number;

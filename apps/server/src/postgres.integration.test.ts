@@ -8,7 +8,10 @@ import { createServer } from "node:net";
 import { createPushVapidFile, loadPushVapid } from "./push-config.js";
 
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
-import { createMandatoryInitialState } from "@gettysburg/content";
+import {
+  createMandatoryInitialState,
+  createWholePointInitialState,
+} from "@gettysburg/content";
 import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -178,6 +181,117 @@ postgres("PostgreSQL durability", () => {
     } finally {
       await blocker.query("ROLLBACK");
       blocker.release();
+      await service.close();
+    }
+  });
+
+  it("persists an explicit rules transition atomically and preserves old/new replay after restart", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await service.migrate();
+      const initial = new InMemoryGameService({ pepper });
+      const host = initial.createGame("union");
+      const snapshot = initial.exportSnapshot();
+      await replaceSnapshot({
+        ...snapshot,
+        games: snapshot.games.map(([id, record]) => [
+          id,
+          { ...record, state: createMandatoryInitialState(id) },
+        ]),
+      });
+      const move = await service.executeCommand(
+        await service.authenticate(host.credential, host.gameId),
+        {
+          schema: COMMAND_SCHEMA_VERSION,
+          command_id: randomUUID(),
+          command_name: "moveUnit",
+          expected_version: 0,
+          game_id: host.gameId,
+          payload: { unit_id: "u-devin", destination: "P7" },
+        },
+      );
+      expect(move.ok).toBe(true);
+      const request = randomUUID();
+      await expect(
+        service.transitionWholePointMovement(host.gameId, 0, "owner", request),
+      ).rejects.toThrow("Game changed");
+      expect((await service.getActions(host.gameId)).length).toBe(1);
+      const after = await service.transitionWholePointMovement(
+        host.gameId,
+        1,
+        "owner",
+        request,
+      );
+      expect(after.units["u-devin"]!.movement_spent).toBe(0.5);
+      expect(after.ruleset_version).toBe("gettysburg-mandatory-v5");
+      expect(
+        await service.transitionWholePointMovement(
+          host.gameId,
+          1,
+          "owner",
+          request,
+        ),
+      ).toEqual(after);
+      const restored = new PostgresGameService({
+        connectionString: connectionString!,
+        pepper,
+      });
+      try {
+        expect(await restored.isReady()).toBe(true);
+        expect(
+          (await restored.getReplay(host.credential, host.gameId, 1)).state
+            .ruleset_version,
+        ).toBe("gettysburg-mandatory-v4");
+        expect(
+          (await restored.getReplay(host.credential, host.gameId)).state,
+        ).toEqual(after);
+        const moved = await restored.executeCommand(
+          await restored.authenticate(host.credential, host.gameId),
+          {
+            schema: COMMAND_SCHEMA_VERSION,
+            command_id: randomUUID(),
+            command_name: "moveUnit",
+            expected_version: 2,
+            game_id: host.gameId,
+            payload: { unit_id: "u-devin", destination: "O7" },
+          },
+        );
+        expect(moved).toMatchObject({
+          ok: true,
+          state: { units: { "u-devin": { movement_spent: 1.5 } } },
+        });
+        expect(
+          await restored.transitionWholePointMovement(
+            host.gameId,
+            1,
+            "owner",
+            request,
+          ),
+        ).toEqual(after);
+        expect((await restored.getGameState(host.gameId)).version).toBe(3);
+        expect(await restored.getActions(host.gameId)).toHaveLength(3);
+        expect(
+          (await restored.getReplay(host.credential, host.gameId)).state,
+        ).toEqual(await restored.getGameState(host.gameId));
+        const rows = await administration.query(
+          "SELECT kind,command_name,expected_version,resulting_version FROM actions WHERE game_id=$1 AND sequence=2",
+          [host.gameId],
+        );
+        expect(rows.rows).toEqual([
+          {
+            kind: "operator_audit",
+            command_name: "adoptWholePointMovement",
+            expected_version: "1",
+            resulting_version: "2",
+          },
+        ]);
+      } finally {
+        await restored.close();
+      }
+    } finally {
       await service.close();
     }
   });
@@ -1459,8 +1573,8 @@ postgres("PostgreSQL durability", () => {
     );
     expect(rows.rows[0]).toMatchObject({
       action_count: "1",
-      content_revision: "gettysburg-mandatory-board-v1",
-      ruleset_version: "gettysburg-mandatory-v4",
+      content_revision: "gettysburg-mandatory-board-v2",
+      ruleset_version: "gettysburg-mandatory-v5",
       snapshot_count: "2",
     });
     await restarted.close();
@@ -1474,7 +1588,7 @@ postgres("PostgreSQL durability", () => {
     await first.migrate();
     const created = await first.createGame("union");
     await first.close();
-    const initial = createMandatoryInitialState(created.gameId);
+    const initial = createWholePointInitialState(created.gameId);
     expect(created.state).toEqual(initial);
     const service = new PostgresGameService({
       connectionString: connectionString!,
@@ -1500,7 +1614,7 @@ postgres("PostgreSQL durability", () => {
       ok: true,
       state: {
         version: 1,
-        units: { "u-wadsworth": { location: "E4", movement_spent: 0.5 } },
+        units: { "u-wadsworth": { location: "E4", movement_spent: 1 } },
         normal_movement: { active_unit_ids: ["u-reynolds", "u-wadsworth"] },
       },
     });
@@ -1539,7 +1653,7 @@ postgres("PostgreSQL durability", () => {
     }
   });
 
-  it("replays paid movement and recorded automatic combat after a database restart", async () => {
+  it("replays retained v4 paid movement and recorded automatic combat after a database restart", async () => {
     const first = new PostgresGameService({
       connectionString: connectionString!,
       pepper,
@@ -1552,6 +1666,22 @@ postgres("PostgreSQL durability", () => {
       const guest = await first.claimInvitation({
         lookupId: created.invitation.lookup_id,
         secret: created.invitation.secret,
+      });
+      // Retained v4 evidence must continue replaying at its original half-point
+      // costs. New v5 games receive separate full-game and transition coverage.
+      const saved = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          completeSnapshotQuery,
+        )
+      ).rows[0]!.snapshot;
+      await replaceSnapshot({
+        ...saved,
+        games: saved.games.map(([id, record]) => [
+          id,
+          id === created.gameId
+            ? { ...record, state: createMandatoryInitialState(id) }
+            : record,
+        ]),
       });
       const credentials = {
         union: created.credential,

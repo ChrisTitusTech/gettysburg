@@ -1,7 +1,7 @@
 import { unitsAfterBoardExit } from "./board-exit.js";
 import type { HexCoordinate } from "./coordinates.js";
 import { eliminateLoneGenerals } from "./generals.js";
-import { MANDATORY_RULESET_VERSION } from "./protocol.js";
+import { isMandatoryRuleset } from "./protocol.js";
 import type { CommandFailure, GameState, Side } from "./protocol.js";
 import { retreatOptions, validateRetreatPath } from "./retreat.js";
 
@@ -31,7 +31,7 @@ function retreatGroup(
   const choice = state.combats[combatId]?.pending_choice;
   const unit = state.units[unitId];
   if (
-    state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+    !isMandatoryRuleset(state.ruleset_version) ||
     state.phase !== "combat" ||
     choice?.kind !== "retreat" ||
     choice.side !== side ||

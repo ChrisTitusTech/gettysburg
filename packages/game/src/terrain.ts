@@ -1,5 +1,5 @@
 import {
-  MANDATORY_RULESET_VERSION,
+  isMandatoryRuleset,
   RULESET_VERSION,
   type GameState,
 } from "./protocol.js";
@@ -12,7 +12,7 @@ export function terrainDefenseModifier(
 ): number {
   if (
     (state.ruleset_version !== RULESET_VERSION &&
-      state.ruleset_version !== MANDATORY_RULESET_VERSION) ||
+      !isMandatoryRuleset(state.ruleset_version)) ||
     state.terrain === undefined
   )
     return 0;

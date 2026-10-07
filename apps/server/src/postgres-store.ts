@@ -886,6 +886,24 @@ export class PostgresGameService implements GameService {
     );
   }
 
+  async transitionWholePointMovement(
+    gameId: string,
+    expectedVersion: number,
+    operatorIdentity: string,
+    requestId: string,
+  ) {
+    return this.#mutate(
+      (service) =>
+        service.transitionWholePointMovement(
+          gameId,
+          expectedVersion,
+          operatorIdentity,
+          requestId,
+        ),
+      [gameId],
+    );
+  }
+
   async purgeDeletedGames() {
     return this.#mutate((service) => service.purgeDeletedGames());
   }

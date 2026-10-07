@@ -12,11 +12,17 @@ export function publicActionLog(
         return [
           {
             command_id: action.operatorRequestId,
-            command_name: "operatorRecovery",
+            command_name:
+              action.commandName === "adoptWholePointMovement"
+                ? "adoptWholePointMovement"
+                : "operatorRecovery",
             event_sequence: action.sequence,
             kind: "operator_audit",
             state_version: action.resultingVersion,
-            summary: "Operator recovery completed",
+            summary:
+              action.commandName === "adoptWholePointMovement"
+                ? "Road and rail movement changed to 1 point; earlier moves retain their original costs"
+                : "Operator recovery completed",
           },
         ];
       return [];

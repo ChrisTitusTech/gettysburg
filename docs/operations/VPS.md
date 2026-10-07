@@ -1,5 +1,23 @@
 # Gettysburg VPS baseline and deployment plan
 
+## Pending whole-point movement rollout
+
+The owner authorized 1-point road/rail movement for new games and the current
+testing game. New games use mandatory-v5 / mandatory-board-v2. Existing v4 games
+are not silently reinterpreted. During a backed-up maintenance window, identify
+the exact approved game, verify its version and movement phase, then invoke
+`PostgresGameService.transitionWholePointMovement(gameId, expectedVersion,
+operatorIdentity, requestId)` with a persistent UUID. There is no public endpoint.
+Retry the same identity after an uncertain result; do not append another audit.
+
+The transition retains all game contents, including previously spent half-points,
+while advancing version/sequence and recording the old/new immutable pair.
+Verify the unchanged fields, the transition action, earlier replay cursors,
+latest exact replay, and restart readiness before reopening the site. Do not
+transition other games or purge saves. A pre-v5 image cannot open v5 saves;
+rollback therefore requires its matching pre-transition encrypted database backup
+and current deletion-ledger reconciliation, not just an image flip.
+
 ## Pending resource-aware creation policy
 
 The owner selected a 90% host CPU or RAM threshold for game creation only.

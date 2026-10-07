@@ -15,13 +15,23 @@ The approved painted A-W board and typed terrain replace the source map's
 coordinates. Existing owner terrain overrides (+2 woods, +4 rough heights,
 connected-terrain cancellation) remain authoritative.
 
+On 2026-10-06 the owner removed half-point movement: eligible road/rail steps
+and road/rail reinforcement entry now cost 1 instead of 0.5. They still replace
+terrain/stream costs, and enemy-ZOC/artillery restrictions remain. This explicit
+house rule is versioned as mandatory-v5 / mandatory-board-v2. Retained v4 games
+keep their original costs unless an operator records the owner's authorized
+transition. The owner also requested that transition for the current testing
+game. It preserves all earlier moves, costs, activation, credentials, and replay;
+only subsequent movement uses the new costs. Previously spent half-points remain
+until normal turn reset rather than retroactively changing the game.
+
 ## Movement and positioning
 
 | Rule | Required behavior | Source |
 | --- | --- | --- |
 | Normal movement | Follow adjacent hexes; do not exceed the available budget | Rules1 3a; Rules2 3b |
 | Clear / ordinary hill / town | Enter for 1 point before other applicable costs | Rules2 3b |
-| Road / railroad | A connected road or rail step costs 0.5 outside enemy ZOC, replacing terrain/stream costs | Rules2 3b1 |
+| Road / railroad | A connected road or rail step costs 1 outside enemy ZOC, replacing terrain/stream costs; retained v4 uses 0.5 | Owner override 2026-10-06; original Rules2 3b1 |
 | Town road movement | The town counts as road terrain, but use explicit connected edges, not arbitrary jumps | Rules2 3b1 |
 | General accompaniment | A combat counter accompanied for its entire move receives +1 movement; the general retains its own printed budget | Rules2 3b2; Manual 8a |
 | Woods | Add 1 on entry unless using eligible road movement | Rules2 3b3 |
@@ -95,7 +105,9 @@ Implement rule families in independently reviewed increments. A pure calculator
 may land before activation; do not call a ruleset complete until the authoritative
 reducer and browser previews both use it. Activate complete mandatory rules under
 a new immutable rules/content pair, retaining existing game interpretation.
-No silent migration or reinterpretation of old actions is permitted.
+No silent migration or reinterpretation of old actions is permitted. The explicit
+forward-only v4-to-v5 operator audit is replayed at its recorded sequence; it
+advances both state version and event sequence. It is not a public game command.
 
 Tests must cover half-point budgets; cumulative terrain costs; connected versus
 disconnected roads; enemy-ZOC transitions; general accompaniment; artillery;

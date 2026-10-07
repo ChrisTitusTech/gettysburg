@@ -4,7 +4,7 @@ import {
   isHexCoordinate,
 } from "./coordinates.js";
 import type { HexCoordinate } from "./coordinates.js";
-import { terrainMovementCost } from "./movement.js";
+import { roadMovementCost, terrainMovementCost } from "./movement.js";
 import { movementStackFits } from "./movement-validation.js";
 import { planNormalMove } from "./normal-move.js";
 import type { CommandFailure, GameState, Side, UnitState } from "./protocol.js";
@@ -144,7 +144,7 @@ export function prepareReinforcement(
     );
   const cost =
     state.movement_edges.entry_roads?.includes(destination) === true
-      ? 0.5
+      ? roadMovementCost(state)
       : terrain;
   const plan = planNormalMove(state.normal_movement, arriving);
   if (!plan.ok)

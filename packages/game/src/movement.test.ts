@@ -4,6 +4,7 @@ import type { HexCoordinate } from "./coordinates";
 import { normalMovementRoute, normalMovementStep } from "./movement";
 import type { MovementEdges } from "./movement";
 import type { GameState, HexTerrain, UnitKind, UnitState } from "./protocol";
+import { WHOLE_POINT_RULESET_VERSION } from "./protocol";
 
 const emptyEdges: MovementEdges = { roads: [], railroads: [], streams: [] };
 const clear: HexTerrain = {
@@ -62,6 +63,37 @@ function step(
 }
 
 describe("mandatory movement step calculator (not yet activated)", () => {
+  it.each(["infantry", "cavalry", "artillery", "general"] as const)(
+    "charges whole points on roads and rail for v5 %s, retaining terrain restrictions",
+    (kind) => {
+      for (const route of ["roads", "railroads"] as const) {
+        const edges: MovementEdges = {
+          ...emptyEdges,
+          [route]: [["A2", "B2"]],
+          streams: [["A2", "B2"]],
+        };
+        const current = {
+          ...base,
+          ruleset_version: WHOLE_POINT_RULESET_VERSION,
+        };
+        expect(
+          step({ kind: "woods", woods: true }, edges, current, [kind]),
+        ).toEqual({ cost: 1, road: true, terrain: 1, stream: 0, zoc: 0 });
+        expect(
+          normalMovementStep(current, "confederate", [kind], edges, "B2", "A2")
+            ?.cost,
+        ).toBe(1);
+        expect(
+          step({ kind: "woods", woods: true }, emptyEdges, current, [kind])
+            ?.cost,
+        ).toBe(2);
+        if (kind === "artillery")
+          expect(
+            step({ kind: "rough_hill", woods: true }, edges, current, [kind]),
+          ).toBeNull();
+      }
+    },
+  );
   it.each(["clear", "hill", "town"] as const)(
     "charges one for ordinary %s",
     (kind) => expect(step({ kind })?.cost).toBe(1),
