@@ -16,6 +16,9 @@ The independently reviewed workflow batch (#57/#60/#67) then merged through
 `fb883b1` with normal approval and all required exact-head checks passing.
 The compatible Colyseus batch (#63/#65) merged through `c34c0b2` after independent
 review and passing exact-head PostgreSQL, Chromium, Firefox, and WebKit CI.
+The development batch (#64/#71/#72) merged through `31687e6` with independent
+review, normal approval, and all required exact-head checks passing. Duplicate
+Vitest PR #62 was closed as superseded; Vitest 5.0.3 is included through #72.
 The October PR work does not redeploy the VPS or close the public tablet gate.
 
 The container PR replaces the unsuitable generic Node digest with the explicit
@@ -3358,6 +3361,9 @@ The integrated batch passes frozen installation, format, lint, typecheck,
 reports zero findings. All 29 PostgreSQL cases skipped without a local test URL
 remain covered by the required exact-head CI database job; the public VPS tablet
 timing failure is not waived by dependency test results.
+Reviewed head `cad522c` subsequently passed Application `37560298496`, browser
+compatibility `37560298456`, Documentation, Security, and both CodeQL analyses
+before merge through `31687e6`.
 
 Initial individual validation: frozen install, format, lint, typecheck,
 758 workspace tests, 34 harness
