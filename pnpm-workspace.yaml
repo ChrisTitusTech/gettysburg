@@ -16,4 +16,4 @@ overrides:
   source-map-js: 1.2.2
 
 patchedDependencies:
-  "@colyseus/sdk@0.17.43": patches/@colyseus__sdk@0.17.43.patch
+  "@colyseus/sdk@0.18.5": patches/@colyseus__sdk@0.18.5.patch
