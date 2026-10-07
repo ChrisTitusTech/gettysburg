@@ -18,8 +18,9 @@ was deployed on 2026-09-07 after exact-head CI, independent review, retained-dat
 VPS full games, vulnerability scanning, and encrypted backup/restore checks.
 Public readiness and two-client HTTPS/WebSocket checks pass; gameplay is available
 for owner testing. The public tablet full-game timing gate still fails near
-turn 24; this is not release acceptance. PR #56 awaits required code-owner
-approval. Phase 2 historical operational closeout remains
+turn 24; this is not release acceptance. PR #56 merged on 2026-10-06 after
+review, exact-head CI, and an owner-authorized self-approval exception.
+Phase 2 historical operational closeout remains
 complete. The deployed candidate uses
 `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
 weighted movement, continuous stack activation, reinforcement costs, connected

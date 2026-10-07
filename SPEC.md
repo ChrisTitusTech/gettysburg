@@ -44,7 +44,8 @@ retired those games; the database was preserved.
 
 The 2026-09-07 development VPS repair deploys reviewed candidate `1baebbd`
 from PR #56, including mandatory Scenario Five for new games, replay, and private
-spectators. PR #56 remains unmerged pending required code-owner approval.
+spectators. PR #56 merged on 2026-10-06 after review and exact-head CI with an
+explicit owner-authorized self-approval exception; branch policy was unchanged.
 Push remains disabled pending signing-key/provider setup. This does not claim
 owner acceptance of Phase 3 or Phase 4 production readiness.
 The site is open for owner gameplay testing. Public desktop full-game checks,

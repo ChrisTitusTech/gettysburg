@@ -45,7 +45,8 @@ Public-browser acceptance exposed room connection timeouts. Reviewed repair
 candidate `1baebbd` is now deployed after exact-head CI and both retained-data
 VPS full games. Public readiness/two-client smoke and the desktop full game pass.
 Owner gameplay testing is available, but the public tablet full-game timing gate
-still fails near turn 24. PR #56 requires code-owner approval before merge.
+still fails near turn 24. PR #56 merged on 2026-10-06 after review and exact-head
+CI, using the owner's explicit self-approval exception without changing policy.
 `TASKS.md` preserves the failed-run history and current evidence.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,

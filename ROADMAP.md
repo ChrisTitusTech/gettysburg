@@ -214,7 +214,8 @@ deployed as `dc6b73b` on 2026-09-07, then held behind maintenance after browser
 connection failures. Reviewed repair `1baebbd` is now deployed after exact-head
 CI and both retained-data VPS full games. Public desktop full-game checks pass;
 the tablet timing gate still fails near turn 24. Owner gameplay testing is
-available. PR #56 requires code-owner approval. Deployment does not establish
+available. PR #56 merged on 2026-10-06 after review, exact-head CI, and the
+owner-authorized self-approval exception. Deployment does not establish
 Phase 3 completion. Optional rules/additional
 scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in

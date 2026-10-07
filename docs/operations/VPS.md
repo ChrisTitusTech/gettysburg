@@ -34,8 +34,9 @@ The owner authorized repair and reopening for acceptance. Reviewed PR #56 source
 `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as immutable image
 `459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
 The clean detached VPS checkout was advanced using a verified Git bundle.
-The PR remains unmerged pending required code-owner approval; deployment of this
-reviewed development candidate does not bypass that merge requirement.
+PR #56 merged on 2026-10-06 after review and exact-head CI with the owner's
+explicit self-approval exception. That merge did not redeploy the VPS or grant
+final production-release acceptance.
 
 Exact-head Application, Documentation, Firefox/WebKit, Security, and CodeQL pass;
 independent Codex and CodeRabbit reviews found no actionable defects. Both

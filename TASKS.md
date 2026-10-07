@@ -9,6 +9,22 @@ waive the public tablet timing failure, retained-version replay scope decision,
 device/accessibility, push delivery/key recovery, capacity, rollback/reboot, or
 final production-release gates. Historical evidence below remains dated.
 
+PR #56 merged as `f119204` after exact-head CI and resolution of all hosted
+review threads. The owner explicitly authorized the admin merge for the
+author/sole-code-owner self-approval deadlock; no protection settings changed.
+The independently reviewed workflow batch (#57/#60/#67) then merged through
+`fb883b1` with normal approval and all required exact-head checks passing.
+The October PR work does not redeploy the VPS or close the public tablet gate.
+
+The container PR replaces the unsuitable generic Node digest with the explicit
+`node:24-alpine` variant pinned to digest
+`ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1`.
+Runtime inspection identifies Node 24.21.0 / Alpine 3.24.2. An initial candidate
+with the development-security batch passes Trivy 0.75.0 HIGH/CRITICAL scanning
+including unfixed advisories. Rootless container smoke passes UID 1000:1000,
+PostgreSQL restart/resume, fail-closed readiness, and clean shutdown. The final
+integrated image must be rebuilt and rescanned after the remaining merges.
+
 ## Source rollup: 2026-09-07
 
 ### Repair deployed for owner testing; tablet timing gate remains failed
@@ -19,8 +35,9 @@ immutable image
 Exact-head Application `34152244060`, Firefox/WebKit `34152244030`, Documentation
 `34152244048`, Security `34152244015`, and CodeQL `34152241466` all pass.
 Independent Codex and CodeRabbit reviews found no actionable regression; all
-three hosted feedback threads are resolved. PR #56 remains unmerged because
-GitHub requires code-owner approval; no approval requirement was bypassed.
+three initial hosted feedback threads were resolved. PR #56 was subsequently
+merged on 2026-10-06 under the explicit exception recorded above, after the
+later documentation threads were also resolved.
 
 Both retained-data VPS full games pass within their unchanged eight-minute
 bounds, with pending-result reload and exact replay. Desktop covers retreat/
