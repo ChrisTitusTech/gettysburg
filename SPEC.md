@@ -42,10 +42,16 @@ not remain compatible. The owner subsequently authorized retirement of five old
 development games after encrypted backup verification. Normal audited deletion
 retired those games; the database was preserved.
 
-The last verified VPS deployment implements the Phase 2 Scenario Five
-rules-light digital tabletop, durable PostgreSQL state, recovery, and staging.
-That evidence does not claim complete Phase 3 rule enforcement or Phase 4
-production readiness. Phase 2 operational closeout completed on 2026-09-06:
+The 2026-09-07 development VPS repair deploys reviewed candidate `1baebbd`
+from PR #56, including mandatory Scenario Five for new games, replay, and private
+spectators. PR #56 remains unmerged pending required code-owner approval.
+Push remains disabled pending signing-key/provider setup. This does not claim
+owner acceptance of Phase 3 or Phase 4 production readiness.
+The site is open for owner gameplay testing. Public desktop full-game checks,
+both-width basic workflows, restart recovery, and final backup verification pass.
+The public tablet full-game timing gate still fails near turn 24; deployment
+success does not supersede that failure or establish release acceptance.
+Historical Phase 2 operational closeout completed on 2026-09-06:
 PR #4 passed independent review and exact-head CI, merged with passing post-merge
 CI, and deployed as `40cff572aab183660dfeee188c4b6acddb2b1de5`. Public readiness,
 encrypted backup/restore, desktop/tablet two-client workflows, and application
@@ -783,6 +789,29 @@ handshake wait, then reauthorizes and sends under the same database read lock.
 Delayed acknowledgement across session expiry or an unnotified revocation
 closes the observer without a snapshot. A pending handshake does not hold the
 room delivery queue or a database connection.
+Game-scoped PostgreSQL reads project only the requested game's canonical record
+before transferring and reconstructing it. Unrelated retained boards and action
+histories must not burden each room read. Authorization metadata remains in the
+same canonical snapshot; delivery retains its SHARE lock and bounded deadline.
+This read optimization does not modify stored records or the retention policy.
+Gameplay transactions reconstruct undeleted games and any explicitly targeted
+retired game, so global notification pruning and stale-authorization behavior
+remain intact. Under the same canonical UPDATE lock, PostgreSQL overlays those
+records and preserves omitted retired histories and their ordering. Gameplay
+cannot change the game inventory. Creation, host management, retention, and
+recovery keep the full-snapshot transaction path; no data migration is required.
+An admission read that reaches its deadline reports transient status 503.
+Player/spectator clients retry only that status, at most four attempts with
+500/1000/2000 ms backoff, and cancel pending backoff on navigation. Denied or
+revoked access is not retried. The server deadline and revocation lock remain
+unchanged; retry is not a promise that unbounded host load can be accepted.
+Browser acceptance records the native console diagnostic for an observed
+same-origin POST admission 503 instead of treating that expected response as
+an application error. Classification requires the exact matchmaking endpoint,
+matching console location/status, and a fresh unconsumed response observation.
+Other HTTP errors still fail the audit; connection and workflow assertions,
+retry exhaustion, and all time bounds remain mandatory.
+
 An abortable two-slot admission queue owns delivery-pool capacity. A disconnected
 or replaced join is removed immediately before it can request a pool connection;
 live waiters retain FIFO order. At most two connection establishments can remain
@@ -1188,11 +1217,12 @@ accepted when:
 
 ## Remaining decisions and acceptance
 
-- Which remaining Battle Manual interpretations must be approved for complete
-  Phase 3 enforcement?
-- Complete gameplay acceptance of inferred movement edges and the painted-board
-  scenario adaptations; all 253 terrain rows are already approved.
-- Implement the owner-approved continuous-move UI: repeated drags of one
+The owner accepted the current board and mandatory rules on 2026-10-06.
+This closes physical-rule adjudication, not the technical release gates above.
+
+- Preserve the approved movement edges and painted-board scenario adaptations;
+  all 253 terrain rows and the current rule interpretation are accepted.
+- Preserve the implemented continuous-move UI: repeated drags of one
   unit/stack are allowed until a different unit moves; reconnect does not reset
   that boundary.
 - Complete final production-candidate validation and obtain release approval.
