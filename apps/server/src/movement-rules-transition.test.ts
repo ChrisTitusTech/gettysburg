@@ -69,10 +69,27 @@ describe("explicit whole-point rules transition", () => {
     expect(move("O7")).toMatchObject({ ok: true });
     const final = service.getGameState(host.gameId);
     expect(final.units["u-devin"]!.movement_spent).toBe(1.5);
+    expect(
+      service.transitionWholePointMovement(
+        host.gameId,
+        1,
+        "owner-approved-maintenance",
+        request,
+      ),
+    ).toEqual(after);
+    expect(service.getGameState(host.gameId)).toEqual(final);
     const restored = new InMemoryGameService({
       pepper,
       snapshot: service.exportSnapshot(),
     });
+    expect(
+      restored.transitionWholePointMovement(
+        host.gameId,
+        1,
+        "owner-approved-maintenance",
+        request,
+      ),
+    ).toEqual(after);
     expect(restored.getReplay(host.credential, host.gameId, 0).state).toEqual(
       createMandatoryInitialState(host.gameId),
     );

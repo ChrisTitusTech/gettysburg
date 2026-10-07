@@ -264,6 +264,16 @@ postgres("PostgreSQL durability", () => {
           state: { units: { "u-devin": { movement_spent: 1.5 } } },
         });
         expect(
+          await restored.transitionWholePointMovement(
+            host.gameId,
+            1,
+            "owner",
+            request,
+          ),
+        ).toEqual(after);
+        expect((await restored.getGameState(host.gameId)).version).toBe(3);
+        expect(await restored.getActions(host.gameId)).toHaveLength(3);
+        expect(
           (await restored.getReplay(host.credential, host.gameId)).state,
         ).toEqual(await restored.getGameState(host.gameId));
         const rows = await administration.query(

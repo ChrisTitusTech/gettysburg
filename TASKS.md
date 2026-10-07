@@ -26,8 +26,13 @@ be updated too. Engineering owns this separate increment from capacity PR #75.
 - [x] Independent Codex reviews of the complete implementation and final browser
   harness changes found no actionable defects; the final reviewer independently
   reran workspace tests, typechecking, and diff checks.
-- [ ] Exact-head CI and hosted review before merge; the separate movement admin
-  merge exception is awaiting owner confirmation. No deployment has occurred.
+- [ ] Exact-head CI and hosted review before merge. The owner authorized the
+  separate movement admin merge, combined deployment, and current-game update
+  on 2026-10-07. Hosted review found that a retry after later gameplay returned
+  the latest state; retries now replay the original transition sequence instead.
+  Regression coverage verifies stable results and unchanged live state both
+  in memory and after PostgreSQL restart. Fresh local gates and all 33 PostgreSQL
+  tests pass; final review/CI of this correction remain required.
 - [ ] Back up and deploy the reviewed image; apply the authorized transition
   only to the identified current testing game and verify all old/new replay
   cursors and unchanged game contents. Other saves keep their pinned versions.

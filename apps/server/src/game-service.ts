@@ -3075,7 +3075,9 @@ export class InMemoryGameService {
         prior.expectedVersion !== expectedVersion
       )
         throw new Error("Operator request identity conflict");
-      return structuredClone(game.state);
+      // Trusted maintenance must also retry transitions beyond the public
+      // replay work limit. No public route can select this unlimited bound.
+      return this.#replayGame(gameId, prior.sequence, Infinity).state;
     }
     if (game.state.version !== expectedVersion)
       throw new Error("Game changed before rules transition");
@@ -3125,6 +3127,14 @@ export class InMemoryGameService {
         "unauthorized",
         "Current game access is required.",
       );
+    return this.#replayGame(gameId, requestedSequence);
+  }
+
+  #replayGame(
+    gameId: string,
+    requestedSequence?: number,
+    sequenceLimit = 10_000,
+  ): ReplaySnapshot {
     const game = this.#requireActiveGame(gameId);
     const latest = game.state.event_sequence;
     const sequence = requestedSequence ?? latest;
@@ -3141,7 +3151,7 @@ export class InMemoryGameService {
       );
     // Bound synchronous verification work. Larger histories remain exportable;
     // checkpointed replay and measured capacity are separate release gates.
-    if (game.actions.length !== latest || sequence > 10_000)
+    if (game.actions.length !== latest || sequence > sequenceLimit)
       throw new ServiceError("replay_unavailable", "Replay is unavailable.");
     try {
       return {
