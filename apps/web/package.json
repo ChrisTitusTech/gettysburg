@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@colyseus/sdk": "0.17.43",
+    "@colyseus/sdk": "0.18.5",
     "@gettysburg/content": "workspace:*",
     "@gettysburg/game": "workspace:*",
     "react": "19.2.8",
