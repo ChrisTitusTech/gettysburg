@@ -8,6 +8,7 @@ import {
   loadDeletionLedgerStartupReadiness,
 } from "./runtime-config.js";
 import { createGettysburgServer } from "./server.js";
+import { startCreationAdmission } from "./creation-admission.js";
 
 const host = process.env.GETTYSBURG_SERVER_HOST ?? "127.0.0.1";
 const port = Number(process.env.GETTYSBURG_SERVER_PORT ?? "2567");
@@ -63,7 +64,9 @@ const readiness = {
     return true;
   },
 };
+const creationAdmission = await startCreationAdmission();
 const gameServer = createGettysburgServer({
+  creationAdmission,
   ...(pushVapid ? { pushPublicKey: pushVapid.publicKey } : {}),
   gameService,
   readiness,
@@ -80,6 +83,7 @@ async function shutdown(signal: NodeJS.Signals) {
   }
 
   isShuttingDown = true;
+  creationAdmission.stop();
   console.log(`Received ${signal}; stopping Gettysburg server`);
   await pushWorker?.stop();
   await gameServer.gracefullyShutdown(false);

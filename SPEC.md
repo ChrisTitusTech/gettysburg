@@ -1063,8 +1063,20 @@ commit only once.
   non-TLS production upgrades before parsing cookies or commands. The session
   credential and requested game/seat binding are validated during every upgrade.
 - Every command is authorized against the server-side seat and game status.
-- Rate limits cover game creation, invitation attempts, HTTP endpoints, and
-  WebSocket message volume.
+- Game creation has no separate per-source or global count quota. Per owner
+  direction on 2026-10-06, Linux host-wide CPU or memory utilization at or above
+  90% pauses creation with `429 creation_capacity_exceeded` and `Retry-After: 5`.
+  CPU is aggregate busy-time delta over one-second samples; memory is
+  `(MemTotal - MemAvailable) / MemTotal`, not free RAM alone. Below both thresholds,
+  creation resumes automatically. Unavailable or over-five-second-old telemetry
+  returns `503 creation_capacity_unavailable`, not a fabricated utilization.
+  The production entry point starts the sampler before listening and stops it
+  during shutdown. This is admission protection, not a capacity certification;
+  disk utilization, cgroup limits, and workload forecasting are not measured.
+- Invitation attempts, general HTTP endpoints, replay, push, and WebSocket
+  message volume retain their independent abuse limits, including on creation
+  requests covered by the general HTTP budget. Existing-game access is not
+  subject to the creation-specific capacity gate.
 - Logs omit session tokens, invitation secrets, and database credentials. Full
   client IP addresses are never recorded; security telemetry may use a documented
   truncated or keyed-pseudonymous value with bounded retention.

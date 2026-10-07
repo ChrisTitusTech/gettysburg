@@ -15,6 +15,7 @@ import express, {
 import { ServiceError, type ServiceErrorCode } from "./game-service.js";
 import { publicActionLog } from "./public-action-log.js";
 import { isCanonicalCredential } from "./credentials.js";
+import type { CreationAdmission } from "./creation-admission.js";
 import type { GameEventBus } from "./event-bus.js";
 import {
   InMemoryAsyncGameService,
@@ -22,52 +23,9 @@ import {
 } from "./postgres-store.js";
 
 export const SESSION_COOKIE_NAME = "__Host-gettysburg-session";
-const CREATION_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
-const CREATION_LIMIT_PER_SOURCE = 10;
-const CREATION_LIMIT_GLOBAL = 100;
 const CLAIM_LIMIT_WINDOW_MS = 15 * 60 * 1_000;
 const CLAIM_LIMIT_PER_SOURCE = 20;
 const CLAIM_LIMIT_GLOBAL = 200;
-
-interface CreationBucket {
-  readonly creationIds: Set<string>;
-  readonly resetAt: number;
-}
-
-class CreationRateLimiter {
-  #global: CreationBucket = {
-    creationIds: new Set(),
-    resetAt: Date.now() + CREATION_LIMIT_WINDOW_MS,
-  };
-  readonly #sources = new Map<string, CreationBucket>();
-
-  allow(source: string, creationId: string, now = Date.now()): boolean {
-    if (this.#global.resetAt <= now) {
-      this.#global = {
-        creationIds: new Set(),
-        resetAt: now + CREATION_LIMIT_WINDOW_MS,
-      };
-      this.#sources.clear();
-    }
-    if (this.#global.creationIds.has(creationId)) return true;
-    if (this.#global.creationIds.size >= CREATION_LIMIT_GLOBAL) return false;
-
-    let sourceBucket = this.#sources.get(source);
-    if (sourceBucket === undefined || sourceBucket.resetAt <= now) {
-      sourceBucket = {
-        creationIds: new Set(),
-        resetAt: now + CREATION_LIMIT_WINDOW_MS,
-      };
-      this.#sources.set(source, sourceBucket);
-    }
-    if (sourceBucket.creationIds.size >= CREATION_LIMIT_PER_SOURCE) {
-      return false;
-    }
-    sourceBucket.creationIds.add(creationId);
-    this.#global.creationIds.add(creationId);
-    return true;
-  }
-}
 
 interface AttemptBucket {
   count: number;
@@ -111,6 +69,7 @@ export interface ReadinessState {
 }
 
 export interface HttpApplicationOptions {
+  readonly creationAdmission?: CreationAdmission;
   readonly pushPublicKey?: string;
   readonly eventBus?: GameEventBus;
   readonly gameService: GameService;
@@ -190,7 +149,6 @@ export function configureHttpApplication(
   options: HttpApplicationOptions,
 ): Application {
   const { gameService, readiness, staticDirectory } = options;
-  const creationRateLimiter = new CreationRateLimiter();
   const claimRateLimiter = new AttemptRateLimiter();
   // Process-local limits precede database reads and synchronous reconstruction.
   // Both maps are bounded by the global attempt budget and expire each minute.
@@ -425,12 +383,19 @@ export function configureHttpApplication(
         typeof suppliedCreationId === "string"
           ? suppliedCreationId
           : randomUUID();
-      if (!creationRateLimiter.allow(request.ip ?? "unknown", creationId)) {
-        response.setHeader(
-          "Retry-After",
-          String(Math.ceil(CREATION_LIMIT_WINDOW_MS / 1_000)),
-        );
-        response.status(429).json({ error: "creation_rate_limited" });
+      const admission = options.creationAdmission?.status() ?? "available";
+      if (admission !== "available") {
+        response.setHeader("Retry-After", "5");
+        response.status(admission === "busy" ? 429 : 503).json({
+          error:
+            admission === "busy"
+              ? "creation_capacity_exceeded"
+              : "creation_capacity_unavailable",
+          message:
+            admission === "busy"
+              ? "The server is busy (90% CPU or memory usage). Please try hosting again shortly."
+              : "Server capacity is being checked. Please try hosting again shortly.",
+        });
         return;
       }
 
@@ -833,6 +798,11 @@ export function configureHttpApplication(
 export function createHttpApplication(
   readiness: ReadinessState,
   gameService: GameService = new InMemoryAsyncGameService(),
+  creationAdmission?: CreationAdmission,
 ): Application {
-  return configureHttpApplication(express(), { gameService, readiness });
+  return configureHttpApplication(express(), {
+    gameService,
+    readiness,
+    ...(creationAdmission ? { creationAdmission } : {}),
+  });
 }

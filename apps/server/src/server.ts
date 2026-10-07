@@ -5,8 +5,10 @@ import { configureHttpApplication, type ReadinessState } from "./http.js";
 import { GameEventBus } from "./event-bus.js";
 import type { GameService } from "./postgres-store.js";
 import { createGettysburgRoom } from "./room.js";
+import type { CreationAdmission } from "./creation-admission.js";
 
 export interface GettysburgServerOptions {
+  readonly creationAdmission?: CreationAdmission;
   readonly pushPublicKey?: string;
   readonly gameService: GameService;
   readonly readiness: ReadinessState;

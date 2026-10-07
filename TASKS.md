@@ -1,5 +1,53 @@
 # Gettysburg project tasks
 
+## Resource-aware game creation: 2026-10-06
+
+The owner confirmed that the 90% resource policy replaces game-creation quotas
+only; all other abuse protections remain. Engineering owns this separate repair.
+
+- [x] Replace the 10/source and 100/global creation windows with sampled Linux
+  host CPU/RAM admission at 90%, a five-second retry hint, and automatic recovery.
+  Unavailable/stale telemetry yields a retryable 503 rather than false capacity.
+  Requests do not bypass the existing general HTTP or credential protections.
+- [x] Verify the live rootless container sees the VPS aggregate CPU and memory
+  counters without new mounts or privileges. No application restart performed.
+- [x] Frozen install, format, lint, typecheck, 780 workspace tests, 39 harness
+  tests, build, smoke, Markdown lint, and diff checks pass. The 31 opt-in
+  PostgreSQL tests are unchanged and reuse the passing PR #73 evidence.
+  Focused coverage includes exact 90% boundaries, memory cache accounting,
+  counter failures/reset/staleness, sampler cleanup, 101 creations from one
+  source, unchanged HTTP/claim budgets, and existing-game access under pressure.
+- [x] Rootless container smoke passes non-root operation, startup sampling,
+  PostgreSQL restart/resume, fail-closed readiness, and shutdown. Two-session
+  Chromium checks pass at desktop 1440x900 and touch-tablet 1024x768, including
+  both 24-turn games, pending-result reload, exact replay, and inspected rendered
+  screenshots in ignored `test-results/capacity-creation`. Report-mode input
+  observations were 120.5/132.7 ms; this is not calibrated capacity acceptance.
+- [x] Independent Codex implementation review found no actionable issues and
+  independently ran server tests and typechecking.
+- [ ] Exact-head CI, final documentation review, and reviewed rollout. The owner
+  explicitly authorized admin merge and deployment after checks pass, preserving
+  saved games. The VPS still runs `2990d8e`; this policy is not deployed yet.
+  The previous purge approval is spent; do not delete owner testing games.
+
+Documentation PR #74 merged as `359b87f` after exact-head CI and independent
+review with the owner's explicit self-approval exception. The new runtime change
+has its own subsequent exception above. The proxy source-attribution issue below
+still affects the retained abuse limits and remains open.
+
+### Owner movement observation
+
+The owner reports infantry/cavalry appearing to cost 0.5 for all moves. This is
+not yet reproduced as an incorrect charge. Read-only inspection of the saved
+commands and deterministic reconstruction gives Buford/Gamble O5-M7 = 3,
+Devin Q7-M7 = 2.5, and Reynolds/Wadsworth D3-H9 = 6. The cheapest-path planner
+can take a longer route to use explicitly recorded road/rail discounts. On an
+enemy-free board, all 1,384 directed neighboring steps for each of infantry and
+cavalry charge 0.5 only on the 168 road/rail directions; other steps cost 1-4.
+Engineering still needs a specific visibly incorrect route/preview to separate
+transcription, display, and rules defects. Do not claim this owner observation
+resolved or change the pinned rules/content without reproduced evidence.
+
 ## Per-game persistence repair: 2026-10-06
 
 The owner authorized the performance repair, reviewed PR publication/merge,

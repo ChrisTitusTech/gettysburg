@@ -1,5 +1,29 @@
 # Gettysburg VPS baseline and deployment plan
 
+## Pending resource-aware creation policy
+
+The owner selected a 90% host CPU or RAM threshold for game creation only.
+The new implementation samples `/proc/stat` and `/proc/meminfo` once per second;
+verified read-only inspection confirms these expose VPS-wide counters inside
+the rootless application container. No host mount, privilege, proxy-trust change,
+or new dependency is required. Memory uses available RAM, including reclaimable
+cache. CPU uses aggregate busy-time deltas, not load average or process CPU.
+
+At either threshold, only creation receives `429 creation_capacity_exceeded`
+with `Retry-After: 5` and a readable retry message. Both below threshold reopen
+creation automatically. Failed/stale telemetry produces a retryable 503 and
+must be diagnosed; do not disable the gate to hide missing counters. Startup
+takes an initial one-second CPU sample before listening. The retained general
+HTTP, credential, replay, push, and command abuse budgets still apply.
+
+This policy is not deployed yet. Validate local/built-container startup and
+creation/recovery, preserve saved games, scan the exact new image, and use a
+coordinated rollout window. Do not deliberately overload the public VPS to test
+the boundary; deterministic injected-resource tests cover 89.9%, 90%, and
+recovery. A code/image rollback restores the old creation quotas; no schema
+change or data purge is needed. These samples do not certify concurrency capacity
+or measure disk/cgroup limits. The existing proxy-isolation repair remains open.
+
 ## Scope and snapshot
 
 This document records the dedicated development/production target verified over
