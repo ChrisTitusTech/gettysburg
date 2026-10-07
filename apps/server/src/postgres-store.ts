@@ -9,6 +9,7 @@ import type { PushDeliveryOutcome } from "./push-outbox.js";
 
 import {
   InMemoryGameService,
+  isSavedGameVersionAvailable,
   ServiceError,
   type ClaimResult,
   type CreateGameResult,
@@ -43,14 +44,15 @@ const migrationsDirectory = fileURLToPath(
   new URL("../migrations", import.meta.url),
 );
 
-// Retained games stay durable, but unrelated boards/action histories must not
-// be transferred and reconstructed for each room read. Authorization metadata
-// remains in the same snapshot, protected by the existing delivery SHARE lock.
+// Authorization metadata stays behind the existing global lock. Histories live
+// in separate rows so one game never rewrites another game's retained history.
 const scopedSnapshotQuery = `SELECT jsonb_set(snapshot, '{games}', (
-  SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
-  FROM jsonb_array_elements(snapshot->'games') AS entry
-  WHERE entry->>0 = ANY($1::text[])
+  SELECT coalesce(jsonb_agg(jsonb_build_array(game_id, record || jsonb_build_object('state', state)) ORDER BY position), '[]'::jsonb)
+  FROM service_games WHERE game_id = ANY($1::text[])
 )) AS snapshot FROM service_state WHERE singleton = true`;
+
+type GameSelection =
+  readonly string[] | ((snapshot: GameServiceSnapshot) => readonly string[]);
 
 export interface GameService {
   claimPushDelivery(signal?: AbortSignal): Promise<PushDelivery | undefined>;
@@ -423,8 +425,9 @@ export class PostgresGameService implements GameService {
     gameId: string,
     input: unknown,
   ) {
-    return this.#mutate((service) =>
-      service.setPushSubscription(credential, gameId, input),
+    return this.#mutate(
+      (service) => service.setPushSubscription(credential, gameId, input),
+      [gameId],
     );
   }
   async getPushSubscriptionStatus(
@@ -436,8 +439,9 @@ export class PostgresGameService implements GameService {
     );
   }
   async removePushSubscription(credential: string | undefined, gameId: string) {
-    return this.#mutate((service) =>
-      service.removePushSubscription(credential, gameId),
+    return this.#mutate(
+      (service) => service.removePushSubscription(credential, gameId),
+      [gameId],
     );
   }
   readonly #pool: Pool;
@@ -498,7 +502,13 @@ export class PostgresGameService implements GameService {
   async claimSpectatorInvitation(
     input: Parameters<InMemoryGameService["claimSpectatorInvitation"]>[0],
   ) {
-    return this.#mutate((service) => service.claimSpectatorInvitation(input));
+    return this.#mutate(
+      (service) => service.claimSpectatorInvitation(input),
+      (snapshot) =>
+        snapshot.spectatorInvitations
+          ?.filter(([id]) => id === input.lookupId)
+          .map(([, entry]) => entry.gameId) ?? [],
+    );
   }
   async getSpectatorView(credential: string | undefined, gameId: string) {
     return this.#read([gameId], (service) =>
@@ -551,8 +561,9 @@ export class PostgresGameService implements GameService {
         }>(
           "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
         );
-        const snapshot = storedState.rows[0]?.snapshot;
-        if (snapshot !== undefined) {
+        const metadata = storedState.rows[0]?.snapshot;
+        if (metadata !== undefined) {
+          const snapshot = await this.#loadGames(client, metadata);
           const service = new InMemoryGameService({
             pepper: this.#pepper,
             snapshot,
@@ -600,9 +611,10 @@ export class PostgresGameService implements GameService {
           }));
           const applied = service.synchronizeDeletionLedger(receipts);
           if (applied.length > 0) {
-            await client.query(
-              "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
-              [JSON.stringify(service.exportSnapshot())],
+            await this.#persistSnapshot(
+              client,
+              service.exportSnapshot(),
+              snapshot,
             );
           }
         }
@@ -647,24 +659,17 @@ export class PostgresGameService implements GameService {
     try {
       const result = await this.#pool.query<{
         count: string;
-        snapshot: GameServiceSnapshot;
+        states: GameState[];
       }>(
         `SELECT
-           (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2, 3)) AS count,
-           jsonb_set(snapshot, '{games}', (
-             SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
-             FROM jsonb_array_elements(snapshot->'games') AS entry
-             WHERE entry->1->>'deletedAt' IS NULL
-           )) AS snapshot
+           (SELECT count(*)::text FROM schema_migrations WHERE version IN (1, 2, 3, 4)) AS count,
+           (SELECT coalesce(jsonb_agg(state ORDER BY position), '[]'::jsonb)
+            FROM service_games WHERE deleted_at IS NULL) AS states
          FROM service_state WHERE singleton = true`,
       );
       const row = result.rows[0];
       return (
-        row?.count === "3" &&
-        new InMemoryGameService({
-          pepper: this.#pepper,
-          snapshot: row.snapshot,
-        }).isVersionRegistryReady()
+        row?.count === "4" && row.states.every(isSavedGameVersionAvailable)
       );
     } catch {
       return false;
@@ -690,15 +695,21 @@ export class PostgresGameService implements GameService {
     input: Parameters<InMemoryGameService["claimHostRecovery"]>[0],
     options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    const execution = await this.#mutate((service) => {
-      let committedEvent: AuditEvent | undefined;
-      const result = service.claimHostRecovery(input, {
-        afterCommit: (event) => {
-          committedEvent = event;
-        },
-      });
-      return { committedEvent, result };
-    });
+    const execution = await this.#mutate(
+      (service) => {
+        let committedEvent: AuditEvent | undefined;
+        const result = service.claimHostRecovery(input, {
+          afterCommit: (event) => {
+            committedEvent = event;
+          },
+        });
+        return { committedEvent, result };
+      },
+      (snapshot) =>
+        snapshot.recoveryGrants
+          .filter(([id]) => id === input.lookupId)
+          .map(([, entry]) => entry.gameId),
+    );
     if (execution.committedEvent !== undefined) {
       options.afterCommit?.(execution.committedEvent);
     }
@@ -708,22 +719,34 @@ export class PostgresGameService implements GameService {
   async claimInvitation(
     input: Parameters<InMemoryGameService["claimInvitation"]>[0],
   ) {
-    return this.#mutate((service) => service.claimInvitation(input));
+    return this.#mutate(
+      (service) => service.claimInvitation(input),
+      (snapshot) =>
+        snapshot.invitations
+          .filter(([id]) => id === input.lookupId)
+          .map(([, entry]) => entry.gameId),
+    );
   }
 
   async claimSeatRecovery(
     input: Parameters<InMemoryGameService["claimSeatRecovery"]>[0],
     options: { afterCommit?: (event: AuditEvent) => void } = {},
   ) {
-    const execution = await this.#mutate((service) => {
-      let committedEvent: AuditEvent | undefined;
-      const result = service.claimSeatRecovery(input, {
-        afterCommit: (event) => {
-          committedEvent = event;
-        },
-      });
-      return { committedEvent, result };
-    });
+    const execution = await this.#mutate(
+      (service) => {
+        let committedEvent: AuditEvent | undefined;
+        const result = service.claimSeatRecovery(input, {
+          afterCommit: (event) => {
+            committedEvent = event;
+          },
+        });
+        return { committedEvent, result };
+      },
+      (snapshot) =>
+        snapshot.recoveryGrants
+          .filter(([id]) => id === input.lookupId)
+          .map(([, entry]) => entry.gameId),
+    );
     if (execution.committedEvent !== undefined) {
       options.afterCommit?.(execution.committedEvent);
     }
@@ -736,13 +759,16 @@ export class PostgresGameService implements GameService {
     creationId?: string,
     creationCredential?: string,
   ) {
-    return this.#mutate((service) =>
-      service.createGame(
-        side,
-        existingCredential,
-        creationId,
-        creationCredential,
-      ),
+    return this.#mutate(
+      (service) =>
+        service.createGame(
+          side,
+          existingCredential,
+          creationId,
+          creationCredential,
+        ),
+      [],
+      creationId,
     );
   }
 
@@ -751,15 +777,18 @@ export class PostgresGameService implements GameService {
     input: unknown,
     options: { afterCommit?: () => void } = {},
   ) {
-    const execution = await this.#mutate((service) => {
-      let committed = false;
-      const result = service.executeCommand(authorization, input, {
-        afterCommit: () => {
-          committed = true;
-        },
-      });
-      return { committed, result };
-    }, authorization.gameId);
+    const execution = await this.#mutate(
+      (service) => {
+        let committed = false;
+        const result = service.executeCommand(authorization, input, {
+          afterCommit: () => {
+            committed = true;
+          },
+        });
+        return { committed, result };
+      },
+      [authorization.gameId],
+    );
     if (execution.committed) options.afterCommit?.();
     return execution.result;
   }
@@ -769,17 +798,20 @@ export class PostgresGameService implements GameService {
     input: unknown,
     options: HostManagementCommitOptions = {},
   ) {
-    const execution = await this.#mutate((service) => {
-      let committedEvent: ManagementEvent | undefined;
-      let revokedSpectatorBindingId: string | undefined;
-      const result = service.executeHostCommand(authorization, input, {
-        afterCommit: (event, bindingId) => {
-          committedEvent = event;
-          revokedSpectatorBindingId = bindingId;
-        },
-      });
-      return { committedEvent, result, revokedSpectatorBindingId };
-    });
+    const execution = await this.#mutate(
+      (service) => {
+        let committedEvent: ManagementEvent | undefined;
+        let revokedSpectatorBindingId: string | undefined;
+        const result = service.executeHostCommand(authorization, input, {
+          afterCommit: (event, bindingId) => {
+            committedEvent = event;
+            revokedSpectatorBindingId = bindingId;
+          },
+        });
+        return { committedEvent, result, revokedSpectatorBindingId };
+      },
+      [authorization.gameId],
+    );
     if (execution.committedEvent !== undefined) {
       options.afterCommit?.(
         execution.committedEvent,
@@ -836,14 +868,16 @@ export class PostgresGameService implements GameService {
     side: Side,
     operatorIdentity: string,
   ) {
-    return this.#mutate((service) =>
-      service.issueSeatRecovery(gameId, side, operatorIdentity),
+    return this.#mutate(
+      (service) => service.issueSeatRecovery(gameId, side, operatorIdentity),
+      [gameId],
     );
   }
 
   async issueHostRecovery(gameId: string, operatorIdentity: string) {
-    return this.#mutate((service) =>
-      service.issueHostRecovery(gameId, operatorIdentity),
+    return this.#mutate(
+      (service) => service.issueHostRecovery(gameId, operatorIdentity),
+      [gameId],
     );
   }
 
@@ -895,15 +929,25 @@ export class PostgresGameService implements GameService {
       if (signal.aborted) throw new Error("Room delivery was cancelled.");
       await client.query("BEGIN");
       await client.query("SET LOCAL statement_timeout = '2000ms'");
+      // Acquire the authorization fence before taking the statement snapshot
+      // that reads game rows. A subquery in the locking SELECT could otherwise
+      // retain pre-writer game data while waiting for the metadata row lock.
+      await client.query(
+        "SELECT singleton FROM service_state WHERE singleton = true FOR SHARE",
+      );
       const result = await client.query<{ snapshot: GameServiceSnapshot }>(
         gameIds === undefined
-          ? "SELECT snapshot FROM service_state WHERE singleton = true FOR SHARE"
-          : `${scopedSnapshotQuery} FOR SHARE`,
+          ? "SELECT snapshot FROM service_state WHERE singleton = true"
+          : scopedSnapshotQuery,
         gameIds === undefined ? [] : [gameIds],
       );
-      const snapshot = result.rows[0]?.snapshot;
-      if (snapshot === undefined || signal.aborted)
+      const metadata = result.rows[0]?.snapshot;
+      if (metadata === undefined || signal.aborted)
         throw new Error("Room delivery snapshot is unavailable.");
+      const snapshot =
+        gameIds === undefined
+          ? await this.#loadGames(client, metadata, this.#pushGameIds(metadata))
+          : metadata;
       // The synchronous send occurs while this lock prevents a revocation from
       // committing. Returning authorization and sending later would race again.
       operation(new InMemoryGameService({ pepper: this.#pepper, snapshot }));
@@ -948,54 +992,41 @@ export class PostgresGameService implements GameService {
 
   async #mutate<T>(
     operation: (service: InMemoryGameService) => T,
-    commandGameId?: string,
+    selection?: GameSelection,
+    creationId?: string,
   ): Promise<T> {
-    // Gameplay cannot add or purge games. Keep every undeleted game for global
-    // notification pruning, plus a retired target for stale-command semantics.
-    // PostgreSQL preserves omitted histories under the same canonical row lock.
+    // The small metadata row serializes authorization changes and writers;
+    // unrelated game rows are neither reconstructed nor rewritten.
     const client = await this.#pool.connect();
     let released = false;
     try {
       await client.query("BEGIN");
       const result = await client.query<{ snapshot: GameServiceSnapshot }>(
-        commandGameId === undefined
-          ? "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE"
-          : `SELECT jsonb_set(snapshot, '{games}', (
-              SELECT coalesce(jsonb_agg(entry), '[]'::jsonb)
-              FROM jsonb_array_elements(snapshot->'games') AS entry
-              WHERE entry->1->>'deletedAt' IS NULL OR entry->>0 = $1
-            )) AS snapshot FROM service_state WHERE singleton = true FOR UPDATE`,
-        commandGameId === undefined ? undefined : [commandGameId],
+        "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
       );
-      const snapshot = result.rows[0]?.snapshot;
-      if (snapshot === undefined)
+      const metadata = result.rows[0]?.snapshot;
+      if (metadata === undefined)
         throw new Error("PostgreSQL service state is unavailable");
+      let gameIds =
+        typeof selection === "function" ? selection(metadata) : selection;
+      if (gameIds !== undefined) {
+        gameIds = [...gameIds, ...this.#pushGameIds(metadata)];
+        if (creationId !== undefined) {
+          const replay = await client.query<{ game_id: string }>(
+            "SELECT game_id FROM service_games WHERE creation_id = $1",
+            [creationId],
+          );
+          gameIds = [...gameIds, ...replay.rows.map((row) => row.game_id)];
+        }
+      }
+      const snapshot = await this.#loadGames(client, metadata, gameIds);
       const service = new InMemoryGameService({
         pepper: this.#pepper,
         snapshot,
       });
       const value = operation(service);
       const nextSnapshot = service.exportSnapshot();
-      if (
-        commandGameId !== undefined &&
-        !isDeepStrictEqual(
-          nextSnapshot.games.map(([id]) => id),
-          snapshot.games.map(([id]) => id),
-        )
-      )
-        throw new Error("Gameplay cannot change the game inventory.");
-      await client.query(
-        commandGameId === undefined
-          ? "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true"
-          : `UPDATE service_state SET snapshot = jsonb_set($1::jsonb, '{games}', (
-              SELECT coalesce(jsonb_agg(coalesce(updated.entry, retained.entry) ORDER BY retained.position), '[]'::jsonb)
-              FROM jsonb_array_elements(snapshot->'games') WITH ORDINALITY AS retained(entry, position)
-              LEFT JOIN jsonb_array_elements($1::jsonb->'games') AS updated(entry)
-                ON updated.entry->>0 = retained.entry->>0
-            )), updated_at = now() WHERE singleton = true`,
-        [JSON.stringify(nextSnapshot)],
-      );
-      await this.#mirrorSnapshot(client, nextSnapshot, snapshot);
+      await this.#persistSnapshot(client, nextSnapshot, snapshot);
       await client.query("COMMIT");
       return value;
     } catch (error) {
@@ -1013,6 +1044,74 @@ export class PostgresGameService implements GameService {
     } finally {
       if (!released) client.release();
     }
+  }
+
+  #pushGameIds(snapshot: GameServiceSnapshot): string[] {
+    const bindings = new Set(
+      (snapshot.pushSubscriptions ?? []).map((entry) => entry.bindingId),
+    );
+    return snapshot.seatBindings
+      .filter((binding) => bindings.has(binding.id))
+      .map((binding) => binding.gameId);
+  }
+
+  async #loadGames(
+    client: PoolClient,
+    metadata: GameServiceSnapshot,
+    gameIds?: readonly string[],
+  ): Promise<GameServiceSnapshot> {
+    const result = await client.query<{
+      game_id: string;
+      record: GameServiceSnapshot["games"][number][1];
+    }>(
+      `SELECT game_id, record || jsonb_build_object('state', state) AS record
+       FROM service_games ${gameIds === undefined ? "" : "WHERE game_id = ANY($1::text[])"} ORDER BY position`,
+      gameIds === undefined ? [] : [gameIds],
+    );
+    return {
+      ...metadata,
+      games: result.rows.map((row) => [row.game_id, row.record]),
+    };
+  }
+
+  async #persistSnapshot(
+    client: PoolClient,
+    next: GameServiceSnapshot,
+    previous: GameServiceSnapshot,
+  ) {
+    const metadata = { ...next, games: [] };
+    if (!isDeepStrictEqual(metadata, { ...previous, games: [] })) {
+      await client.query(
+        "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
+        [JSON.stringify(metadata)],
+      );
+    }
+    const prior = new Map(previous.games);
+    const retained = new Set(next.games.map(([id]) => id));
+    for (const [id, game] of next.games) {
+      if (isDeepStrictEqual(game, prior.get(id))) continue;
+      const { state, ...record } = game;
+      await client.query(
+        `INSERT INTO service_games (game_id, state, record, deleted_at, creation_id)
+         VALUES ($1, $2::jsonb, $3::jsonb, $4, $5)
+         ON CONFLICT (game_id) DO UPDATE SET state = EXCLUDED.state,
+           record = EXCLUDED.record, deleted_at = EXCLUDED.deleted_at, creation_id = EXCLUDED.creation_id`,
+        [
+          id,
+          JSON.stringify(state),
+          JSON.stringify(record),
+          game.deletedAt ?? null,
+          game.creation?.creationId ?? null,
+        ],
+      );
+    }
+    for (const [id] of previous.games) {
+      if (!retained.has(id))
+        await client.query("DELETE FROM service_games WHERE game_id = $1", [
+          id,
+        ]);
+    }
+    await this.#mirrorSnapshot(client, next, previous);
   }
 
   // Worker-only transactions use bounded, cancellable capacity. An idle poll
@@ -1048,8 +1147,13 @@ export class PostgresGameService implements GameService {
         "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
       );
       signal.throwIfAborted();
-      const snapshot = result.rows[0]?.snapshot;
-      if (!snapshot) throw new Error("Push state is unavailable.");
+      const metadata = result.rows[0]?.snapshot;
+      if (!metadata) throw new Error("Push state is unavailable.");
+      const snapshot = await this.#loadGames(
+        client,
+        metadata,
+        this.#pushGameIds(metadata),
+      );
       const service = new InMemoryGameService({
         pepper: this.#pepper,
         snapshot,
@@ -1057,11 +1161,7 @@ export class PostgresGameService implements GameService {
       const value = operation(service);
       const next = service.exportSnapshot();
       if (!isDeepStrictEqual(next, snapshot)) {
-        await client.query(
-          "UPDATE service_state SET snapshot = $1::jsonb, updated_at = now() WHERE singleton = true",
-          [JSON.stringify(next)],
-        );
-        await this.#mirrorSnapshot(client, next, snapshot);
+        await this.#persistSnapshot(client, next, snapshot);
       }
       signal.throwIfAborted();
       await client.query("COMMIT");

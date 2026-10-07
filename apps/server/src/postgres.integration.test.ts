@@ -21,6 +21,11 @@ import {
 const connectionString = process.env.GETTYSBURG_POSTGRES_TEST_URL;
 const postgres = connectionString === undefined ? describe.skip : describe;
 
+const completeSnapshotQuery = `SELECT jsonb_set(snapshot, '{games}', (
+  SELECT coalesce(jsonb_agg(jsonb_build_array(game_id, record || jsonb_build_object('state', state)) ORDER BY position), '[]'::jsonb)
+  FROM service_games
+)) AS snapshot FROM service_state WHERE singleton = true`;
+
 function holdNextDeliveryRead(count = 1) {
   let release!: () => void;
   let captured!: () => void;
@@ -58,6 +63,35 @@ postgres("PostgreSQL durability", () => {
   const pepper = randomBytes(32);
   let administration: Pool;
 
+  async function replaceSnapshot(snapshot: unknown) {
+    const client = await administration.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        "SELECT snapshot FROM service_state WHERE singleton = true FOR UPDATE",
+      );
+      await client.query("DELETE FROM service_games");
+      await client.query(
+        `INSERT INTO service_games (game_id, state, record, deleted_at, creation_id)
+         SELECT entry->>0, entry->1->'state', (entry->1) - 'state',
+                (entry->1->>'deletedAt')::bigint, entry->1->'creation'->>'creationId'
+         FROM jsonb_array_elements($1::jsonb->'games') WITH ORDINALITY AS games(entry, ordinal)
+         ORDER BY ordinal`,
+        [JSON.stringify(snapshot)],
+      );
+      await client.query(
+        "UPDATE service_state SET snapshot = jsonb_set($1::jsonb, '{games}', '[]'::jsonb) WHERE singleton = true",
+        [JSON.stringify(snapshot)],
+      );
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   beforeAll(async () => {
     const target = new URL(connectionString!);
     const allowedHosts = new Set(["127.0.0.1", "::1", "localhost"]);
@@ -76,6 +110,77 @@ postgres("PostgreSQL durability", () => {
 
   afterAll(async () => {
     await administration.end();
+  });
+
+  it("migrates populated legacy snapshots without losing histories, credentials, or retries", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      const authorization = await service.authenticate(
+        host.credential,
+        host.gameId,
+      );
+      const command = {
+        command_id: randomUUID(),
+        command_name: "moveStack",
+        expected_version: 0,
+        game_id: host.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+        payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+      };
+      const accepted = await service.executeCommand(authorization, command);
+      expect(accepted.ok).toBe(true);
+      const before = (
+        await administration.query<{ snapshot: GameServiceSnapshot }>(
+          completeSnapshotQuery,
+        )
+      ).rows[0]!.snapshot;
+      // Re-create the prior storage format in this disposable test database.
+      const client = await administration.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query(
+          "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
+          [JSON.stringify(before)],
+        );
+        await client.query("DROP TABLE service_games");
+        await client.query("DELETE FROM schema_migrations WHERE version = 4");
+        await client.query("COMMIT");
+      } finally {
+        client.release();
+      }
+      await service.migrate();
+      await service.migrate();
+      expect(
+        (await administration.query(completeSnapshotQuery)).rows[0].snapshot,
+      ).toEqual(before);
+      expect(
+        (
+          await administration.query(
+            "SELECT snapshot->'games' AS games FROM service_state",
+          )
+        ).rows[0].games,
+      ).toEqual([]);
+      expect(await service.authenticate(host.credential, host.gameId)).toEqual(
+        authorization,
+      );
+      expect(await service.executeCommand(authorization, command)).toEqual(
+        accepted,
+      );
+      const next = await service.createGame("confederate");
+      const ids = (
+        await administration.query<{ game_id: string }>(
+          "SELECT game_id FROM service_games ORDER BY position",
+        )
+      ).rows.map((row) => row.game_id);
+      expect(ids).toEqual([...before.games.map(([id]) => id), next.gameId]);
+    } finally {
+      await service.close();
+    }
   });
 
   it("starts and stops configured push with a stable public key on a fresh private test database", async () => {
@@ -358,11 +463,7 @@ postgres("PostgreSQL durability", () => {
         await restarted.getPushSubscriptionStatus(host.credential, host.gameId),
       ).toEqual(status);
       const stored = JSON.stringify(
-        (
-          await administration.query(
-            "SELECT snapshot FROM service_state WHERE singleton = true",
-          )
-        ).rows,
+        (await administration.query(completeSnapshotQuery)).rows,
       );
       expect(stored).not.toContain(subscription.endpoint);
       expect(stored).not.toContain(subscription.keys.auth);
@@ -485,9 +586,13 @@ postgres("PostgreSQL durability", () => {
       ).toBe(true);
       const before = (
         await administration.query<{ snapshot: GameServiceSnapshot }>(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
+          completeSnapshotQuery,
         )
       ).rows[0]!.snapshot;
+      const untouched = await administration.query(
+        "SELECT game_id, xmin::text AS revision FROM service_games WHERE game_id <> $1 ORDER BY position",
+        [active.gameId],
+      );
       const command = {
         command_id: randomUUID(),
         command_name: "moveStack",
@@ -507,7 +612,7 @@ postgres("PostgreSQL durability", () => {
       );
       const after = (
         await administration.query<{ snapshot: GameServiceSnapshot }>(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
+          completeSnapshotQuery,
         )
       ).rows[0]!.snapshot;
       expect(after.games.map(([id]) => id)).toEqual(
@@ -517,6 +622,14 @@ postgres("PostgreSQL durability", () => {
         before.games.filter(([id]) => id !== active.gameId),
       );
       expect(after.deletionLedger).toEqual(before.deletionLedger);
+      expect(
+        (
+          await administration.query(
+            "SELECT game_id, xmin::text AS revision FROM service_games WHERE game_id <> $1 ORDER BY position",
+            [active.gameId],
+          )
+        ).rows,
+      ).toEqual(untouched.rows);
       expect(
         await service.getPushSubscriptionStatus(other.credential, other.gameId),
       ).toMatchObject({ enabled: true });
@@ -557,9 +670,7 @@ postgres("PostgreSQL durability", () => {
       const host = await service.createGame("union");
       const other = await service.createGame("confederate");
       const originalSnapshot = (
-        await administration.query(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
-        )
+        await administration.query(completeSnapshotQuery)
       ).rows[0].snapshot;
       const seen: string[][] = [];
       const originalPoolQuery = Pool.prototype.query;
@@ -622,15 +733,80 @@ postgres("PostgreSQL durability", () => {
       for (const ids of seen) expect(ids).toEqual([host.gameId]);
       await service.getDeletionLedger();
       expect(seen.at(-1)).toEqual([]);
-      const after = (
-        await administration.query(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
-        )
-      ).rows[0].snapshot;
+      const after = (await administration.query(completeSnapshotQuery)).rows[0]
+        .snapshot;
       expect(after).toEqual(originalSnapshot);
     } finally {
       query?.mockRestore();
       poolQuery?.mockRestore();
+      await service.close();
+    }
+  });
+
+  it("delivers the committed game row after waiting behind a writer", async () => {
+    const service = new PostgresGameService({
+      connectionString: connectionString!,
+      pepper,
+    });
+    let release!: () => void;
+    let captured!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const committing = new Promise<void>((resolve) => {
+      captured = resolve;
+    });
+    let query: ReturnType<typeof vi.spyOn> | undefined;
+    try {
+      await service.migrate();
+      const host = await service.createGame("union");
+      const authorization = await service.authenticate(
+        host.credential,
+        host.gameId,
+      );
+      const original = PgClient.prototype.query;
+      let hold = true;
+      query = vi
+        .spyOn(PgClient.prototype, "query")
+        .mockImplementation(function (this: PgClient, ...args: unknown[]) {
+          if (hold && args[0] === "COMMIT") {
+            hold = false;
+            captured();
+            return barrier.then(() => Reflect.apply(original, this, args));
+          }
+          return Reflect.apply(original, this, args);
+        } as PgClient["query"]);
+      const write = service.executeCommand(authorization, {
+        command_id: randomUUID(),
+        command_name: "moveStack",
+        expected_version: 0,
+        game_id: host.gameId,
+        schema: COMMAND_SCHEMA_VERSION,
+        payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+      });
+      await committing;
+      const deliver = vi.fn();
+      const delivery = service.deliverAuthorizedState(
+        authorization,
+        deliver,
+        new AbortController().signal,
+      );
+      await vi.waitFor(async () => {
+        const waiting = await administration.query(
+          "SELECT count(*)::int AS count FROM pg_stat_activity WHERE query LIKE '%FOR SHARE' AND wait_event_type = 'Lock'",
+        );
+        expect(waiting.rows[0].count).toBeGreaterThan(0);
+      });
+      release();
+      const result = await write;
+      expect(result.ok).toBe(true);
+      await delivery;
+      expect(deliver).toHaveBeenCalledWith(
+        expect.objectContaining({ version: 1 }),
+      );
+    } finally {
+      release();
+      query?.mockRestore();
       await service.close();
     }
   });
@@ -1638,7 +1814,7 @@ postgres("PostgreSQL durability", () => {
         }[];
         games: [string, { deletedAt: number | null }][];
       };
-    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    }>(completeSnapshotQuery);
     const expired = structuredClone(stored.rows[0]!.snapshot);
     const record = expired.games.find(
       ([gameId]) => gameId === deletedGame.gameId,
@@ -1652,10 +1828,7 @@ postgres("PostgreSQL durability", () => {
       throw new Error("Deletion receipt was not persisted");
     deletionReceipt.deletedAt = record[1].deletedAt;
     const expectedPurgePosition = expired.deletionLedger.at(-1)!.position + 1;
-    await administration.query(
-      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
-      [JSON.stringify(expired)],
-    );
+    await replaceSnapshot(expired);
     await administration.query(
       "UPDATE deletion_ledger SET deleted_at = $1 WHERE game_id = $2::uuid AND purged_at IS NULL",
       [new Date(record[1].deletedAt), deletedGame.gameId],
@@ -1718,7 +1891,7 @@ postgres("PostgreSQL durability", () => {
       const retired = await service.createGame("confederate");
       const snapshot = (
         await administration.query<{ snapshot: GameServiceSnapshot }>(
-          "SELECT snapshot FROM service_state WHERE singleton = true",
+          completeSnapshotQuery,
         )
       ).rows[0]!.snapshot;
       const record = snapshot.games.find(([id]) => id === retired.gameId)![1];
@@ -1735,10 +1908,7 @@ postgres("PostgreSQL durability", () => {
             : game,
         ]),
       };
-      await administration.query(
-        "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
-        [JSON.stringify(retained)],
-      );
+      await replaceSnapshot(retained);
       const seen: string[][] = [];
       const original = Pool.prototype.query;
       query = vi.spyOn(Pool.prototype, "query").mockImplementation(function (
@@ -1749,9 +1919,9 @@ postgres("PostgreSQL durability", () => {
         if (typeof args[0] === "string" && args[0].includes("AS count")) {
           return Promise.resolve(result).then((value) => {
             const rows = (
-              value as { rows: { snapshot: GameServiceSnapshot }[] }
+              value as { rows: { states: { game_id: string }[] }[] }
             ).rows;
-            seen.push(rows[0]!.snapshot.games.map(([id]) => id));
+            seen.push(rows[0]!.states.map((state) => state.game_id));
             return value;
           });
         }
@@ -1768,11 +1938,7 @@ postgres("PostgreSQL durability", () => {
       expect(seen[0]).toContain(active.gameId);
       expect(seen[0]).not.toContain(retired.gameId);
       expect(
-        (
-          await administration.query(
-            "SELECT snapshot FROM service_state WHERE singleton = true",
-          )
-        ).rows[0].snapshot,
+        (await administration.query(completeSnapshotQuery)).rows[0].snapshot,
       ).toEqual(retained);
     } finally {
       query?.mockRestore();
@@ -1791,7 +1957,7 @@ postgres("PostgreSQL durability", () => {
 
     const stored = await administration.query<{
       snapshot: Record<string, unknown>;
-    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    }>(completeSnapshotQuery);
     const original = structuredClone(stored.rows[0]!.snapshot) as {
       games: [string, { state: { ruleset_version: string } }][];
     };
@@ -1801,10 +1967,7 @@ postgres("PostgreSQL durability", () => {
     );
     if (record === undefined) throw new Error("Created game was not persisted");
     record[1].state.ruleset_version = "missing-v99";
-    await administration.query(
-      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
-      [JSON.stringify(unavailable)],
-    );
+    await replaceSnapshot(unavailable);
 
     const unavailableService = new PostgresGameService({
       connectionString: connectionString!,
@@ -1812,10 +1975,7 @@ postgres("PostgreSQL durability", () => {
     });
     expect(await unavailableService.isReady()).toBe(false);
     await unavailableService.close();
-    await administration.query(
-      "UPDATE service_state SET snapshot = $1::jsonb WHERE singleton = true",
-      [JSON.stringify(original)],
-    );
+    await replaceSnapshot(original);
   });
 
   it("backfills the deletion ledger for a legacy soft-deleted game", async () => {
@@ -1845,7 +2005,7 @@ postgres("PostgreSQL durability", () => {
 
     const stored = await administration.query<{
       snapshot: { deletionLedger: unknown[] };
-    }>("SELECT snapshot FROM service_state WHERE singleton = true");
+    }>(completeSnapshotQuery);
     const legacySnapshot = structuredClone(stored.rows[0]!.snapshot);
     legacySnapshot.deletionLedger.pop();
     await administration.query(
