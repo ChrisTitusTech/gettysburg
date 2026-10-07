@@ -179,7 +179,7 @@ passed using the isolated CI database on reviewed head `92a7797`. Application
 run `37559367677` and Firefox/WebKit run `37559367734`, plus Documentation,
 Security, and both CodeQL analyses passed before merge. This is not a VPS rollout.
 
-### Repair deployed for owner testing; tablet timing gate remains failed
+### Historical September repair; tablet timing gate was still failed
 
 Reviewed source `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as
 immutable image
@@ -564,19 +564,20 @@ not claim calibrated-hardware or VPS acceptance. Application runtime is unchange
 CodeRabbit's second review also completed with zero findings on the three-file
 deadline/setup repair; hosted threads are resolved only after publishing it.
 
-This rollup distinguishes merged source from the last verified VPS deployment.
+The following summary was refreshed on 2026-10-06 to match the per-game rollout.
+It distinguishes merged source from the last verified VPS deployment.
 Older incremental entries below preserve their contemporaneous stopping points
 and evidence; they do not supersede this current status or close owner gates.
 
 | Area | Current state | Remaining gate |
 | --- | --- | --- |
-| Phases 0-2 | Historical closeout complete; repaired VPS candidate is `1baebbd`; restart and final backup verified | Public tablet timing gate remains failed; owner gameplay testing is available |
-| Mandatory Scenario Five rules | Implementation and owner board/rules acceptance complete (2026-10-06) | Public tablet timing and retained-version replay scope remain; Phase 3 not complete |
+| Phases 0-2 | Historical closeout complete; VPS source `2990d8e` deployed; both public full games, restart, and final backup verified | Owner testing is available; proxy source-attribution repair and later release gates remain |
+| Mandatory Scenario Five rules | Implementation and owner board/rules acceptance complete (2026-10-06); public desktop/tablet full games pass | Retained-version replay scope remains; Phase 3 not complete |
 | Mandatory replay and automated games | PRs #29-31 merged full 24-turn desktop/tablet automation, pending-choice reload, and authorized exact replay | Legacy tabletop saves resume without interpreted replay; coverage or an explicit scope decision remains |
-| Private spectators | Claims, live transport, private host links, revocation, and the read-only observer interface are deployed in the candidate | Current public-browser blocker and final release/device acceptance |
+| Private spectators | Claims, live transport, private host links, revocation, and observer UI are deployed; both public layouts and local WebKit pass | Recurrence diagnostics for the first post-merge WebKit failure; final release/device acceptance |
 | Opt-in browser push | Targeting, encrypted consent, durable outbox/receipts, provider transport, serial worker, optional startup, notification service worker, browser consent UI, encrypted key-recovery wiring, and Home Screen metadata are merged through PRs #49-52 | Actual Home Screen installation, VPS key recovery, and real provider/device acceptance |
 | Browser/accessibility | PRs #53-54 merged WCAG audits, named controls, strict-CSP browser fixes, and Chromium/Firefox/WebKit full-game CI | Manual contrast/screen-reader/reduced-motion and actual Safari/iPad acceptance |
-| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan and backup/restore evidence recorded above | Public tablet latency gate, accessibility/device/performance, compatible rollback/reboot, measured capacity, and final release approval |
+| Phase 4 release | Original presentation approved; supplied scans remain private; exact VPS image scan, full public games, and backup/restore evidence recorded above | Proxy source isolation, accessibility/device/calibrated performance, compatible rollback/reboot, measured capacity, and final release approval |
 
 Owner: ChrisTitusTech for physical-game and release acceptance. Engineering must
 continue through reviewed increments, recording failed or unavailable gates
