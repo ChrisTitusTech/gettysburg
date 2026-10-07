@@ -2983,3 +2983,18 @@ require its exact-head checks/final threads before merge; transport merges first
 | Exact-head CI | ChrisTitusTech | Passed: Validate planning foundation | No unavailable check | Reverify the Phase 1 exact head before merge |
 
 - Post-merge follow-up: Completed in the first Phase 1 task-status update.
+
+## Dependency PR validation: 2026-10-06
+
+PR #71 updates the development dependency group and normalizes its lockfile.
+The current production audit also identified critical `proxy-addr` and moderate
+`ip-address` advisories. Explicit overrides pin their published fixes at 2.0.8
+and 10.7.1 respectively, without changing the request-trust configuration.
+The updated jsdom dependency requires patched undici 8.10.2 or newer.
+
+Frozen installation, format, lint, typecheck, 758 workspace tests, 34 harness
+tests, build, and smoke pass locally. PostgreSQL tests require the isolated
+database supplied by exact-head CI; 26 local integration cases were skipped
+without that test URL. Engineering must verify the current PostgreSQL and
+desktop/tablet browser CI before merge. No VPS deployment or release acceptance
+is implied by dependency validation.
