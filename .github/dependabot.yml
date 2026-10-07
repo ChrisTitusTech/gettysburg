@@ -5,6 +5,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    # This SDK has a version-specific browser WebSocket patch. Routine upgrades
+    # require porting/removing that patch and browser validation by a maintainer.
+    # Semver-only ignores preserve security updates and vulnerability alerts.
+    ignore:
+      - dependency-name: "@colyseus/sdk"
+        update-types:
+          - version-update:semver-major
+          - version-update:semver-minor
+          - version-update:semver-patch
     groups:
       development:
         dependency-type: development
