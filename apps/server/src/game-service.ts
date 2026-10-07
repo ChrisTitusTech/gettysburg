@@ -10,8 +10,9 @@ import {
 } from "node:crypto";
 
 import {
-  createMandatoryInitialState,
+  createWholePointInitialState,
   MANDATORY_CONTENT_REVISION,
+  WHOLE_POINT_CONTENT_REVISION,
   SCENARIO_CONTENT_REVISION,
 } from "@gettysburg/content";
 import {
@@ -22,6 +23,8 @@ import {
   isHexCoordinate,
   LEGACY_RULESET_VERSION,
   MANDATORY_RULESET_VERSION,
+  WHOLE_POINT_RULESET_VERSION,
+  isMandatoryRuleset,
   reduceGameplayCommand,
   RULESET_VERSION,
   toCommandSuccess,
@@ -39,6 +42,10 @@ import {
 } from "@gettysburg/game";
 import canonicalize from "canonicalize";
 import { hasPinnedMandatoryContent } from "./mandatory-content.js";
+import {
+  adoptWholePointMovement,
+  WHOLE_POINT_TRANSITION,
+} from "./movement-rules-transition.js";
 import { ReplayError, replayMandatoryActions } from "./mandatory-replay.js";
 import { publicActionLog } from "./public-action-log.js";
 import {
@@ -186,6 +193,7 @@ export interface StoredAction {
   readonly commandName:
     | GameplayCommand["command_name"]
     | HostManagementCommand["command_name"]
+    | "adoptWholePointMovement"
     | null;
   readonly contentRevision: string;
   readonly expectedVersion: number;
@@ -680,6 +688,14 @@ interface GameVersionHandler {
 
 const gameVersionRegistry = new Map<string, GameVersionHandler>([
   [
+    `${WHOLE_POINT_RULESET_VERSION}\u0000${WHOLE_POINT_CONTENT_REVISION}`,
+    {
+      accepts: hasPinnedMandatoryContent,
+      normalize: (state) => state,
+      replay: replayMandatoryActions,
+    },
+  ],
+  [
     `${MANDATORY_RULESET_VERSION}\u0000${MANDATORY_CONTENT_REVISION}`,
     {
       accepts: hasPinnedMandatoryContent,
@@ -1035,7 +1051,7 @@ export class InMemoryGameService {
     const authorization = this.authenticate(credential, gameId);
     const game = this.#requireActiveGame(gameId);
     if (
-      game.state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+      !isMandatoryRuleset(game.state.ruleset_version) ||
       game.state.phase === "completed"
     ) {
       throw new ServiceError(
@@ -1121,7 +1137,7 @@ export class InMemoryGameService {
         !game ||
         game.deletedAt !== null ||
         game.state.phase === "completed" ||
-        game.state.ruleset_version !== MANDATORY_RULESET_VERSION
+        !isMandatoryRuleset(game.state.ruleset_version)
       )
         this.#pushSubscriptions.delete(id);
     }
@@ -1395,7 +1411,7 @@ export class InMemoryGameService {
       creationCredential,
     );
     const gameId = randomUUID();
-    const state = createMandatoryInitialState(gameId);
+    const state = createWholePointInitialState(gameId);
 
     const invitation = this.#createInvitation(gameId, otherSide(side));
     this.#games.set(gameId, {
@@ -3032,6 +3048,61 @@ export class InMemoryGameService {
     return structuredClone(this.#requireGame(gameId).actions);
   }
 
+  // Operator-only maintenance entry point. No public HTTP/WebSocket route.
+  transitionWholePointMovement(
+    gameId: string,
+    expectedVersion: number,
+    operatorIdentity: string,
+    requestId: string,
+  ): GameState {
+    if (
+      !operatorIdentity.trim() ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        requestId,
+      )
+    )
+      throw new Error(
+        "A named operator and UUID request identity are required",
+      );
+    const game = this.#requireActiveGame(gameId);
+    const prior = game.actions.find(
+      (action) => action.operatorRequestId === requestId,
+    );
+    if (prior) {
+      if (
+        prior.commandName !== "adoptWholePointMovement" ||
+        prior.authorizingId !== operatorIdentity ||
+        prior.expectedVersion !== expectedVersion
+      )
+        throw new Error("Operator request identity conflict");
+      return structuredClone(game.state);
+    }
+    if (game.state.version !== expectedVersion)
+      throw new Error("Game changed before rules transition");
+    const before = game.state;
+    const after = adoptWholePointMovement(before);
+    game.actions.push({
+      authorizingId: operatorIdentity,
+      authorizingType: "operator",
+      authorizingVersion: 1,
+      canonicalRequestHash: null,
+      canonicalizationVersion: null,
+      commandId: null,
+      commandName: "adoptWholePointMovement",
+      contentRevision: before.content_revision,
+      expectedVersion,
+      kind: "operator_audit",
+      operatorRequestId: requestId,
+      payload: { ...WHOLE_POINT_TRANSITION },
+      resultingVersion: after.version,
+      result: null,
+      sequence: after.event_sequence,
+      rulesetVersion: before.ruleset_version,
+    });
+    game.state = after;
+    return structuredClone(after);
+  }
+
   getReplay(
     credential: string | undefined,
     gameId: string,
@@ -3157,6 +3228,12 @@ export class InMemoryGameService {
                     }),
               })),
           },
+          game.actions[0]
+            ? {
+                ruleset_version: game.actions[0].rulesetVersion,
+                content_revision: game.actions[0].contentRevision,
+              }
+            : game.state,
         ),
         sequence,
         latest_sequence: latest,

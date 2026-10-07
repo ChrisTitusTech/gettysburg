@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import {
-  MANDATORY_RULESET_VERSION,
+  isMandatoryRuleset,
   type GameState,
   type Side,
 } from "@gettysburg/game";
@@ -73,7 +73,7 @@ export function turnNotificationIntents(
 ): readonly TurnNotificationIntent[] {
   if (
     before.game_id !== after.game_id ||
-    before.ruleset_version !== MANDATORY_RULESET_VERSION ||
+    !isMandatoryRuleset(before.ruleset_version) ||
     after.ruleset_version !== before.ruleset_version ||
     after.content_revision !== before.content_revision ||
     after.version !== before.version + 1 ||

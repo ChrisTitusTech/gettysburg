@@ -3,8 +3,13 @@ import type { HexCoordinate } from "./coordinates.js";
 import type { GameState, MovementEdges, Side, UnitKind } from "./protocol.js";
 import { enemyZoneOfControl } from "./zoc.js";
 import { hasCombatSupport, isUnsupportedGeneral } from "./generals.js";
+import { WHOLE_POINT_RULESET_VERSION } from "./protocol.js";
 
 export type { MovementEdges } from "./protocol.js";
+
+export function roadMovementCost(state: GameState): number {
+  return state.ruleset_version === WHOLE_POINT_RULESET_VERSION ? 1 : 0.5;
+}
 
 export interface MovementRoute {
   readonly path: readonly HexCoordinate[];
@@ -92,7 +97,10 @@ function stepCalculator(
       !zoc.has(destination) &&
       (linked(edges.roads, origin, destination) ||
         linked(edges.railroads, origin, destination));
-    if (road) return { cost: 0.5, road: true, terrain: 0.5, stream: 0, zoc: 0 };
+    if (road) {
+      const cost = roadMovementCost(state);
+      return { cost, road: true, terrain: cost, stream: 0, zoc: 0 };
+    }
     const streamCost = Number(linked(edges.streams, origin, destination));
     const zocCost = Number(zoc.has(destination));
     return {

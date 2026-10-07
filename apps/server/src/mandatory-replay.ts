@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { createMandatoryInitialState } from "@gettysburg/content";
+import {
+  createMandatoryInitialState,
+  createPinnedMandatoryState,
+} from "@gettysburg/content";
 import {
   COMMAND_SCHEMA_VERSION,
   combatSkirmishes,
@@ -10,6 +13,10 @@ import {
   type GameplayCommand,
 } from "@gettysburg/game";
 import canonicalize from "canonicalize";
+import {
+  adoptWholePointMovement,
+  WHOLE_POINT_TRANSITION,
+} from "./movement-rules-transition.js";
 import {
   SPECTATOR_INVITATION_LIMIT,
   SPECTATOR_INVITATION_LIFETIME_MS,
@@ -255,8 +262,29 @@ export function replayMandatoryActions(
   bindings: readonly SeatBinding[],
   expectedFinal?: GameState,
   management: ReplayManagementEvidence = { hosts: [], invitations: [] },
+  initialPair?: Pick<GameState, "ruleset_version" | "content_revision">,
 ): GameState {
-  let state = createMandatoryInitialState(gameId);
+  const first = actions[0];
+  const pair =
+    initialPair ??
+    (first
+      ? {
+          ruleset_version: first.rulesetVersion,
+          content_revision: first.contentRevision,
+        }
+      : expectedFinal);
+  let state: GameState;
+  try {
+    state = pair
+      ? createPinnedMandatoryState(
+          gameId,
+          pair.ruleset_version,
+          pair.content_revision,
+        )
+      : createMandatoryInitialState(gameId);
+  } catch {
+    throw new ReplayError(0, "unavailable initial version pair");
+  }
   const seatIndex = bindingIndex(gameId, bindings);
   const hostIndex = bindingIndex(gameId, management.hosts);
   const invitationIndex = new Map<
@@ -393,6 +421,28 @@ export function replayMandatoryActions(
         action.expectedVersion === state.version,
         "expected version mismatch",
       );
+      if (action.commandName === "adoptWholePointMovement") {
+        assertReplay(
+          action.kind === "operator_audit" &&
+            action.authorizingType === "operator" &&
+            typeof action.authorizingId === "string" &&
+            action.authorizingId.trim().length > 0 &&
+            action.authorizingVersion === 1 &&
+            action.commandId === null &&
+            typeof action.operatorRequestId === "string" &&
+            generatedId.test(action.operatorRequestId) &&
+            !operatorRequestIds.has(action.operatorRequestId) &&
+            action.canonicalizationVersion === null &&
+            action.canonicalRequestHash === null &&
+            action.result === null &&
+            equal(action.payload, WHOLE_POINT_TRANSITION) &&
+            action.resultingVersion === state.version + 1,
+          "invalid whole-point transition audit",
+        );
+        operatorRequestIds.add(action.operatorRequestId!);
+        state = adoptWholePointMovement(state);
+        continue;
+      }
       assertReplay(
         action.resultingVersion ===
           state.version + Number(action.kind === "gameplay"),

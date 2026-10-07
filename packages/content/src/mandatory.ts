@@ -1,5 +1,6 @@
 import {
   MANDATORY_RULESET_VERSION,
+  WHOLE_POINT_RULESET_VERSION,
   type GameState,
   type HexCoordinate,
   type MovementEdges,
@@ -11,6 +12,34 @@ import { RAIL_LINKS, ROAD_LINKS, STREAM_CROSSINGS } from "./terrain-edges.js";
 // Never repurpose this revision after activation. Its complete initial-state
 // fingerprint is pinned in mandatory.test.ts; changed content needs a new pair.
 export const MANDATORY_CONTENT_REVISION = "gettysburg-mandatory-board-v1";
+export const WHOLE_POINT_CONTENT_REVISION = "gettysburg-mandatory-board-v2";
+
+/** Owner's whole-point road/rail revision; v4 construction stays immutable. */
+export function createWholePointInitialState(gameId: string): GameState {
+  return {
+    ...createMandatoryInitialState(gameId),
+    ruleset_version: WHOLE_POINT_RULESET_VERSION,
+    content_revision: WHOLE_POINT_CONTENT_REVISION,
+  };
+}
+
+export function createPinnedMandatoryState(
+  gameId: string,
+  ruleset: string,
+  revision: string,
+): GameState {
+  if (
+    ruleset === MANDATORY_RULESET_VERSION &&
+    revision === MANDATORY_CONTENT_REVISION
+  )
+    return createMandatoryInitialState(gameId);
+  if (
+    ruleset === WHOLE_POINT_RULESET_VERSION &&
+    revision === WHOLE_POINT_CONTENT_REVISION
+  )
+    return createWholePointInitialState(gameId);
+  throw new Error("Unknown mandatory version pair");
+}
 
 // Explicit painted road/rail crossings of the outer boundary, not every edge
 // hex with an on-board route. See TERRAIN_CONNECTIONS.md for visual estimates.

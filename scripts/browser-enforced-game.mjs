@@ -121,11 +121,13 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
     for (const page of Object.values(pages))
       await page.getByText("connected", { exact: true }).waitFor();
     await synchronize(0);
-    assert.equal(state.ruleset_version, "gettysburg-mandatory-v4");
+    assert.equal(state.ruleset_version, "gettysburg-mandatory-v5");
 
     await move("union", "u-gamble", "P3");
     assert.equal(state.units["u-buford"].location, "P3");
-    await move("union", "u-devin", "S3");
+    // T2 keeps the approach to Q3 outside Devin's ZOC. With whole-point roads,
+    // Pegram can no longer afford the former S3-controlled detour on turn 2.
+    await move("union", "u-devin", "T2");
     await end();
     for (const [id, destination] of [
       ["c-heth", "S2"],

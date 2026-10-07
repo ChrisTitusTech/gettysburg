@@ -4,7 +4,7 @@ import {
   acceptGameplayEvent,
   acceptManagementEvent,
   COMMAND_SCHEMA_VERSION,
-  MANDATORY_RULESET_VERSION,
+  isMandatoryRuleset,
   type CommandResult,
   type AuditEvent,
   type ActionEvent,
@@ -804,7 +804,7 @@ export function App({
       <header className="game-header">
         <div>
           <p className="eyebrow">
-            {activeGame.state.ruleset_version === MANDATORY_RULESET_VERSION
+            {isMandatoryRuleset(activeGame.state.ruleset_version)
               ? "Private mandatory-rules game"
               : "Private saved tabletop"}
           </p>
@@ -847,7 +847,7 @@ export function App({
 
       {activeGame.seat !== null &&
       connectionStatus === "connected" &&
-      activeGame.state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      isMandatoryRuleset(activeGame.state.ruleset_version) &&
       activeGame.state.phase !== "completed" ? (
         <NotificationBoundary>
           <Suspense

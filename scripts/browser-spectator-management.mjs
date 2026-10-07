@@ -25,7 +25,19 @@ export async function checkSpectatorManagement(
     page.on("pageerror", (error) => issues.push(error.message));
   try {
     await host.goto(origin);
+    const creationResponse = host.waitForResponse(
+      (response) =>
+        response.url() === `${origin}/api/games` &&
+        response.request().method() === "POST",
+    );
     await host.getByRole("button", { name: "Host as Union" }).click();
+    const created = await creationResponse;
+    if (created.status() !== 201) {
+      const body = await created.json().catch(() => ({}));
+      throw new Error(
+        `${options.label} spectator setup creation failed: ${created.status()} ${typeof body.error === "string" ? body.error : "unknown"}`,
+      );
+    }
     await guest.goto(
       await host.getByLabel("One-time invitation URL").inputValue(),
     );

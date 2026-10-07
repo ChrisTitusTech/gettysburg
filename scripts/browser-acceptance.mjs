@@ -212,7 +212,7 @@ async function dragWithinMovement(page, prefix, inputMode) {
     await page.mouse.down();
     await page.mouse.move(to.x, to.y, { steps: 10 });
   }
-  await page.locator(".movement-route").getByText("5 / 5").waitFor();
+  await page.locator(".movement-route").getByText("4 / 4").waitFor();
   // Do not auto-scroll an element while its pointer capture is active.
   await captureScreenshot(page, page, {
     fullPage: true,
@@ -356,7 +356,7 @@ async function runScenario(browser, origin, options) {
       })
       .click();
     await unionPage.locator('[data-coordinate="U11"]').click();
-    await unionPage.getByText(/this group has 5.5 remaining/i).waitFor();
+    await unionPage.getByText(/this group has 5 remaining/i).waitFor();
     await waitForVersion(unionPage, 1);
 
     const unionGameUrl = unionPage.url();
@@ -379,7 +379,7 @@ async function runScenario(browser, origin, options) {
     await unionPage.getByText("connected", { exact: true }).waitFor();
     await waitForVersion(unionPage, 1);
     await unionPage
-      .getByText(/2 counters moved to E4 \(0.5 movement\)/)
+      .getByText(/2 counters moved to E4 \(1 movement\)/)
       .waitFor();
 
     await selectAndMove(
@@ -401,7 +401,7 @@ async function runScenario(browser, origin, options) {
     await waitForVersion(confederatePage, 3);
     await confederatePage
       .getByRole("button", {
-        name: /Wadsworth, P7/,
+        name: /Wadsworth, J5/,
       })
       .waitFor();
 
@@ -411,7 +411,7 @@ async function runScenario(browser, origin, options) {
       await waitForVersion(unionPage, 4);
       await waitForVersion(confederatePage, 4);
       await confederatePage
-        .getByRole("button", { name: /Wadsworth, P7/ })
+        .getByRole("button", { name: /Wadsworth, J5/ })
         .waitFor();
       await confederatePage
         .getByRole("button", { name: /Gamble, P5/ })
@@ -527,7 +527,7 @@ async function runScenario(browser, origin, options) {
       .getByText(new RegExp(`Viewing event ${liveVersion} of`))
       .waitFor();
     await viewer
-      .getByRole("button", { name: /Wadsworth, P7, selectable/ })
+      .getByRole("button", { name: /Wadsworth, J5, selectable/ })
       .waitFor();
     const authoritativeVersion = await unionPage.evaluate(async () => {
       const id = window.location.pathname.split("/").at(-1);

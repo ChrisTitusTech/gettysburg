@@ -31,6 +31,18 @@ The owner approved the original generated board, original counter symbols, and
 clearly marked reduced strength for public release; supplied scans stay private.
 `docs/references/MANDATORY_RULES.md` records the remaining rules contract.
 
+The 2026-10-06 owner override removes half-point movement. New games use
+`gettysburg-mandatory-v5` / `gettysburg-mandatory-board-v2`: connected road/rail
+movement and eligible road/rail reinforcement entry cost 1. Terrain/stream
+replacement and ZOC/artillery restrictions are unchanged. Retained v4 games
+continue with their original costs unless explicitly transitioned. The owner
+authorized a recorded forward-only operator transition for the current testing
+game, preserving earlier costs, move activation, credentials, and exact replay.
+The transition is maintenance-only, requires the expected state version and a
+retry-safe request ID, and advances both version and event sequence. It is
+allowed during movement without pending choices, never by rewriting old actions.
+Previously spent half-points remain until normal reset. Rollout is pending.
+
 The 2026-09-06 development terrain follow-up supersedes the older terrain
 exclusion below: the active board is A-W / 1-11 (253 hexes), matching the painted
 columns. All terrain rows are owner-approved. Explicit best-guess forest and
@@ -325,7 +337,7 @@ gameplay events, delete retries during soft deletion, and the post-purge
 ### Rules enforcement stages
 
 The current source candidate creates new games under the complete pinned
-`gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` pair. The mandatory
+`gettysburg-mandatory-v5` / `gettysburg-mandatory-board-v2` pair. The mandatory
 contract in `docs/references/MANDATORY_RULES.md` governs their weighted movement,
 continuous-move activation, reinforcement costs, terrain defense, retreat,
 advance, and night behavior. Preview controls and authoritative reducers share

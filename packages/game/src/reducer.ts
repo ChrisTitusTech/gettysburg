@@ -3,7 +3,7 @@ import type { HexCoordinate } from "./coordinates.js";
 import { automaticCombatResolution, combatSkirmishes } from "./combat.js";
 import { enemyZoneOfControl, movementPath } from "./zoc.js";
 import { prepareNormalMovement } from "./movement-validation.js";
-import { MANDATORY_RULESET_VERSION } from "./protocol.js";
+import { isMandatoryRuleset } from "./protocol.js";
 import { eliminateLoneGenerals } from "./generals.js";
 import { prepareReinforcement } from "./reinforcements.js";
 import { prepareBoardExit } from "./board-exit.js";
@@ -51,7 +51,7 @@ function accepted(
     event_sequence: state.event_sequence + 1,
     version: state.version + 1,
   };
-  if (next.ruleset_version === MANDATORY_RULESET_VERSION) {
+  if (isMandatoryRuleset(next.ruleset_version)) {
     next.units = eliminateLoneGenerals(next);
   }
   return {
@@ -83,8 +83,7 @@ function scoreVictory(
       score[beneficiary] += unit.combat ?? 0;
     } else if (
       unit.strength === "reduced" &&
-      (state.ruleset_version !== MANDATORY_RULESET_VERSION ||
-        unit.status === "deployed")
+      (!isMandatoryRuleset(state.ruleset_version) || unit.status === "deployed")
     ) {
       score[beneficiary] += 1;
     }
@@ -184,7 +183,7 @@ function moveUnit(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "moveUnit" }>,
 ): ReducerResult {
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+  if (isMandatoryRuleset(state.ruleset_version)) {
     return mandatoryMovement(
       state,
       actorSide,
@@ -261,7 +260,7 @@ function moveStack(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "moveStack" }>,
 ): ReducerResult {
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+  if (isMandatoryRuleset(state.ruleset_version)) {
     return mandatoryMovement(
       state,
       actorSide,
@@ -414,7 +413,7 @@ function nightUnitsAbleToWithdraw(
   side: Side,
 ): readonly UnitState[] | null {
   if (!state.night) return [];
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION)
+  if (isMandatoryRuleset(state.ruleset_version))
     return mandatoryNightWithdrawals(state, side);
   const enemyZoc = enemyZoneOfControl(state, side);
   return Object.values(state.units).filter((unit) => {
@@ -441,7 +440,7 @@ function enterReinforcement(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "enterReinforcement" }>,
 ): ReducerResult {
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+  if (isMandatoryRuleset(state.ruleset_version)) {
     return mandatoryReinforcement(
       state,
       actorSide,
@@ -515,7 +514,7 @@ function mandatoryReinforcement(
   ids: readonly string[],
   destination: HexCoordinate,
 ): ReducerResult {
-  if (state.ruleset_version !== MANDATORY_RULESET_VERSION) {
+  if (!isMandatoryRuleset(state.ruleset_version)) {
     return failure(
       state,
       "phase_invalid",
@@ -537,7 +536,7 @@ function exitBoard(
   side: Side,
   ids: readonly string[],
 ): ReducerResult {
-  if (state.ruleset_version !== MANDATORY_RULESET_VERSION)
+  if (!isMandatoryRuleset(state.ruleset_version))
     return failure(
       state,
       "phase_invalid",
@@ -793,7 +792,7 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
       const ids = stackedUnitsForSide(state, combatIds, state.active_side!);
       const destinations = (combat.defender_hexes ?? []).filter(
         (hex) =>
-          state.ruleset_version !== MANDATORY_RULESET_VERSION ||
+          !isMandatoryRuleset(state.ruleset_version) ||
           !Object.values(state.units).some(
             (unit) =>
               unit.status === "deployed" &&
@@ -803,8 +802,7 @@ function nextChoice(state: GameState, combat: CombatState): CombatState {
       );
       if (
         ids.length > 0 &&
-        (state.ruleset_version !== MANDATORY_RULESET_VERSION ||
-          destinations.length > 0)
+        (!isMandatoryRuleset(state.ruleset_version) || destinations.length > 0)
       )
         choice = {
           destination_hexes: destinations,
@@ -997,7 +995,7 @@ function retreatUnit(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "retreatUnit" }>,
 ): ReducerResult {
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION) {
+  if (isMandatoryRuleset(state.ruleset_version)) {
     const source = state.units[command.payload.unit_id]?.location;
     return applyForcedRetreat(
       state,
@@ -1051,7 +1049,7 @@ function retreatStack(
   actorSide: Side,
   command: Extract<GameplayCommand, { command_name: "retreatStack" }>,
 ): ReducerResult {
-  if (state.ruleset_version === MANDATORY_RULESET_VERSION)
+  if (isMandatoryRuleset(state.ruleset_version))
     return applyForcedRetreat(
       state,
       command.payload.combat_id,
@@ -1316,7 +1314,7 @@ function advanceAfterCombat(
       );
     }
     if (
-      state.ruleset_version === MANDATORY_RULESET_VERSION &&
+      isMandatoryRuleset(state.ruleset_version) &&
       (state.terrain?.[destination] === undefined ||
         !movers.some(
           (unit) =>
@@ -1379,7 +1377,7 @@ function finishSideTurn(
         combats: {},
         phase: "movement",
         units: resetMovementForSide(state, "union"),
-        ...(state.ruleset_version === MANDATORY_RULESET_VERSION
+        ...(isMandatoryRuleset(state.ruleset_version)
           ? {
               normal_movement: {
                 active_unit_ids: [],
@@ -1437,7 +1435,7 @@ function finishSideTurn(
       phase: "movement",
       turn: state.turn + 1,
       units: resetMovementForSide(state, "confederate"),
-      ...(state.ruleset_version === MANDATORY_RULESET_VERSION
+      ...(isMandatoryRuleset(state.ruleset_version)
         ? {
             normal_movement: {
               active_unit_ids: [],

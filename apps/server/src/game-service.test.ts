@@ -208,7 +208,7 @@ describe("in-memory game lifecycle", () => {
     const game = service.createGame("union");
     const state = service.getGameState(game.gameId);
 
-    expect(state.ruleset_version).toBe("gettysburg-mandatory-v4");
+    expect(state.ruleset_version).toBe("gettysburg-mandatory-v5");
     expect(Object.keys(state.terrain ?? {})).toHaveLength(253);
     expect(state.terrain?.B2).toMatchObject({ kind: "woods", defense: 2 });
     expect(state.terrain?.F11).toMatchObject({ kind: "woods", defense: 2 });

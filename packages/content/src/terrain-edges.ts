@@ -1,7 +1,7 @@
 import type { HexCoordinate } from "@gettysburg/game";
 
 // Best-guess edge transcription from sampled centerlines on the approved PNG.
-// Movement costs do not consume these links yet; see TERRAIN_CONNECTIONS.md.
+// Mandatory movement uses these links; see TERRAIN_CONNECTIONS.md.
 export const ROAD_LINKS = [
   ["A2", "B2"],
   ["A7", "B7"],

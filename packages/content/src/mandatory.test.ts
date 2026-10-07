@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   BOARD_EDGE_HEXES,
   BOARD_HEXES,
+  adjacentHexes,
+  normalMovementStep,
   MANDATORY_RULESET_VERSION,
   prepareReinforcement,
   type HexCoordinate,
 } from "@gettysburg/game";
 import {
   createMandatoryInitialState,
+  createWholePointInitialState,
   MANDATORY_CONTENT_REVISION,
   MANDATORY_MOVEMENT_EDGES,
   OFF_BOARD_ROUTE_ENTRIES,
@@ -17,6 +20,59 @@ import { SCENARIO_CONTENT_REVISION, SCENARIO_UNITS } from "./scenario";
 import { BOARD_TERRAIN } from "./terrain";
 
 describe("pinned mandatory Scenario Five content", () => {
+  it("pins the new whole-point revision without changing the retained v4 fingerprint", () => {
+    const state = createWholePointInitialState("content-fingerprint");
+    expect(
+      createHash("sha256").update(JSON.stringify(state)).digest("hex"),
+    ).toBe("84c76048334bc77743aa910a854541156fd9154d20a5745db16a2beb70103a94");
+    expect(state).toEqual({
+      ...createMandatoryInitialState("content-fingerprint"),
+      ruleset_version: "gettysburg-mandatory-v5",
+      content_revision: "gettysburg-mandatory-board-v2",
+    });
+  });
+
+  it.each(["infantry", "cavalry", "artillery", "general"] as const)(
+    "uses whole-point costs for every reachable v5 %s step",
+    (kind) => {
+      const state = { ...createWholePointInitialState("fixture"), units: {} };
+      for (const from of BOARD_HEXES)
+        for (const to of adjacentHexes(from)) {
+          const step = normalMovementStep(
+            state,
+            "union",
+            [kind],
+            state.movement_edges!,
+            from,
+            to,
+          );
+          if (step) {
+            expect(step.cost).toBeGreaterThanOrEqual(1);
+            expect(Number.isInteger(step.cost)).toBe(true);
+          }
+        }
+    },
+  );
+
+  it.each(OFF_BOARD_ROUTE_ENTRIES)(
+    "charges one for v5 road/rail reinforcement entry at %s",
+    (hex) => {
+      const initial = createWholePointInitialState("fixture");
+      const arrival = {
+        ...initial.units["u-barlow"]!,
+        entry_hexes: [hex],
+        entry_turn: 1,
+      };
+      expect(
+        prepareReinforcement(
+          { ...initial, units: { [arrival.id]: arrival } },
+          "union",
+          [arrival.id],
+          hex,
+        ),
+      ).toMatchObject({ ok: true, cost: 1 });
+    },
+  );
   it("has a distinct revision and complete initial state", () => {
     const state = createMandatoryInitialState("fixture");
     expect(state.ruleset_version).toBe(MANDATORY_RULESET_VERSION);
