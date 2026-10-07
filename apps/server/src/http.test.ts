@@ -5,6 +5,7 @@ import { COMMAND_SCHEMA_VERSION } from "@gettysburg/game";
 import { describe, expect, it, vi } from "vitest";
 
 import { createHttpApplication } from "./http.js";
+import type { CreationAdmission } from "./creation-admission.js";
 import {
   type GameServiceSnapshot,
   InMemoryGameService,
@@ -31,12 +32,14 @@ async function withServer(
   isReady: boolean | (() => boolean),
   assertion: (origin: string) => Promise<void>,
   gameService?: InMemoryAsyncGameService,
+  creationAdmission?: CreationAdmission,
 ) {
   const app = createHttpApplication(
     {
       isReady: () => (typeof isReady === "function" ? isReady() : isReady),
     },
     gameService,
+    creationAdmission,
   );
   const server = app.listen(0, "127.0.0.1");
 
@@ -411,9 +414,9 @@ describe("service health", () => {
 });
 
 describe("HTTP game lifecycle", () => {
-  it("rate-limits distinct anonymous creations while allowing retries", async () => {
+  it("allows more than the former per-source and global creation quotas below capacity", async () => {
     await withServer(true, async (origin) => {
-      const requests = Array.from({ length: 10 }, () => ({
+      const requests = Array.from({ length: 101 }, () => ({
         creationCredential: randomBytes(32).toString("base64url"),
         creationId: randomUUID(),
       }));
@@ -432,17 +435,62 @@ describe("HTTP game lifecycle", () => {
         expect((await create(request)).status).toBe(201);
       }
       expect((await create(requests[9]!)).status).toBe(201);
-      const limited = await create({
+      const another = await create({
         creationCredential: randomBytes(32).toString("base64url"),
         creationId: randomUUID(),
       });
-      expect(limited.status).toBe(429);
-      expect(limited.headers.get("retry-after")).toBe("900");
-      expect(await limited.json()).toEqual({
-        error: "creation_rate_limited",
-      });
+      expect(another.status).toBe(201);
+      await another.arrayBuffer();
     });
   });
+
+  it.each(["busy", "unavailable"] as const)(
+    "rejects creation without writing when capacity is %s, then recovers",
+    async (initial) => {
+      const service = new InMemoryAsyncGameService();
+      const existing = await service.createGame("union");
+      const create = vi.spyOn(service, "createGame");
+      let status: ReturnType<CreationAdmission["status"]> = initial;
+      await withServer(
+        true,
+        async (origin) => {
+          const request = {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              seat: "union",
+              creation_id: randomUUID(),
+              creation_credential: randomBytes(32).toString("base64url"),
+            }),
+          };
+          const rejected = await fetch(`${origin}/api/games`, request);
+          expect(rejected.status).toBe(initial === "busy" ? 429 : 503);
+          expect(rejected.headers.get("retry-after")).toBe("5");
+          expect(await rejected.json()).toMatchObject({
+            error:
+              initial === "busy"
+                ? "creation_capacity_exceeded"
+                : "creation_capacity_unavailable",
+          });
+          expect(create).not.toHaveBeenCalled();
+          const saved = await fetch(`${origin}/api/games/${existing.gameId}`, {
+            headers: {
+              cookie: `__Host-gettysburg-session=${existing.credential}`,
+            },
+          });
+          expect(saved.status).toBe(200);
+          await saved.arrayBuffer();
+          status = "available";
+          const accepted = await fetch(`${origin}/api/games`, request);
+          expect(accepted.status).toBe(201);
+          await accepted.arrayBuffer();
+          expect(create).toHaveBeenCalledOnce();
+        },
+        service,
+        { status: () => status },
+      );
+    },
+  );
 
   it("rate-limits bearer claims across invitation and recovery endpoints", async () => {
     await withServer(true, async (origin) => {
