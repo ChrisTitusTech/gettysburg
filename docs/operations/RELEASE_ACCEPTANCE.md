@@ -18,12 +18,12 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
 - All 253 terrain hexes are owner-verified; B2/F11 are woods. Connections are
   approved best guesses, not a request to repeat or overwrite the terrain audit.
 - Phase 2 is complete. The latest 2026-10-06 development rollout uses merged
-  `cabb03c` and immutable image
-  `536b97fc0ac5625c9b3171cdd42e30273e11af6fc67b693bb9ab57b59e165558`.
-  Public input latency is 5.36-5.87 seconds; performance acceptance remains open.
-  The owner authorized per-game persistence repair and an encrypted-backup-first
-  purge of all existing development games. That repair is not yet deployed.
-  Engineering must rerun public desktop/tablet full games and timing after it.
+  `2990d8e` and immutable image
+  `ef965b292886cb340701d8f41f996da018c1366d7aebb07296dcaffbfb82c5ea`.
+  Per-game persistence is deployed; the owner-authorized backup-first purge
+  removed 63 old development games. Public input observations improved from
+  5.36-5.87 seconds to 248-260 ms, with reconnects around 0.9 seconds. These
+  report-mode observations do not close calibrated performance or capacity gates.
   See `TASKS.md` and `VPS.md` for current rollout evidence and rollback boundaries.
 - Historical evidence: the 2026-09-07 development VPS rollout used source
   `1baebbd2a31963bfdb3974b714914a29bd839957` and immutable image
@@ -31,10 +31,11 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   This is not final public-release or Phase 3/4 acceptance.
   The repair passed both retained-data VPS full games and exact-head CI.
   Public readiness/two-client smoke and the desktop full game pass. The public
-  tablet full-game timing gate remains failed near turn 24. Owner gameplay
+  tablet full-game timing gate remained failed near turn 24. Owner gameplay
   testing is available, but this candidate is not release-accepted.
   PR #56 merged on 2026-10-06 after review and exact-head CI using the owner's
-  explicit self-approval exception. The October PR work is not a VPS rollout.
+  explicit self-approval exception. The newer rollout above supersedes this
+  historical candidate's deployment status without erasing failed-run evidence.
   Browser-run environment: Codex engineering automation on ChrisTitusTech's
   Fedora Linux 44 x86_64 workstation, headless Chromium 151.0.7922.34,
   1440x900 desktop keyboard and 1024x768 touch-tablet viewports. These do not
@@ -101,34 +102,41 @@ leave contrast over the image/SVG board for manual inspection.
 
 Responsible owner: ChrisTitusTech approves the maintenance window and release;
 engineering executes and records the reviewed procedures in `VPS.md`.
-The owner authorized the application rollout on 2026-09-07. That authorization
-does not close separate disruptive exercises or final public-release approval.
+The owner authorized this application rollout and data purge on 2026-10-06.
+This does not close separate disruptive exercises or final public-release approval.
 
 - [x] Approve and execute the reviewed application rollout. Exact candidate-commit
-  Application, Documentation, and Firefox/WebKit CI passed. Trivy 0.74.0 found
-  zero HIGH/CRITICAL findings across 18 Alpine and 363 Node packages in the exact
-  deployed image, including unfixed advisories.
+  Application, Documentation, and Firefox/WebKit CI passed for PR #73 and the
+  merge revision. The first post-merge WebKit run failed at spectator revocation;
+  the unchanged rerun and local WebKit acceptance passed. Trivy 0.75.0 found
+  zero HIGH/CRITICAL findings in the exact deployed image, including unfixed
+  advisories. No branch protection or test threshold was relaxed.
 - [x] Verify an encrypted pre-deployment database/state/ledger backup, isolated
-  restore, and off-host checksum/decryption checks. Backup `20260907T175422Z`
-  preserved 30 deleted games and ledger watermark 30; no active games existed.
-- [x] Verify the repaired candidate's post-test recovery set and ledger
-  acknowledgement after browser/restart probe cleanup. Backup
-  `20260907T194121Z` passed isolated restore and off-host checksum/decryption;
-  final audit: zero active games, 45 retained deleted games, ledger/ack 45.
+  restore, and off-host checksum/decryption checks. Frozen pre-purge backup
+  `20261007T032915Z` preserved all 63 games and ledger watermark 81; post-purge
+  backup `20261007T033000Z` verified zero games and watermark 176. The old image,
+  credentials, database volumes, and encrypted recovery copies remain retained.
+- [x] Verify the repaired candidate's final post-test recovery set and ledger
+  acknowledgement after browser/restart probe cleanup. Backup `20261007T034301Z`
+  passed isolated restore and off-host checks. Final audit: zero active games,
+  12 normally deleted acceptance games, four migrations, ledger/ack 188.
 - [ ] Verify actual VAPID key continuity and off-host recovery. Push remains
   disabled and no signing key was provisioned; absent-key backup checks are not
   evidence of real key recovery or provider delivery.
 - [x] Verify public health/readiness and authenticated two-client HTTPS/WebSocket
   movement and saved-state resume against the deployed immutable image.
-- [ ] Complete desktop/tablet public-site browser and full 24-turn checks.
-  The reviewed repair passes both full games on an isolated retained-data VPS
-  copy. Public desktop passes; the latest public tablet rerun exceeds eight
-  minutes near turn 24 despite recovered admissions. Both-width basic flows,
-  replay management, and private spectators pass. Engineering owns retained-
-  history latency repair and an unchanged tablet rerun; see `TASKS.md`.
+- [x] Complete desktop/tablet public-site browser and full 24-turn checks.
+  Chromium 153.0.8010.12 on the Fedora 44 workstation passes both public games
+  at 1440x900 desktop and 1024x768 touch-tablet widths, including combat choices,
+  pending-result reload, and exact replay. Both retain the eight-minute bound.
+  Basic flows, spectator revocation, replay management, and automated
+  accessibility checks pass; fit-board screenshots were inspected. Evidence:
+  `test-results/performance-vps`. This supersedes the public tablet failure
+  for this candidate, not the manual device or calibrated performance gates.
 - [x] Verify both saved credentials and identical authoritative state after
   restarting the repaired application. Normal probe deletion is covered by
-  backup `20260907T194121Z`; this was not a host reboot.
+  the final backup above. Pre-restart backup `20261007T033729Z` passed isolated
+  restore/off-host checks; this was not a host reboot.
 - [ ] Exercise migration and compatible rollback on an isolated copy. Saved
   rollback files alone do not establish compatibility with newer game writes.
 - [ ] Approve and exercise VPS reboot/recovery. A pending reboot marker was
@@ -136,6 +144,11 @@ does not close separate disruptive exercises or final public-release approval.
 - [ ] Measure concurrent-room capacity on the target VPS and publish only the
   demonstrated limit. Local zoom timings do not establish broadband loading,
   all board-interaction latency, Internet-excluded command latency, or VPS capacity.
+- [ ] Repair and verify per-source rate-limit isolation through Caddy/rootless
+  Podman, including rejection of spoofed forwarding headers. Owner testing hit
+  the harness-exhausted creation budget; a controlled restart cleared that
+  window, but the private proxy peer is not covered by loopback-only trust.
+  Engineering owns the configuration repair; limits remain enabled.
 - [ ] Run the strict 100 ms benchmark on calibrated supported desktop hardware;
   record hardware, OS/browser, workload, and numeric evidence. Shared-CI report
   mode retains misses as diagnostics and cannot close this release gate.

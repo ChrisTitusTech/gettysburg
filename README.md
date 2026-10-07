@@ -13,19 +13,24 @@ phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 
 ## Current status
 
-The reviewed repair candidate `1baebbd2a31963bfdb3974b714914a29bd839957`
-was deployed on 2026-09-07 after exact-head CI, independent review, retained-data
-VPS full games, vulnerability scanning, and encrypted backup/restore checks.
-Public readiness and two-client HTTPS/WebSocket checks pass; gameplay is available
-for owner testing. The public tablet full-game timing gate still fails near
-turn 24; this is not release acceptance. PR #56 merged on 2026-10-06 after
-review, exact-head CI, and an owner-authorized self-approval exception.
+Reviewed PR #73 source `2990d8eb44f5b98b1fa96930234fb818382e7bc3` was deployed
+on 2026-10-06 after independent review, exact-head CI, vulnerability scanning,
+and verified encrypted backups. Per-game persistence replaces whole-service
+history rewriting. The owner-authorized purge removed 63 old development games;
+database volumes, credentials, audit history, and recovery backups were retained.
+Public desktop/tablet full 24-turn games now pass with unchanged bounds, reload,
+and exact replay. Move synchronization was observed at 248-260 ms instead of
+5.36-5.87 seconds. Public readiness, two-client HTTPS/WebSocket checks, and
+restart/resume pass; gameplay is available for owner testing, not final release.
+Owner testing exposed a separate proxy source-attribution defect after the
+acceptance harness exhausted the creation budget. A controlled restart cleared
+that window without changing limits; proxy isolation remains an open repair.
 Phase 2 historical operational closeout remains
 complete. The deployed candidate uses
 `gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
 weighted movement, continuous stack activation, reinforcement costs, connected
-terrain defense, retreat/advance, and mandatory night withdrawal. Existing saves
-retain their original rules. Dependency advisories were patched separately.
+terrain defense, retreat/advance, and mandatory night withdrawal. Saved versions
+are not silently reinterpreted. Dependency advisories were patched separately.
 Push remains disabled pending signing-key/provider setup. Retained-version replay,
 and Phase 4 release gates remain open. The owner accepted the board and rules
 on 2026-10-06; that approval does not close the remaining technical gates.
