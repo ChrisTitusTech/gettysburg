@@ -103,50 +103,29 @@ diff --git a/src/Room.ts b/src/Room.ts
 index 668a97f2a24a9b5874f1b682914809fad0cebcd7..cbc8ff81bcbe9df922e0084becfa535254c33df8 100644
 --- a/src/Room.ts
 +++ b/src/Room.ts
-@@ -57,6 +57,7 @@ export class Room<
-     public reconnection: ReconnectionOptions = createReconnection();
- 
+@@ -59,1 +59,2 @@ export class Room<
      protected joinedAtTime: number = 0;
 +    protected joinErrorReported: boolean = false;
- 
-     /**
-      * Server-time + RTT estimator, driven by the {@link ProtocolModifier.TIMED}
-@@ -151,6 +152,7 @@ export class Room<
-     }
- 
+@@ -153,2 +154,3 @@ export class Room<
      public connect(endpoint: string, options?: any, headers?: any) {
 +        this.joinErrorReported = false;
          this.connection = new Connection(options.protocol);
-         this.connection.events.onmessage = this.onMessageCallback.bind(this);
-         this.connection.events.onclose = (e: CloseEvent) => {
-@@ -158,6 +160,7 @@ export class Room<
-             this.#rejectAllPending("connection closed before a response was received.");
- 
+@@ -160,2 +162,3 @@ export class Room<
              if (this.joinedAtTime === 0) {
 +                if (this.joinErrorReported) return;
                  console.warn?.(`Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
-                 this.onError.invoke(e.code, e.reason);
-                 return;
-@@ -642,6 +645,7 @@ export class Room<
-             }
- 
+@@ -644,2 +647,3 @@ export class Room<
          } else if (code === Protocol.ERROR) {
 +            this.joinErrorReported = this.joinedAtTime === 0;
              const code = decode.number(buffer as Buffer, it);
-             const message = decode.string(buffer as Buffer, it);
- 
 diff --git a/src/transport/WebSocketTransport.ts b/src/transport/WebSocketTransport.ts
 index 92e86383eca4ec2b15ffb2ee406e9b41597a1b85..468b7a195a9c4d29e15576a3b66bf390b8531e15 100644
 --- a/src/transport/WebSocketTransport.ts
 +++ b/src/transport/WebSocketTransport.ts
-@@ -48,7 +48,9 @@ export class WebSocketTransport implements ITransport {
-      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
-      */
+@@ -50,3 +50,5 @@ export class WebSocketTransport {
      public connect(url: string, headers?: any): void {
 -        try {
 +        if (typeof window !== 'undefined') {
 +            this.ws = new WebSocket(url, this.protocols);
 +        } else try {
              // Node or Bun environments (supports custom headers)
-             this.ws = new WebSocket(url, { headers, protocols: this.protocols });
- 

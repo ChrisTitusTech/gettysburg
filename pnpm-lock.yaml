@@ -9,7 +9,7 @@ overrides:
   shell-quote: 1.9.0
 
 patchedDependencies:
-  "@colyseus/sdk@0.18.5": 0d84f0a9672086c0e45d28b831568afd67532ee690252bed42a8f2429b59ae85
+  "@colyseus/sdk@0.18.5": ff1af09cf63011c6af81d8b8efe14d954bac342e6099344a9165966d217c8037
 
 importers:
   .:
@@ -19,7 +19,7 @@ importers:
         version: 4.13.0(playwright-core@1.62.1)
       "@colyseus/sdk":
         specifier: 0.18.5
-        version: 0.18.5(patch_hash=0d84f0a9672086c0e45d28b831568afd67532ee690252bed42a8f2429b59ae85)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
+        version: 0.18.5(patch_hash=ff1af09cf63011c6af81d8b8efe14d954bac342e6099344a9165966d217c8037)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
       "@eslint/js":
         specifier: 10.0.1
         version: 10.0.1(eslint@10.0.1(supports-color@10.2.2))
@@ -89,7 +89,7 @@ importers:
     devDependencies:
       "@colyseus/sdk":
         specifier: 0.18.5
-        version: 0.18.5(patch_hash=0d84f0a9672086c0e45d28b831568afd67532ee690252bed42a8f2429b59ae85)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
+        version: 0.18.5(patch_hash=ff1af09cf63011c6af81d8b8efe14d954bac342e6099344a9165966d217c8037)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
       "@types/express":
         specifier: 5.0.6
         version: 5.0.6
@@ -107,7 +107,7 @@ importers:
     dependencies:
       "@colyseus/sdk":
         specifier: 0.18.5
-        version: 0.18.5(patch_hash=0d84f0a9672086c0e45d28b831568afd67532ee690252bed42a8f2429b59ae85)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
+        version: 0.18.5(patch_hash=ff1af09cf63011c6af81d8b8efe14d954bac342e6099344a9165966d217c8037)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)
       "@gettysburg/content":
         specifier: workspace:*
         version: link:../../packages/content
@@ -3408,7 +3408,7 @@ snapshots:
     optionalDependencies:
       typescript: 5.9.3
 
-  "@colyseus/sdk@0.18.5(patch_hash=0d84f0a9672086c0e45d28b831568afd67532ee690252bed42a8f2429b59ae85)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)":
+  "@colyseus/sdk@0.18.5(patch_hash=ff1af09cf63011c6af81d8b8efe14d954bac342e6099344a9165966d217c8037)(@colyseus/core@0.18.18)(typescript@5.9.3)(zod@4.4.3)":
     dependencies:
       "@colyseus/better-call": 1.3.3(zod@4.4.3)
       "@colyseus/schema": 5.0.36(typescript@5.9.3)
