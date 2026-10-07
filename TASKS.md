@@ -13,8 +13,8 @@ final production-release gates. Historical evidence below remains dated.
 
 ### Colyseus dependency compatibility work: 2026-10-06
 
-PRs #63/#65 must move together: ws-transport 0.18.2 imports an export absent from
-core 0.17.42. Core 0.18.10 and transport 0.18.2 therefore also require SDK 0.18.5
+PRs #63/#65 must move together: ws-transport 0.18 imports an export absent from
+core 0.17.42. Refreshed core 0.18.18 and transport 0.18.4 also require SDK 0.18.5
 to satisfy its declared core peer range. The maintainer-owned SDK patch is
 ported in TypeScript, ESM, and CJS, preserving the browser WebSocket constructor
 and single-error rejected-join behavior. No room protocol, authorization, or
