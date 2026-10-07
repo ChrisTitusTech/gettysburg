@@ -3298,7 +3298,20 @@ The current production audit also identified critical `proxy-addr` and moderate
 and 10.7.1 respectively, without changing the request-trust configuration.
 The updated jsdom dependency requires patched undici 8.10.2 or newer.
 
-Frozen installation, format, lint, typecheck, 758 workspace tests, 34 harness
+The integrated #64/#71/#72 batch also revealed development-tool advisories in
+the previously pinned shell-quote and retained brace-expansion/source-map-js
+versions. Overrides now select shell-quote 1.11.0, brace-expansion 5.0.12, and
+source-map-js 1.2.2. These are published fixes within the installed major lines;
+both production and complete dependency audits must pass before merge.
+
+The integrated batch passes frozen installation, format, lint, typecheck,
+766 workspace/39 harness tests, build, and smoke. The complete dependency audit
+reports zero findings. All 29 PostgreSQL cases skipped without a local test URL
+remain covered by the required exact-head CI database job; the public VPS tablet
+timing failure is not waived by dependency test results.
+
+Initial individual validation: frozen install, format, lint, typecheck,
+758 workspace tests, 34 harness
 tests, build, and smoke pass locally. PostgreSQL tests require the isolated
 database supplied by exact-head CI; 26 local integration cases were skipped
 without that test URL. Engineering must verify the current PostgreSQL and
