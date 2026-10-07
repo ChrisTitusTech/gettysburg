@@ -4,6 +4,23 @@
 
 ### Public repository security hardening
 
+Published revision `f2b7e35` closed CodeQL alerts #1 and #2 and passed secret
+scanning, documentation, CodeQL, and local browser/container/database validation.
+Dependabot configuration validation passed, but the first npm update run failed
+with `ERR_PNPM_UNUSED_PATCH` when upgrading the version-patched `@colyseus/sdk`.
+The follow-up makes routine SDK SemVer upgrades maintainer-owned while preserving
+security updates/alerts; all other version updates remain automated. Firefox CI
+had a spectator-refresh timeout despite a passing local Firefox run; the failed
+job passed on retry. Application `34147950651`, Browser compatibility
+`34147950563`, Security `34147950564`, Documentation `34147950603`, and CodeQL
+`34147950189` all passed for `f2b7e35`. The first Firefox failure remains recorded;
+no application/browser assertions were relaxed to obtain the retry result.
+The Dependabot-only follow-up passed formatting, Markdown, diff, and manual
+configuration review against upstream SemVer-ignore semantics. CodeRabbit hit
+its review quota for that follow-up; the preceding implementation and adjusted
+request budget both received zero-finding CodeRabbit reviews. Engineering owns
+future advisory-driven SDK patch maintenance and published-run verification.
+
 The public-repository audit found no confirmed credential exposure. This change
 repairs the empty Dependabot ecosystem with weekly npm, Actions, and container
 updates; pins workflow Actions to reviewed commit SHAs; adds maintainer ownership,
