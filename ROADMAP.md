@@ -206,11 +206,16 @@ approval are complete. The newer source candidate enables mandatory rules for
 new games, including weighted movement, reinforcement costs, retreat/advance,
 and night guidance, under its complete pinned version pair. Mandatory replay
 and its authorized browser controls are merged. Automated desktop/tablet games
-complete all 24 turns with pending-choice reload and exact replay; representative
-owner adjudication against the physical rules remains open. Legacy tabletop
+complete all 24 turns with pending-choice reload and exact replay. The owner
+accepted the board and rules on 2026-10-06. Legacy tabletop
 saves still resume without interpreted replay, so retained-version replay
-coverage needs implementation or an explicit scope decision. This source
-activation is not a deployment or Phase 3 completion. Optional rules/additional
+coverage needs implementation or an explicit scope decision. This source was
+deployed as `dc6b73b` on 2026-09-07, then held behind maintenance after browser
+connection failures. Reviewed repair `1baebbd` is now deployed after exact-head
+CI and both retained-data VPS full games. Public desktop full-game checks pass;
+the tablet timing gate still fails near turn 24. Owner gameplay testing is
+available. PR #56 requires code-owner approval. Deployment does not establish
+Phase 3 completion. Optional rules/additional
 scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in
 `docs/references/TERRAIN_ADJUSTMENTS.md`; all rows are now approved and transcribed.
@@ -278,8 +283,11 @@ Private spectator transport and browser workflows are merged through PR #40.
 Push foundations through optional startup and the service worker are merged
 through PR #49, with browser consent merged in PR #50 and encrypted key-recovery
 wiring merged in PR #51. Home Screen and actual device/recovery acceptance remain.
-Container hardening merged in PR #45 with passing severity-bounded
-scan and browser evidence; this is not a new VPS deployment or release approval.
+Container hardening merged in PR #45. After the initial `dc6b73b` rollout,
+reviewed repair `1baebbd` was deployed on 2026-09-07 with exact-image scanning,
+public readiness/WebSocket checks, restart recovery, and verified backups.
+The site reopened for owner testing; the public tablet timing gate remains
+failed near turn 24. This is not final release approval; push remains disabled.
 Existing staging, backup, restore, and browser evidence do not replace the
 remaining accessibility, security, capacity, reboot, and final acceptance gates.
 
