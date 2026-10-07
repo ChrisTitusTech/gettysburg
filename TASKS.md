@@ -27,6 +27,20 @@ integrated image must be rebuilt and rescanned after the remaining merges.
 
 ## Source rollup: 2026-09-07
 
+### Colyseus dependency compatibility work: 2026-10-06
+
+PRs #63/#65 must move together: ws-transport 0.18 imports an export absent from
+core 0.17.42. Refreshed core 0.18.18 and transport 0.18.4 also require SDK 0.18.5
+to satisfy its declared core peer range. The maintainer-owned SDK patch is
+ported in TypeScript, ESM, and CJS, preserving the browser WebSocket constructor
+and single-error rejected-join behavior. No room protocol, authorization, or
+game rule is intentionally changed. Peer validation, frozen installation,
+formatting, lint, typechecking, 766 workspace/39 harness tests, build, and smoke
+pass. Independent Codex review found no actionable defects, including socket
+and browser-constructor regressions. The 29 PostgreSQL cases skipped locally
+need the isolated CI database. Exact-head PostgreSQL and full browser CI remain
+required before merge; engineering owns any failed gate. This is not a VPS rollout.
+
 ### Repair deployed for owner testing; tablet timing gate remains failed
 
 Reviewed source `1baebbd2a31963bfdb3974b714914a29bd839957` is deployed as

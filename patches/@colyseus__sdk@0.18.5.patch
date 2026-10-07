@@ -1,0 +1,131 @@
+diff --git a/build/Room.cjs b/build/Room.cjs
+index 25523d0f506862cb5a5cc05cf20798b77efb2a96..8f710a8981b1b03d4ce7feee781fb82a337b08ab 100644
+--- a/build/Room.cjs
++++ b/build/Room.cjs
+@@ -35,6 +35,7 @@ class Room {
+         // reconnection logic
+         this.reconnection = Reconnection.createReconnection();
+         this.joinedAtTime = 0;
++        this.joinErrorReported = false;
+         /**
+          * Server-time + RTT estimator, driven by the {@link ProtocolModifier.TIMED}
+          * prefix that servers emit when `defineInput()` was called.
+@@ -102,6 +103,7 @@ class Room {
+         });
+     }
+     connect(endpoint, options, headers) {
++        this.joinErrorReported = false;
+         var _a;
+         this.connection = new Connection.Connection(options.protocol);
+         this.connection.events.onmessage = this.onMessageCallback.bind(this);
+@@ -110,6 +112,7 @@ class Room {
+             // the in-flight requests can't be answered on a closed socket
+             tslib.__classPrivateFieldGet(this, _Room_instances, "m", _Room_rejectAllPending).call(this, "connection closed before a response was received.");
+             if (this.joinedAtTime === 0) {
++                if (this.joinErrorReported) return;
+                 (_a = console.warn) === null || _a === void 0 ? void 0 : _a.call(console, `Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
+                 this.onError.invoke(e.code, e.reason);
+                 return;
+@@ -562,6 +565,7 @@ _Room_lastPingTime = new WeakMap(), _Room_pingCallback = new WeakMap(), _Room_ne
+         }
+     }
+     else if (code === sharedTypes.Protocol.ERROR) {
++        this.joinErrorReported = this.joinedAtTime === 0;
+         const code = schema.decode.number(buffer, it);
+         const message = schema.decode.string(buffer, it);
+         this.onError.invoke(code, message);
+diff --git a/build/Room.mjs b/build/Room.mjs
+index c803013e4f81f48014a4d56eb8a9519d85e59ca6..51ad13de6af9e4eff41bc4344b7162608207dd00 100644
+--- a/build/Room.mjs
++++ b/build/Room.mjs
+@@ -36,6 +36,7 @@ class Room {
+     // reconnection logic
+     reconnection = createReconnection();
+     joinedAtTime = 0;
++    joinErrorReported = false;
+     /**
+      * Server-time + RTT estimator, driven by the {@link ProtocolModifier.TIMED}
+      * prefix that servers emit when `defineInput()` was called.
+@@ -112,12 +113,14 @@ class Room {
+         });
+     }
+     connect(endpoint, options, headers) {
++        this.joinErrorReported = false;
+         this.connection = new Connection(options.protocol);
+         this.connection.events.onmessage = this.onMessageCallback.bind(this);
+         this.connection.events.onclose = (e) => {
+             // the in-flight requests can't be answered on a closed socket
+             this.#rejectAllPending("connection closed before a response was received.");
+             if (this.joinedAtTime === 0) {
++                if (this.joinErrorReported) return;
+                 console.warn?.(`Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
+                 this.onError.invoke(e.code, e.reason);
+                 return;
+@@ -496,6 +499,7 @@ class Room {
+             }
+         }
+         else if (code === Protocol.ERROR) {
++            this.joinErrorReported = this.joinedAtTime === 0;
+             const code = decode.number(buffer, it);
+             const message = decode.string(buffer, it);
+             this.onError.invoke(code, message);
+diff --git a/build/transport/WebSocketTransport.cjs b/build/transport/WebSocketTransport.cjs
+index 7c94aad3cb16177d569a22d747463d7bb9850bac..216d739e8f0b14588c09d8063ccee33e09fb9a89 100644
+--- a/build/transport/WebSocketTransport.cjs
++++ b/build/transport/WebSocketTransport.cjs
+@@ -45,7 +45,9 @@ class WebSocketTransport {
+      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
+      */
+     connect(url, headers) {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
+             this.ws = new WebSocket(url, { headers, protocols: this.protocols });
+         }
+diff --git a/build/transport/WebSocketTransport.mjs b/build/transport/WebSocketTransport.mjs
+index fbe564a318f401c02d5d9f690484fb46a65053ba..1f898d1c28b783ae150a3c76294a439018e86312 100644
+--- a/build/transport/WebSocketTransport.mjs
++++ b/build/transport/WebSocketTransport.mjs
+@@ -46,7 +46,9 @@ class WebSocketTransport {
+      * @param headers custom headers to send with the connection (only supported in Node.js. Web Browsers do not allow setting custom headers)
+      */
+     connect(url, headers) {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
+             this.ws = new WebSocket(url, { headers, protocols: this.protocols });
+         }
+diff --git a/src/Room.ts b/src/Room.ts
+index 668a97f2a24a9b5874f1b682914809fad0cebcd7..cbc8ff81bcbe9df922e0084becfa535254c33df8 100644
+--- a/src/Room.ts
++++ b/src/Room.ts
+@@ -59,1 +59,2 @@ export class Room<
+     protected joinedAtTime: number = 0;
++    protected joinErrorReported: boolean = false;
+@@ -153,2 +154,3 @@ export class Room<
+     public connect(endpoint: string, options?: any, headers?: any) {
++        this.joinErrorReported = false;
+         this.connection = new Connection(options.protocol);
+@@ -160,2 +162,3 @@ export class Room<
+             if (this.joinedAtTime === 0) {
++                if (this.joinErrorReported) return;
+                 console.warn?.(`Room connection was closed unexpectedly (${e.code}): ${e.reason}`);
+@@ -644,2 +647,3 @@ export class Room<
+         } else if (code === Protocol.ERROR) {
++            this.joinErrorReported = this.joinedAtTime === 0;
+             const code = decode.number(buffer as Buffer, it);
+diff --git a/src/transport/WebSocketTransport.ts b/src/transport/WebSocketTransport.ts
+index 92e86383eca4ec2b15ffb2ee406e9b41597a1b85..468b7a195a9c4d29e15576a3b66bf390b8531e15 100644
+--- a/src/transport/WebSocketTransport.ts
++++ b/src/transport/WebSocketTransport.ts
+@@ -50,3 +50,5 @@ export class WebSocketTransport {
+     public connect(url: string, headers?: any): void {
+-        try {
++        if (typeof window !== 'undefined') {
++            this.ws = new WebSocket(url, this.protocols);
++        } else try {
+             // Node or Bun environments (supports custom headers)
