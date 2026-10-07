@@ -41,7 +41,10 @@ game, preserving earlier costs, move activation, credentials, and exact replay.
 The transition is maintenance-only, requires the expected state version and a
 retry-safe request ID, and advances both version and event sequence. It is
 allowed during movement without pending choices, never by rewriting old actions.
-Previously spent half-points remain until normal reset. Rollout is pending.
+Previously spent half-points remain until normal reset. The reviewed `d018e92`
+rollout completed on 2026-10-07 with verified pre/post backups, exact historical
+replay, unchanged other saves, and public two-client smoke. Resource-aware game
+creation at 90% host CPU or RAM is also deployed; other abuse limits remain.
 
 The 2026-09-06 development terrain follow-up supersedes the older terrain
 exclusion below: the active board is A-W / 1-11 (253 hexes), matching the painted
