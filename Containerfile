@@ -1,5 +1,5 @@
-# Node 24.18.0 on Alpine 3.24; security floors tolerate repository revisions.
-FROM docker.io/library/node@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS base
+# Node 24.21.0 on Alpine 3.24; retain the variant when refreshing the digest.
+FROM docker.io/library/node:24-alpine@sha256:ebfe2f90462722a7a4de65e91990e97fe0d401c70e0e762c5b53302f905ec1c1 AS base
 RUN apk add --no-cache --upgrade 'libcrypto3>=3.5.8-r0' 'libssl3>=3.5.8-r0'
 
 FROM base AS build

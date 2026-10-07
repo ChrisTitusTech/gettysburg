@@ -25,7 +25,8 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   Public readiness/two-client smoke and the desktop full game pass. The public
   tablet full-game timing gate remains failed near turn 24. Owner gameplay
   testing is available, but this candidate is not release-accepted.
-  PR #56 remains unmerged pending required code-owner approval.
+  PR #56 merged on 2026-10-06 after review and exact-head CI using the owner's
+  explicit self-approval exception. The October PR work is not a VPS rollout.
   Browser-run environment: Codex engineering automation on ChrisTitusTech's
   Fedora Linux 44 x86_64 workstation, headless Chromium 151.0.7922.34,
   1440x900 desktop keyboard and 1024x768 touch-tablet viewports. These do not
