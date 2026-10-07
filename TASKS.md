@@ -1,5 +1,59 @@
 # Gettysburg project tasks
 
+## Per-game persistence repair: 2026-10-06
+
+The owner authorized the performance repair, reviewed PR publication/merge,
+deployment, and purging all existing development games. Retain and verify an
+encrypted backup before the purge; do not remove database volumes, credentials,
+or deletion-ledger history. This is development cleanup, not a change to normal
+retention. Engineering owns rollout and all remaining gates below.
+
+The preceding VPS rollout deployed merged `cabb03c` as immutable image
+`536b97fc0ac5625c9b3171cdd42e30273e11af6fc67b693bb9ab57b59e165558`.
+Final encrypted/off-host backup `20261007T025516Z` and isolated restore passed;
+the audit recorded 32 active games, 31 retained deleted games, and ledger/off-host
+watermark 81. Protected evidence is under
+`/home/titus/.local/state/gettysburg/acceptance/20261006-rollout`.
+Both basic layouts and spectator/replay checks passed, but public input took
+5.36-5.87 seconds and PostgreSQL reported shared-row lock deadlines. A tablet
+spectator retry passed after the normal creation quota expired. The full public
+tablet timing gate remains open. The historical September sections below do
+not describe the current deployment.
+
+An isolated restore reproduced whole-service JSON rewriting: about 38 MB of
+expanded data, including unrelated histories, on every move. Migration 004
+moves canonical game records into ordered per-game rows and leaves only global
+metadata in the shared row. In the populated local restore, a move improved
+from about 1,949 ms to 23 ms, creation from 2,334 ms to 18 ms, and readiness from
+418 ms to 79 ms. These are individual local observations, not VPS/capacity
+acceptance. The live database has not yet been purged or migrated.
+
+- [x] Frozen install, format, lint, typecheck, 766 workspace tests, 39 harness
+  tests, build, and smoke pass. The separately isolated PostgreSQL run passes
+  all 31 tests (including migration/retry/order preservation, unrelated-row
+  isolation, rollback/revocation, and delivery waiting behind a writer).
+- [x] Populated two-session Chromium 153.0.8010.12 checks pass at 1440x900
+  desktop and 1024x768 touch-tablet widths, including both 24-turn games,
+  retreat/advance/loss choices, pending-result reload, and exact replay.
+  Inspected fit-board screenshots and browser evidence are retained in ignored
+  `test-results/per-game-populated`. Report-mode input observations are
+  223/234 ms and reconnects 808/820 ms; no timing target was missed. These are
+  local observations, not physical-device or calibrated-capacity acceptance.
+  Container smoke passes non-root execution, PostgreSQL restart/resume,
+  fail-closed readiness, and clean shutdown.
+- [x] Independent Codex review found no actionable regressions and independently
+  reran all 31 PostgreSQL tests and server typechecking. Implementation commit:
+  `27f6b12`. Protected engineering logs are retained under
+  `/home/titus/.local/state/gettysburg/acceptance/20261006-performance`.
+- [ ] Exact-head PR CI and required merge approval. The sole CODEOWNER is also
+  the author; engineering requested an explicit admin-merge exception rather
+  than changing branch policy. Await owner direction if no other reviewer exists.
+- [ ] Back up, purge authorized development games with audit receipts, deploy,
+  and verify public timing, restart recovery, and encrypted restore/off-host copy.
+  Pre-004 image rollback requires restoring its matching database backup.
+  Fresh pre-purge backup `20261007T031634Z` passed isolated restore and off-host
+  checksum/decryption verification. The purge and deployment remain pending.
+
 ## Owner acceptance and PR closeout: 2026-10-06
 
 ChrisTitusTech explicitly accepted the board and rules and authorized working

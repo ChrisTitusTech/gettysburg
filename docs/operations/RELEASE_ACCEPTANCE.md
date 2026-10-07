@@ -17,7 +17,15 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   strength are approved. Supplied scans remain private.
 - All 253 terrain hexes are owner-verified; B2/F11 are woods. Connections are
   approved best guesses, not a request to repeat or overwrite the terrain audit.
-- Phase 2 is complete. The 2026-09-07 development VPS rollout uses source
+- Phase 2 is complete. The latest 2026-10-06 development rollout uses merged
+  `cabb03c` and immutable image
+  `536b97fc0ac5625c9b3171cdd42e30273e11af6fc67b693bb9ab57b59e165558`.
+  Public input latency is 5.36-5.87 seconds; performance acceptance remains open.
+  The owner authorized per-game persistence repair and an encrypted-backup-first
+  purge of all existing development games. That repair is not yet deployed.
+  Engineering must rerun public desktop/tablet full games and timing after it.
+  See `TASKS.md` and `VPS.md` for current rollout evidence and rollback boundaries.
+- Historical evidence: the 2026-09-07 development VPS rollout used source
   `1baebbd2a31963bfdb3974b714914a29bd839957` and immutable image
   `459eeb0319dea71da0387fc7530937e61754006b7ed0be607e52d9c41759dbc7`.
   This is not final public-release or Phase 3/4 acceptance.

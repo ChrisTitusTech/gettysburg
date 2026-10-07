@@ -794,13 +794,19 @@ Game-scoped PostgreSQL reads project only the requested game's canonical record
 before transferring and reconstructing it. Unrelated retained boards and action
 histories must not burden each room read. Authorization metadata remains in the
 same canonical snapshot; delivery retains its SHARE lock and bounded deadline.
-This read optimization does not modify stored records or the retention policy.
-Gameplay transactions reconstruct undeleted games and any explicitly targeted
-retired game, so global notification pruning and stale-authorization behavior
-remain intact. Under the same canonical UPDATE lock, PostgreSQL overlays those
-records and preserves omitted retired histories and their ordering. Gameplay
-cannot change the game inventory. Creation, host management, retention, and
-recovery keep the full-snapshot transaction path; no data migration is required.
+Migration 004 separates canonical game state and history into `service_games`
+rows, preserving game order, creation retry identity, and all saved records.
+The small `service_state` row retains global authorization, notification, and
+deletion metadata with an empty games collection. Mutations lock that metadata
+before loading their target game and games referenced by push consent; only
+changed game rows are written. Creation retries use an indexed creation ID.
+Global retention and ledger operations still load the complete inventory.
+Delivery acquires the metadata SHARE lock before reading game rows, so a read
+waiting behind a writer observes its committed version and revocation remains
+atomic with synchronous delivery. Readiness checks active game states without
+loading their histories. Normal retention policy is unchanged. Rolling back to
+an image before migration 004 requires its matching pre-migration backup; an
+old image must never run directly against the migrated database.
 An admission read that reaches its deadline reports transient status 503.
 Player/spectator clients retry only that status, at most four attempts with
 500/1000/2000 ms backoff, and cancel pending backoff on navigation. Denied or
