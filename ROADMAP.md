@@ -211,11 +211,12 @@ accepted the board and rules on 2026-10-06. Legacy tabletop
 saves still resume without interpreted replay, so retained-version replay
 coverage needs implementation or an explicit scope decision. This source was
 deployed as `dc6b73b` on 2026-09-07, then held behind maintenance after browser
-connection failures. Reviewed repair `1baebbd` is now deployed after exact-head
-CI and both retained-data VPS full games. Public desktop full-game checks pass;
-the tablet timing gate still fails near turn 24. Owner gameplay testing is
-available. PR #56 merged on 2026-10-06 after review, exact-head CI, and the
-owner-authorized self-approval exception. Deployment does not establish
+connection failures. September repair `1baebbd` reopened owner testing but left
+the public tablet timing gate failed. On 2026-10-06, reviewed PR #73 deployed
+merged `2990d8e`, separating game records and purging 63 old development games
+under explicit backup-first owner authorization. Public readiness, basic
+workflows, and restart recovery pass. `TASKS.md` and the release worksheet own
+the current full-game evidence and remaining gates. Deployment does not establish
 Phase 3 completion. Optional rules/additional
 scenarios are excluded by owner decision. The
 coordinate-by-coordinate review worksheet is in
@@ -287,8 +288,10 @@ wiring merged in PR #51. Home Screen and actual device/recovery acceptance remai
 Container hardening merged in PR #45. After the initial `dc6b73b` rollout,
 reviewed repair `1baebbd` was deployed on 2026-09-07 with exact-image scanning,
 public readiness/WebSocket checks, restart recovery, and verified backups.
-The site reopened for owner testing; the public tablet timing gate remains
-failed near turn 24. This is not final release approval; push remains disabled.
+The site reopened for owner testing but retained a public tablet timing failure.
+The 2026-10-06 `2990d8e` rollout addresses whole-service persistence latency;
+current numeric and browser evidence is in `TASKS.md`. This is not final release
+approval; push remains disabled.
 Existing staging, backup, restore, and browser evidence do not replace the
 remaining accessibility, security, capacity, reboot, and final acceptance gates.
 

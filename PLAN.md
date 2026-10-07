@@ -41,12 +41,15 @@ The initial 2026-09-07 development rollout deployed `dc6b73b` through PR #55,
 enabling mandatory Scenario Five for new games with the complete pinned
 terrain/edge bundle and shared rule previews. It does not reinterpret existing
 saves or close the remaining owner/release acceptance gates.
-Public-browser acceptance exposed room connection timeouts. Reviewed repair
-candidate `1baebbd` is now deployed after exact-head CI and both retained-data
-VPS full games. Public readiness/two-client smoke and the desktop full game pass.
-Owner gameplay testing is available, but the public tablet full-game timing gate
-still fails near turn 24. PR #56 merged on 2026-10-06 after review and exact-head
-CI, using the owner's explicit self-approval exception without changing policy.
+Public-browser acceptance exposed room connection timeouts. The September
+repair `1baebbd` reopened owner testing but left a public tablet timing failure.
+On 2026-10-06, PR #73 merged and deployed as `2990d8e` after independent review,
+exact-head CI, and the owner's explicit self-approval exception without changing
+policy. It separates game records to remove whole-service history rewriting.
+The owner-authorized, encrypted-backup-first purge removed 63 old development
+games while preserving the database, credentials, ledger, and recovery backups.
+Public readiness/two-client smoke, basic workflows, and restart recovery pass;
+the acceptance worksheet records current full-game evidence and release gates.
 `TASKS.md` preserves the failed-run history and current evidence.
 Mandatory-rule replay, authorized browser replay controls, and automated
 24-turn games at desktop/tablet widths are merged through PRs #29-31. Movement,

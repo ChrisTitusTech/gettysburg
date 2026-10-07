@@ -17,8 +17,8 @@ watermark 81. Protected evidence is under
 Both basic layouts and spectator/replay checks passed, but public input took
 5.36-5.87 seconds and PostgreSQL reported shared-row lock deadlines. A tablet
 spectator retry passed after the normal creation quota expired. The full public
-tablet timing gate remains open. The historical September sections below do
-not describe the current deployment.
+tablet timing gate remained open at that rollout. The historical September
+sections below do not describe the current deployment.
 
 An isolated restore reproduced whole-service JSON rewriting: about 38 MB of
 expanded data, including unrelated histories, on every move. Migration 004
@@ -26,7 +26,9 @@ moves canonical game records into ordered per-game rows and leaves only global
 metadata in the shared row. In the populated local restore, a move improved
 from about 1,949 ms to 23 ms, creation from 2,334 ms to 18 ms, and readiness from
 418 ms to 79 ms. These are individual local observations, not VPS/capacity
-acceptance. The live database has not yet been purged or migrated.
+acceptance. The live database was subsequently purged and migrated as recorded
+below; the populated-copy evidence demonstrates this is not merely a purge-based
+performance improvement.
 
 - [x] Frozen install, format, lint, typecheck, 766 workspace tests, 39 harness
   tests, build, and smoke pass. The separately isolated PostgreSQL run passes
@@ -45,14 +47,64 @@ acceptance. The live database has not yet been purged or migrated.
   reran all 31 PostgreSQL tests and server typechecking. Implementation commit:
   `27f6b12`. Protected engineering logs are retained under
   `/home/titus/.local/state/gettysburg/acceptance/20261006-performance`.
-- [ ] Exact-head PR CI and required merge approval. The sole CODEOWNER is also
-  the author; engineering requested an explicit admin-merge exception rather
-  than changing branch policy. Await owner direction if no other reviewer exists.
-- [ ] Back up, purge authorized development games with audit receipts, deploy,
-  and verify public timing, restart recovery, and encrypted restore/off-host copy.
-  Pre-004 image rollback requires restoring its matching database backup.
-  Fresh pre-purge backup `20261007T031634Z` passed isolated restore and off-host
-  checksum/decryption verification. The purge and deployment remain pending.
+- [x] PR #73 passed exact-head CI on `ef9e221`, had no unresolved review threads,
+  and merged as `2990d8e` with the owner's explicit admin-merge exception for
+  sole-CODEOWNER self-approval. Branch protections were not changed.
+  Post-merge Application `37566761296`, Documentation `37566761255`, Security
+  `37566761229`, and CodeQL pass. Browser compatibility `37566761248` passes on
+  attempt 2: the first WebKit attempt timed out waiting for an unclaimed
+  spectator grant to disappear; the unchanged rerun and subsequent local
+  WebKit checks pass. No test deadline or threshold was relaxed. Engineering
+  retains the initial failure and owns follow-up diagnostics if it recurs.
+- [x] Back up and purge all 63 old development games (32 active, 31 retained)
+  through prefix-checked audit receipts. The ledger advanced from 81 to 176;
+  canonical and mirrored game inventories both reached zero. Frozen pre-purge
+  backup `20261007T032915Z` and post-purge backup `20261007T033000Z` passed
+  isolated restore and off-host checksum/decryption verification. The database,
+  credentials, ledger history, old image, and encrypted backups were preserved.
+- [x] Deploy source `2990d8e` as immutable image
+  `ef965b292886cb340701d8f41f996da018c1366d7aebb07296dcaffbfb82c5ea`.
+  Trivy 0.75.0 found no HIGH/CRITICAL vulnerabilities. Public readiness and
+  authenticated HTTPS/WebSocket smoke pass; both rootless containers are
+  healthy. Both credentials resumed identical state after an application
+  restart, with pre-restart backup `20261007T033729Z` verified off-host. The
+  restart probe was normally deleted. Rollback material is retained under
+  `/srv/gettysburg/backups/deploy-20261007T033645Z`; pre-004 image rollback needs
+  a matching database restore and reconciliation of the latest deletion ledger.
+- [x] Public Chromium 153.0.8010.12 passes both 24-turn games at 1440x900
+  desktop and 1024x768 touch-tablet widths, with unchanged eight-minute bounds,
+  combat choices, pending-result reload, and exact replay. Both-width basic
+  flows, spectators, replay management, and automated accessibility checks pass.
+  Inspected screenshots and rendered evidence are in `test-results/performance-vps`.
+  Observed input-to-both-players times are 259.5/247.6 ms (previously
+  5,360/5,873 ms), reconnects 900.7/905.7 ms, and board-response p95 32 ms.
+  This closes the reproduced public tablet run failure for this candidate, not
+  physical-device, calibrated benchmark, or concurrent-capacity acceptance.
+- [x] Final backup `20261007T034301Z` passed isolated restore and off-host
+  checksum/decryption verification. Final audit: zero active games, 12 normally
+  deleted acceptance games in both canonical/mirrored tables, four migrations,
+  empty metadata games collection, and matching ledger/off-host watermark 188.
+  Both services report active/success and logs contain only normal startup.
+  Push remains disabled; no host upgrade or reboot was performed. Phases 3/4
+  and final public-release approval remain open.
+
+### Workstation WebKit dependencies
+
+The owner requested the missing dependencies be added. Fedora 44 repositories
+do not supply the Ubuntu fallback's required ICU 74 and JPEG 8 SONAMEs. A
+temporary rootless Ubuntu 24.04 container installed signed-repository packages
+`libicu74` 74.2-1ubuntu3.1 and `libjpeg-turbo8` 2.1.5-2ubuntu2. Their matching
+ICU data/i18n/uc and JPEG files were copied only into both browser bundles'
+`sys/lib` directories under `/home/titus/.cache/ms-playwright/webkit-2359`.
+No Fedora system libraries were replaced or falsely aliased. Dependency
+validation and actual WebKit 26.6 launch pass; both desktop/tablet full games,
+spectator revocation, reload, and exact replay pass locally. Evidence is in
+`test-results/performance-webkit-diagnostic` and the protected performance
+directory above. Earlier local attempts failed before browser launch, first
+because the matching browser was absent and then because these libraries were
+missing. Fedora remains an unofficial Playwright platform; future browser
+revisions require a fresh dependency check. The temporary dependency container
+and completed test database/volume were removed.
 
 ## Owner acceptance and PR closeout: 2026-10-06
 

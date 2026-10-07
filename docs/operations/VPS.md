@@ -28,29 +28,43 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Current deployment and pending persistence repair: 2026-10-06
+## Current per-game persistence deployment: 2026-10-06
 
-Merged `cabb03c` is deployed as immutable image
-`536b97fc0ac5625c9b3171cdd42e30273e11af6fc67b693bb9ab57b59e165558`.
-The clean VPS checkout is on `main`. Encrypted final backup `20261007T025516Z`
-passed isolated restore and off-host verification. Protected rollout evidence is
-`/home/titus/.local/state/gettysburg/acceptance/20261006-rollout`; rollback files
-are in `/srv/gettysburg/backups/deploy-20261007T023541Z`.
-Public input latency remains unacceptable at 5.36-5.87 seconds despite healthy
-containers and readiness. Engineering is repairing shared JSON persistence.
+PR #73 merged with the owner's explicit self-approval exception. Reviewed source
+`2990d8eb44f5b98b1fa96930234fb818382e7bc3` is deployed as immutable image
+`ef965b292886cb340701d8f41f996da018c1366d7aebb07296dcaffbfb82c5ea`.
+Exact-head PR and post-merge CI pass; the first post-merge WebKit attempt failed
+at spectator revocation, then the unchanged rerun and local WebKit checks passed.
+Trivy 0.75.0 found no HIGH/CRITICAL vulnerabilities in this exact image.
+Protected evidence is under
+`/home/titus/.local/state/gettysburg/acceptance/20261006-performance`; rollback
+files are in `/srv/gettysburg/backups/deploy-20261007T033645Z`.
+Public move synchronization improved from 5.36-5.87 seconds to 248-260 ms, with
+reconnects around 0.9 seconds. These are two report-mode observations, not a
+capacity or physical-device claim. Both saved sessions resumed identical state
+after an application restart. Public readiness and two-client smoke pass.
+Both public 24-turn desktop/tablet games pass with unchanged bounds, reload,
+and exact replay. Final encrypted backup `20261007T034301Z` passed isolated
+restore and off-host verification. Final audit: zero active games, 12 normally
+deleted acceptance games, four applied migrations, and matching ledger/off-host
+watermark 188. Both services report active/success with clean startup logs.
 Push remains disabled; no host upgrade or reboot was performed.
 
-The owner authorized purging all existing development games after verified
-encrypted backup, then deploying the reviewed performance repair. Migration
-004 stores canonical records in `service_games`; `service_state` retains only
-global metadata. It preserves records when run against a populated database.
+The owner-authorized purge removed 63 development games (32 active, 31 retained)
+through audit receipts, advancing the ledger from 81 to 176. Frozen pre-purge
+backup `20261007T032915Z` and post-purge backup `20261007T033000Z` passed isolated
+restore and off-host verification. Pre-restart backup `20261007T033729Z` also
+passed. Database volumes, credentials, backups, and ledger history remain.
+Migration 004 stores canonical records in `service_games`; `service_state`
+retains only global metadata. It preserves records when run against a populated
+database.
 An old image cannot read this new format. For rollback across this boundary,
 keep maintenance enabled, restore the matching pre-migration database and
 credential pepper using the restore procedure, and reconcile the latest
 off-host deletion ledger before reopening. Never merely switch the image back.
-Do not delete backups, credentials, database volumes, or ledger history during
-the authorized development-game purge. Record counts, receipts, and the new
-off-host watermark. `TASKS.md` tracks unfinished validation and rollout.
+Do not delete the retained recovery material. `TASKS.md` tracks validation
+and backup evidence, plus the release gates this development rollout does not
+close.
 
 ## Historical repair rollout: 2026-09-07
 
