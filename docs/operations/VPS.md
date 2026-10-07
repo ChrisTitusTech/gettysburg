@@ -50,6 +50,14 @@ deleted acceptance games, four applied migrations, and matching ledger/off-host
 watermark 188. Both services report active/success with clean startup logs.
 Push remains disabled; no host upgrade or reboot was performed.
 
+Owner testing exposed a separate source-attribution defect after the harness
+exhausted the ten-creation/15-minute budget. The rootless backend observes a
+private non-loopback Caddy peer, but Express trusts only loopback proxies, so
+public clients share the proxy's source bucket. One controlled restart with
+verified ledger/ack 188 cleared the test window; limits were not changed.
+Engineering must validate a narrowly trusted proxy configuration and spoofed-
+header rejection before release. This deployment does not fix that boundary.
+
 The owner-authorized purge removed 63 development games (32 active, 31 retained)
 through audit receipts, advancing the ledger from 81 to 176. Frozen pre-purge
 backup `20261007T032915Z` and post-purge backup `20261007T033000Z` passed isolated

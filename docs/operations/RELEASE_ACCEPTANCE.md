@@ -144,6 +144,11 @@ This does not close separate disruptive exercises or final public-release approv
 - [ ] Measure concurrent-room capacity on the target VPS and publish only the
   demonstrated limit. Local zoom timings do not establish broadband loading,
   all board-interaction latency, Internet-excluded command latency, or VPS capacity.
+- [ ] Repair and verify per-source rate-limit isolation through Caddy/rootless
+  Podman, including rejection of spoofed forwarding headers. Owner testing hit
+  the harness-exhausted creation budget; a controlled restart cleared that
+  window, but the private proxy peer is not covered by loopback-only trust.
+  Engineering owns the configuration repair; limits remain enabled.
 - [ ] Run the strict 100 ms benchmark on calibrated supported desktop hardware;
   record hardware, OS/browser, workload, and numeric evidence. Shared-CI report
   mode retains misses as diagnostics and cannot close this release gate.

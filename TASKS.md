@@ -87,6 +87,17 @@ performance improvement.
   Both services report active/success and logs contain only normal startup.
   Push remains disabled; no host upgrade or reboot was performed. Phases 3/4
   and final public-release approval remain open.
+- [ ] Repair request-source attribution through Caddy/rootless Podman.
+  The owner encountered `creation_rate_limited` after the public harness used
+  all ten creations in the 15-minute source window. A controlled application
+  restart, after verifying ledger/ack equality at 188, cleared the test-induced
+  window and restored readiness without changing limits. Socket inspection
+  confirms Caddy arrives at the app from a private non-loopback peer, while
+  Express trusts only loopback; public source buckets therefore collapse at
+  the proxy hop. Engineering must pin the correct trusted proxy boundary and
+  test distinct-source isolation plus spoofed-forwarding rejection before
+  production acceptance. Do not use unrestricted proxy trust or disable limits.
+  No further public acceptance games will be created during owner testing.
 
 ### Workstation WebKit dependencies
 
