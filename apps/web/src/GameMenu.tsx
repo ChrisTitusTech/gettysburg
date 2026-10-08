@@ -3,11 +3,13 @@ import { useEffect, useId, useRef, type ReactNode } from "react";
 /** A non-modal disclosure: form controls keep their normal keyboard semantics. */
 export function GameMenu({
   label,
+  available = true,
   open,
   onOpenChange,
   children,
 }: {
   readonly label: string;
+  readonly available?: boolean;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly children: ReactNode | ((close: () => void) => ReactNode);
@@ -16,6 +18,10 @@ export function GameMenu({
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!available) {
+      if (open) onOpenChange(false);
+      return;
+    }
     if (!open) return;
     const dismiss = (event: PointerEvent) => {
       if (event.target instanceof Node && !root.current?.contains(event.target))
@@ -33,7 +39,8 @@ export function GameMenu({
       document.removeEventListener("pointerdown", dismiss);
       document.removeEventListener("keydown", escape);
     };
-  }, [open, onOpenChange]);
+  }, [available, open, onOpenChange]);
+  if (!available) return null;
   return (
     <div
       className="game-menu"

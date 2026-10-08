@@ -46,7 +46,15 @@ PR #79. Deployment remains outside this increment. Engineering owns validation.
   897 workspace tests, 39 harness tests, build, and smoke pass. Desktop/tablet
   Chromium, Firefox, and WebKit menu/replay acceptance also passes, as do both
   integrated Chromium full games with reload and exact replay.
-- [ ] Hosted exact-head CI after the focus fix and integration. Engineering must
+- Integrated head `9d16d9d` passed all hosted checks. Two subsequent review
+  findings are addressed by explicit menu availability: guests in replay no
+  longer see an empty Seat options menu, and unavailable Notifications clear
+  their open state instead of reopening after reconnect. Regression coverage
+  exercises disappearance/reappearance and guest replay visibility. Formatting,
+  lint, typecheck, 898 workspace/39 harness tests, build, and smoke pass, along
+  with desktop/tablet Chromium, Firefox, and WebKit acceptance. The unchanged
+  full-game checks reuse the integrated runs above and will rerun in hosted CI.
+- [ ] Hosted exact-head CI after the menu-availability fixes. Engineering must
   verify the new head and unresolved review threads before merge. No VPS changes.
 
 ## Flat movement and shortest drag routes: 2026-10-07

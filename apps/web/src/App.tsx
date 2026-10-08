@@ -847,34 +847,37 @@ export function App({
           </button>
         ) : null}
         <nav className="game-tools" aria-label="Game tools">
-          {activeGame.seat !== null &&
-          connectionStatus === "connected" &&
-          isMandatoryRuleset(activeGame.state.ruleset_version) &&
-          activeGame.state.phase !== "completed" ? (
-            <GameMenu
-              label="Notifications"
-              open={openMenu === "notifications"}
-              onOpenChange={(open) =>
-                setOpenMenu(open ? "notifications" : null)
-              }
-            >
-              <NotificationBoundary>
-                <Suspense
-                  fallback={
-                    <p role="status">Loading notification controls...</p>
-                  }
-                >
-                  <PushControls
-                    key={`${activeGame.game_id}:${activeGame.seat}`}
-                    gameId={activeGame.game_id}
-                  />
-                </Suspense>
-              </NotificationBoundary>
-            </GameMenu>
-          ) : null}
+          <GameMenu
+            label="Notifications"
+            available={
+              activeGame.seat !== null &&
+              connectionStatus === "connected" &&
+              isMandatoryRuleset(activeGame.state.ruleset_version) &&
+              activeGame.state.phase !== "completed"
+            }
+            open={openMenu === "notifications"}
+            onOpenChange={(open) => setOpenMenu(open ? "notifications" : null)}
+          >
+            <NotificationBoundary>
+              <Suspense
+                fallback={<p role="status">Loading notification controls...</p>}
+              >
+                <PushControls
+                  key={`${activeGame.game_id}:${activeGame.seat}`}
+                  gameId={activeGame.game_id}
+                />
+              </Suspense>
+            </NotificationBoundary>
+          </GameMenu>
 
           <GameMenu
             label="Seat options"
+            available={
+              activeGame.is_host ||
+              activeGame.invitationUrl !== undefined ||
+              activeInvitationLookupId !== null ||
+              (activeGame.seat !== null && !replayOpen)
+            }
             open={openMenu === "seats"}
             onOpenChange={(open) => setOpenMenu(open ? "seats" : null)}
           >

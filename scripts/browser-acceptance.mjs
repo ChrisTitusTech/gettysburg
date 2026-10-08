@@ -488,6 +488,13 @@ async function runScenario(browser, origin, options) {
     await viewer.getByText(/Viewing event 0 of/).waitFor();
     assert.equal(
       await unionPage
+        .getByRole("button", { name: "Seat options", exact: true })
+        .count(),
+      options.hostName === "Union" ? 1 : 0,
+      "Guests must not receive an empty seat menu during replay",
+    );
+    assert.equal(
+      await unionPage
         .getByRole("button", { name: "Surrender seat", exact: true })
         .count(),
       0,

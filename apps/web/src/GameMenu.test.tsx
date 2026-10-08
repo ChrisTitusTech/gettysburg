@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { GameMenu } from "./GameMenu";
 
-function Tools() {
+function Tools({ available = true }: { available?: boolean }) {
   const [active, setActive] = useState<string | null>(null);
   return (
     <>
@@ -12,6 +12,7 @@ function Tools() {
         <GameMenu
           key={label}
           label={label}
+          available={available}
           open={active === label}
           onOpenChange={(open) => setActive(open ? label : null)}
         >
@@ -24,6 +25,24 @@ function Tools() {
 }
 
 describe("game toolbar disclosures", () => {
+  it("removes unavailable tools and clears their open state before they return", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Tools />);
+    await user.click(screen.getByRole("button", { name: "Notifications" }));
+    expect(
+      screen.getByRole("button", { name: "Notifications action" }),
+    ).toBeVisible();
+    rerender(<Tools available={false} />);
+    expect(screen.queryByRole("button", { name: "Notifications" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Seat options" })).toBeNull();
+    rerender(<Tools />);
+    expect(
+      screen.getByRole("button", { name: "Notifications" }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: "Notifications action" }),
+    ).toBeNull();
+  });
   it("restores trigger focus when a keyboard action closes its panel", async () => {
     const user = userEvent.setup();
     render(<Tools />);
