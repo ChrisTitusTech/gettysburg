@@ -484,7 +484,11 @@ describe("Board", () => {
 
     expect(counter).toHaveAttribute("data-combat", "3");
     expect(counter).toHaveAttribute("data-movement", "5");
-    expect(counter).toHaveTextContent("INF");
+    expect(counter).toHaveAccessibleName(/infantry/);
+    expect(counter?.querySelector("image")).toHaveAttribute(
+      "href",
+      expect.stringContaining("infantry.webp"),
+    );
     expect(counter).toHaveTextContent("3-5");
 
     await user.click(

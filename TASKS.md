@@ -1,5 +1,28 @@
 # Gettysburg project tasks
 
+## Illustrated unit counters: 2026-10-07
+
+The owner approved the artwork mockup and authorized commit, push to main, and
+VPS deployment. Engineering owns implementation and rollout verification.
+
+- [x] Replace CAV/INF/GEN/ART face text with original transparent cavalry,
+  marching infantry, general portraits, and cannon artwork. Preserve counter
+  metadata, accessible unit types, interactions, and the approved red loss stripe.
+- [x] Frozen install, formatting, lint, typecheck, 898 workspace tests, 39 harness
+  tests, build, startup smoke, and diff checks pass. The normal workspace run
+  skips 33 database cases; isolated database validation follows separately.
+- [x] Inspect actual counter artwork at desktop/tablet widths and enlarged.
+  Five asset URLs load successfully; all artwork totals 86 KB. Protected local
+  evidence: `20261007-unit-artwork` under the workstation acceptance directory.
+- [x] All 33 isolated PostgreSQL tests and desktop/tablet two-session Chromium
+  acceptance pass. Initial browser failure came from a single-image locator;
+  the harness now decodes every board/counter image before reload. No gate or
+  deadline was weakened. Markdown lint passes.
+- [x] Pre-deployment encrypted backup `20261008T042307Z` passes isolated restore
+  and verified off-host copy.
+- [ ] Complete exact-head hosted checks, deployment, and live restart/resume.
+  This presentation increment does not close any existing phase/release gates.
+
 ## Compact management bar: 2026-10-07
 
 Owner screenshot showed excessive vertical space above the map. The requested

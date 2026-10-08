@@ -283,10 +283,14 @@ async function runScenario(browser, origin, options) {
     await hostPage
       .getByRole("region", { name: "Turn notifications", includeHidden: true })
       .waitFor({ state: "attached" });
-    await hostPage.locator(".board-svg image").evaluate(async (element) => {
-      const image = new Image();
-      image.src = element.href.baseVal;
-      await image.decode();
+    await hostPage.locator(".board-svg image").evaluateAll(async (elements) => {
+      await Promise.all(
+        elements.map(async (element) => {
+          const image = new Image();
+          image.src = element.href.baseVal;
+          await image.decode();
+        }),
+      );
     });
     intentionalReloads.add(hostPage);
     const reconnectStarted = performance.now();

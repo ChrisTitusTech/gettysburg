@@ -706,11 +706,8 @@ summary {
   pointer-events: none;
 }
 
-.counter-kind rect {
-  fill: rgb(255 248 226 / 18%);
-  stroke: #17120d;
-  stroke-width: 1.25;
-  filter: none;
+.counter-artwork {
+  pointer-events: none;
 }
 
 .counter text {
@@ -728,11 +725,6 @@ summary {
 
 .counter-turn {
   font-size: 6.5px;
-}
-
-.counter-kind text {
-  font-size: 6px;
-  letter-spacing: 0.4px;
 }
 
 .counter-org {

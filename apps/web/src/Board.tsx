@@ -36,6 +36,11 @@ import { BoardTerrain, presentationTerrain } from "./BoardTerrain";
 import { previewMandatoryMovement } from "./movement-preview";
 import { MovementControls } from "./MovementControls";
 import { previewAdvance } from "./advance-preview";
+import artilleryArtwork from "./assets/units/artillery.webp";
+import cavalryArtwork from "./assets/units/cavalry.webp";
+import infantryArtwork from "./assets/units/infantry.webp";
+import unionGeneralArtwork from "./assets/units/general-union.webp";
+import confederateGeneralArtwork from "./assets/units/general-confederate.webp";
 
 interface BoardProps {
   readonly readOnly?: boolean;
@@ -88,11 +93,10 @@ const FIT_ZOOM = 1;
 const DEFAULT_ZOOM = 1;
 const MAX_ZOOM = 2.4;
 
-const UNIT_KIND_MARKS = {
-  artillery: "ART",
-  cavalry: "CAV",
-  general: "GEN",
-  infantry: "INF",
+const UNIT_ARTWORK = {
+  artillery: artilleryArtwork,
+  cavalry: cavalryArtwork,
+  infantry: infantryArtwork,
 } as const;
 
 function organizationMark(organization: string): string {
@@ -1193,12 +1197,22 @@ export function Board({
                   <text className="counter-turn" x="21" y="-7">
                     {unit.entry_turn ?? 1}
                   </text>
-                  <g className={`counter-kind counter-kind-${unit.kind}`}>
-                    <rect height="15" rx="0" width="25" x="-12.5" y="-12" />
-                    <text x="0" y="-1">
-                      {UNIT_KIND_MARKS[unit.kind]}
-                    </text>
-                  </g>
+                  <image
+                    aria-hidden="true"
+                    className={`counter-artwork counter-kind-${unit.kind}`}
+                    height="27"
+                    href={
+                      unit.kind === "general"
+                        ? unit.side === "union"
+                          ? unionGeneralArtwork
+                          : confederateGeneralArtwork
+                        : UNIT_ARTWORK[unit.kind]
+                    }
+                    preserveAspectRatio="xMidYMid meet"
+                    width="40"
+                    x="-22"
+                    y="-14"
+                  />
                   <text className="counter-org" x="-19" y="20">
                     {organizationMark(unit.organization)}
                   </text>
