@@ -17,7 +17,18 @@ scans to public evidence. A failed check needs a reproduction and follow-up.
   strength are approved. Supplied scans remain private.
 - All 253 terrain hexes are owner-verified; B2/F11 are woods. Connections are
   approved best guesses, not a request to repeat or overwrite the terrain audit.
-- Phase 2 is complete. The latest 2026-10-06 development rollout uses merged
+- The latest 2026-10-07 development rollout uses reviewed merged `d018e92` and
+  image `c15f0a8105d60a84495d6720ac28c4cfd6de144844106f112ab25e66cdba4803`.
+  New games and the explicitly approved testing game use 1-point road/rail
+  movement. The other four active v4 games were not changed. Earlier costs and
+  replay are preserved; previously spent half-points remain until normal reset.
+  Creation uses the 90% host CPU/RAM policy; other abuse limits remain.
+  Exact-head review/CI, image scan, frozen backup, transition/replay checks,
+  public two-client smoke, and post-deploy backup passed. Backup identifiers are
+  `20261007T130255Z` and `20261007T130441Z`; final ledger/ack is 189.
+  This does not close physical-device, calibrated capacity, push, rollback
+  exercise, or final-release gates below.
+- Phase 2 is complete. The previous 2026-10-06 development rollout used merged
   `2990d8e` and immutable image
   `ef965b292886cb340701d8f41f996da018c1366d7aebb07296dcaffbfb82c5ea`.
   Per-game persistence is deployed; the owner-authorized backup-first purge

@@ -1,6 +1,34 @@
 # Gettysburg VPS baseline and deployment plan
 
-## Pending whole-point movement rollout
+## Current whole-point and capacity deployment: 2026-10-07
+
+Reviewed PR #77 merged as `d018e92bf20f10e39afa98926126ff33accc575a` after
+all exact-head checks and resolved feedback, using the owner's admin exception.
+The VPS runs immutable image
+`c15f0a8105d60a84495d6720ac28c4cfd6de144844106f112ab25e66cdba4803`.
+Trivy 0.75.0 found zero HIGH/CRITICAL vulnerabilities in that exact image.
+PRs #75/#76 resource-aware creation fixes are included. No schema, proxy-trust,
+SSH, firewall, host-package, or push configuration changes were made.
+
+The app-only maintenance window retained the database service. Frozen encrypted
+backup `20261007T130255Z` passed isolated restore and off-host verification before
+the approved game transitioned from version 9/sequence 10 to version 10/sequence
+11. All old replay cursors, game contents, credentials, and other records were
+verified unchanged. New-image startup, readiness, health, and transition retry
+passed before Caddy reopened. Public two-client smoke created a v5 game and
+normally deleted only that test game. Final backup `20261007T130441Z` passed
+restore/off-host checks; five active games remain, with ledger/off-host ack 189.
+The four other active v4 games retain their versions. Both services are healthy.
+
+Rollback artifacts and the previous image are retained under
+`/srv/gettysburg/backups/whole-point-20261007`; protected validation logs are under
+the existing workstation `20261006-performance` evidence folder.
+The task-specific transition helper was rehearsed against an isolated database.
+After v5 saves exist, keep maintenance mode on failure rather than starting an
+older image against incompatible saves. A rollback requires the matching frozen
+backup and current deletion-ledger reconciliation. No purge is authorized.
+
+### Whole-point transition procedure
 
 The owner authorized 1-point road/rail movement for new games and the current
 testing game. New games use mandatory-v5 / mandatory-board-v2. Existing v4 games
@@ -18,7 +46,7 @@ transition other games or purge saves. A pre-v5 image cannot open v5 saves;
 rollback therefore requires its matching pre-transition encrypted database backup
 and current deletion-ledger reconciliation, not just an image flip.
 
-## Pending resource-aware creation policy
+### Deployed resource-aware creation policy
 
 The owner selected a 90% host CPU or RAM threshold for game creation only.
 The new implementation samples `/proc/stat` and `/proc/meminfo` once per second;
@@ -34,9 +62,9 @@ must be diagnosed; do not disable the gate to hide missing counters. Startup
 takes an initial one-second CPU sample before listening. The retained general
 HTTP, credential, replay, push, and command abuse budgets still apply.
 
-This policy is not deployed yet. Validate local/built-container startup and
-creation/recovery, preserve saved games, scan the exact new image, and use a
-coordinated rollout window. Do not deliberately overload the public VPS to test
+This policy is deployed in the current image above. For later rollouts, validate
+local/built-container startup and creation/recovery, preserve saved games, scan
+the exact new image, and use a coordinated window. Do not overload the VPS to test
 the boundary; deterministic injected-resource tests cover 89.9%, 90%, and
 recovery. A code/image rollback restores the old creation quotas; no schema
 change or data purge is needed. These samples do not certify concurrency capacity
@@ -70,7 +98,7 @@ The observed Let's Encrypt certificate had CN `gettysburg.christitus.com`, a
 start date of 2026-08-15 01:59:43 UTC, and an expiry of 2026-11-13 01:59:42 UTC.
 Caddy manages renewal, so the dates must not be treated as a manual renewal plan.
 
-## Current per-game persistence deployment: 2026-10-06
+## Previous per-game persistence deployment: 2026-10-06
 
 PR #73 merged with the owner's explicit self-approval exception. Reviewed source
 `2990d8eb44f5b98b1fa96930234fb818382e7bc3` is deployed as immutable image

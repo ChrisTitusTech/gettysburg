@@ -13,6 +13,13 @@ phase/release acceptance remains tracked in `ROADMAP.md` and `TASKS.md`.
 
 ## Current status
 
+The latest reviewed deployment is `d018e92` (2026-10-07). Road/rail movement
+and eligible reinforcement entry cost 1 for new games and the explicitly
+transitioned testing game. Earlier replay/costs and other saves are preserved.
+Game creation pauses at 90% host CPU or RAM; other abuse protections remain.
+Encrypted pre/post backups, exact-image scanning, transition verification, and
+public two-client smoke passed. See `TASKS.md` for evidence and rollback limits.
+
 Reviewed PR #73 source `2990d8eb44f5b98b1fa96930234fb818382e7bc3` was deployed
 on 2026-10-06 after independent review, exact-head CI, vulnerability scanning,
 and verified encrypted backups. Per-game persistence replaces whole-service
@@ -27,7 +34,7 @@ acceptance harness exhausted the creation budget. A controlled restart cleared
 that window without changing limits; proxy isolation remains an open repair.
 Phase 2 historical operational closeout remains
 complete. The deployed candidate uses
-`gettysburg-mandatory-v4` / `gettysburg-mandatory-board-v1` for new games, including
+`gettysburg-mandatory-v5` / `gettysburg-mandatory-board-v2` for new games, including
 weighted movement, continuous stack activation, reinforcement costs, connected
 terrain defense, retreat/advance, and mandatory night withdrawal. Saved versions
 are not silently reinterpreted. Dependency advisories were patched separately.

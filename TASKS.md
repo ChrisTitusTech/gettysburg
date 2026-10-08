@@ -26,20 +26,32 @@ be updated too. Engineering owns this separate increment from capacity PR #75.
 - [x] Independent Codex reviews of the complete implementation and final browser
   harness changes found no actionable defects; the final reviewer independently
   reran workspace tests, typechecking, and diff checks.
-- [ ] Exact-head CI and hosted review before merge. The owner authorized the
+- [x] Exact-head CI and hosted review before merge. The owner authorized the
   separate movement admin merge, combined deployment, and current-game update
   on 2026-10-07. Hosted review found that a retry after later gameplay returned
   the latest state; retries now replay the original transition sequence instead.
   Regression coverage verifies stable results and unchanged live state both
   in memory and after PostgreSQL restart. Fresh local gates and all 33 PostgreSQL
-  tests pass; final review/CI of this correction remain required.
-- [ ] Back up and deploy the reviewed image; apply the authorized transition
+  tests pass. Independent review and all exact-head CI passed on `deed3be`;
+  the review thread was resolved before PR #77 merged as `d018e92`.
+- [x] Back up and deploy the reviewed image; apply the authorized transition
   only to the identified current testing game and verify all old/new replay
   cursors and unchanged game contents. Other saves keep their pinned versions.
   Restoring an older image requires its compatible backup once v5 games exist.
+  Deployment on 2026-10-07 uses image
+  `c15f0a8105d60a84495d6720ac28c4cfd6de144844106f112ab25e66cdba4803`.
+  Exact-image Trivy scanning found zero HIGH/CRITICAL issues. Frozen backup
+  `20261007T130255Z` passed isolated restore and off-host verification before
+  the transition. The approved game advanced from version 9/sequence 10 to
+  version 10/sequence 11; all earlier replay cursors, game contents, credentials,
+  and other game records verified unchanged. App startup and idempotent retry
+  checks passed before reopening. Public readiness/two-client smoke passed;
+  its new v5 test game was normally deleted. Final backup `20261007T130441Z`
+  passed restore/off-host checks with ledger/ack 189. Five active games remain,
+  including four unchanged v4 games; no owner games were deleted.
 
 The earlier movement observation below is superseded by this explicit house-rule
-choice, not proof of a universal half-cost defect. Deployment remains pending.
+choice, not proof of a universal half-cost defect. Deployment is complete.
 
 ## Resource-aware game creation: 2026-10-06
 
@@ -51,7 +63,7 @@ Engineering acknowledges this merge-order error. Follow-up PR #76 merged as
 passed. It fixes authenticated lost-response creation retries, rechecks admission
 under the database mutation lock for queued work, and reports telemetry
 failure/recovery without raw diagnostic data. The three original review threads
-were resolved after the correction merged. Neither change is deployed yet.
+were resolved after the correction merged. Both fixes are deployed with `d018e92`.
 
 The owner confirmed that the 90% resource policy replaces game-creation quotas
 only; all other abuse protections remain. Engineering owns this separate repair.
@@ -76,9 +88,9 @@ only; all other abuse protections remain. Engineering owns this separate repair.
   observations were 120.5/132.7 ms; this is not calibrated capacity acceptance.
 - [x] Independent Codex implementation review found no actionable issues and
   independently ran server tests and typechecking.
-- [ ] Exact-head CI, final documentation review, and reviewed rollout. The owner
+- [x] Exact-head CI, independent review, and reviewed rollout. The owner
   explicitly authorized admin merge and deployment after checks pass, preserving
-  saved games. The VPS still runs `2990d8e`; this policy is not deployed yet.
+  saved games. The VPS runs `d018e92`; the 90% creation policy is deployed.
   The previous purge approval is spent; do not delete owner testing games.
 
 Documentation PR #74 merged as `359b87f` after exact-head CI and independent
