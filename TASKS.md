@@ -24,7 +24,8 @@ scope is a new PR only, not merge or deployment. Engineering owns validation.
   handler and regression test resolve it. No acceptance bounds were relaxed.
 - [x] Independent Codex review found no actionable defects and independently
   passed web/script tests, typechecking, build, and desktop/tablet acceptance.
-- [ ] Publish a ready-for-review PR after local gates pass. No VPS changes.
+- [ ] Hosted exact-head CI after PR publication. The owner requested a PR only;
+  merge and deployment are outside this increment. No VPS changes.
 
 ## Whole-point movement override: 2026-10-06
 
