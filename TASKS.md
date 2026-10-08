@@ -1,5 +1,48 @@
 # Gettysburg project tasks
 
+## Flat movement and shortest drag routes: 2026-10-07
+
+The owner requested a new PR for movement reach and drag-line realignment, then
+explicitly removed all numeric movement penalties and bonuses. Engineering owns
+this increment, isolated from the unrelated toolbar work.
+
+- [x] Add immutable mandatory-v6 / mandatory-board-v3 for new games. Every legal
+  normal step and reinforcement entry costs one, with no general bonus; a stack
+  uses its slowest remaining printed allowance. Retain occupancy, stacking,
+  activation, night/ZOC and artillery prohibitions, and combat modifiers.
+- [x] Choose shortest legal routes and break equal-length ties by proximity to
+  the start/target line. Recompute and clamp drag previews with the same server
+  route. Retain v4/v5 constructors, fingerprints, costs, bonuses and route ties
+  for exact historical replay. No saved game is migrated or deployed by this PR.
+- [x] Cover Reynolds/Wadsworth moving five hexes through woods with no bonus,
+  slow mixed stacks, partial moves, overshoot and pointer realignment, legal
+  step/entry costs across the complete board, and retained historical paths.
+- [x] Frozen install, formatting, lint, typecheck, build and startup smoke pass
+  on Node 24.18.0 / pnpm 11.21.0. Chromium mouse/touch movement fixtures pass at
+  1440x900 and 1024x768. Rendered evidence is kept in ignored
+  `test-results/mandatory-movement-preview`.
+- [x] All 893 workspace tests and 39 harness tests pass. All 33 isolated
+  PostgreSQL tests pass, including persisted five-point stack movement, retry,
+  restart and exact replay. The first database run still expected the old v5
+  constructor; its new-game expectation and movement/replay assertions were
+  updated and the complete database suite passed.
+- [x] Two-session Chromium desktop/tablet acceptance passes, including both
+  24-turn games, pending-result reload, and exact replay. Evidence: ignored
+  `test-results/flat-movement-acceptance`. Board-response p95 was 32.2/32.3 ms
+  in report mode; this does not close calibrated release performance gates.
+  Earlier superseded routing-only checks encountered a transient creation 429
+  and a changed overshoot endpoint. The final v6 harness expects the new
+  three-point remaining budget and I6 endpoint.
+- [x] Independent Codex review found no actionable correctness issues and
+  independently reran workspace tests and typechecking. Its documentation
+  finding was an outdated new-game version in `SPEC.md`, now corrected.
+  Implementation commit: `df5a1ee`. A separate review of the final documentation
+  found no actionable issues. Rootless Podman container smoke passes non-root
+  operation, PostgreSQL restart/resume, fail-closed readiness, and clean shutdown.
+- [ ] Exact-head CI after PR publication. Engineering owns checking the
+  published head and resolving any failures before merge. No merge, deployment,
+  or existing-game transition is authorized by this increment.
+
 ## Whole-point movement override: 2026-10-06
 
 The owner removed the 0.5 rule and explicitly requested the current testing game
