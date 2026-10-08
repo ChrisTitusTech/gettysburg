@@ -38,6 +38,7 @@ import {
   type SessionResponse,
 } from "./api";
 import { Board } from "./Board";
+import { GameMenu } from "./GameMenu";
 import { NotificationBoundary } from "./NotificationBoundary";
 import { ReplayViewer } from "./ReplayViewer";
 import { SpectatorHostControls } from "./SpectatorHostControls";
@@ -109,6 +110,7 @@ export function App({
       : { ...initialInvitation, kind: "invitation" as const });
   const [activeGame, setActiveGame] = useState<ActiveGame | null>(null);
   const [replayOpen, setReplayOpen] = useState(false);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [replayEventCursor, setReplayEventCursor] = useState<{
     game_id: string;
     event_sequence: number;
@@ -140,6 +142,7 @@ export function App({
   const enterGame = useCallback(
     (session: SessionResponse, shareUrl?: string) => {
       setReplayOpen(false);
+      setOpenMenu(null);
       setReplayEventCursor({
         game_id: session.game_id,
         event_sequence: session.state.event_sequence,
@@ -843,140 +846,183 @@ export function App({
             Reconnect
           </button>
         ) : null}
-      </header>
-
-      {activeGame.seat !== null &&
-      connectionStatus === "connected" &&
-      isMandatoryRuleset(activeGame.state.ruleset_version) &&
-      activeGame.state.phase !== "completed" ? (
-        <NotificationBoundary>
-          <Suspense
-            fallback={<p role="status">Loading notification controls...</p>}
-          >
-            <PushControls
-              key={`${activeGame.game_id}:${activeGame.seat}`}
-              gameId={activeGame.game_id}
-            />
-          </Suspense>
-        </NotificationBoundary>
-      ) : null}
-
-      {activeGame.invitationUrl === undefined &&
-      activeInvitationLookupId === null ? null : (
-        <section className="invitation-panel" aria-labelledby="invite-heading">
-          <div>
-            <p className="eyebrow">Opposing seat</p>
-            <h2 id="invite-heading">
-              {activeGame.invitationUrl === undefined
-                ? "Manage the active invitation"
-                : "Share this one-time invitation"}
-            </h2>
-            <p>
-              Open it in a private window or a separate browser. This browser
-              already owns
-              {activeGame.seat === null
-                ? " host controls."
-                : ` the ${humanSide(activeGame.seat)} seat.`}
-            </p>
-          </div>
-          {activeGame.invitationUrl === undefined ? (
-            <p>
-              The bearer secret is not stored in the browser. Revoke this
-              invitation or issue a replacement if it was not shared.
-            </p>
-          ) : (
-            <>
-              <input
-                aria-label="One-time invitation URL"
-                onFocus={(event) => event.currentTarget.select()}
-                readOnly
-                value={activeGame.invitationUrl}
-              />
-              <button onClick={() => void handleCopyInvitation()}>Copy</button>
-            </>
-          )}
-          {activeGame.is_host && activeInvitationLookupId !== null ? (
-            <button
-              disabled={isBusy}
-              onClick={() => void handleRevokeInvitation()}
+        <nav className="game-tools" aria-label="Game tools">
+          {activeGame.seat !== null &&
+          connectionStatus === "connected" &&
+          isMandatoryRuleset(activeGame.state.ruleset_version) &&
+          activeGame.state.phase !== "completed" ? (
+            <GameMenu
+              label="Notifications"
+              open={openMenu === "notifications"}
+              onOpenChange={(open) =>
+                setOpenMenu(open ? "notifications" : null)
+              }
             >
-              Revoke
-            </button>
+              <NotificationBoundary>
+                <Suspense
+                  fallback={
+                    <p role="status">Loading notification controls...</p>
+                  }
+                >
+                  <PushControls
+                    key={`${activeGame.game_id}:${activeGame.seat}`}
+                    gameId={activeGame.game_id}
+                  />
+                </Suspense>
+              </NotificationBoundary>
+            </GameMenu>
           ) : null}
-          <p aria-live="polite" className="copy-status">
-            {copyStatus}
-          </p>
-        </section>
-      )}
 
-      <section className="game-lifecycle" aria-label="Game lifecycle">
-        {activeGame.is_host
-          ? activeInvitations.map((invitation) => (
-              <button
-                disabled={isBusy}
-                key={invitation.lookup_id}
-                onClick={() =>
-                  void handleRevokeInvitation(invitation.lookup_id)
-                }
+          <GameMenu
+            label="Seat options"
+            open={openMenu === "seats"}
+            onOpenChange={(open) => setOpenMenu(open ? "seats" : null)}
+          >
+            {activeGame.invitationUrl === undefined &&
+            activeInvitationLookupId === null ? null : (
+              <section
+                className="invitation-panel"
+                aria-labelledby="invite-heading"
               >
-                Revoke {humanSide(invitation.seat)} invitation
-              </button>
-            ))
-          : null}
-        {activeGame.is_host ? (
-          <>
-            {activeGame.seat === null ? null : (
-              <button
-                disabled={isBusy}
-                onClick={() => void handleIssueInvitation()}
-              >
-                Issue opposing-seat invitation
-              </button>
+                <div>
+                  <p className="eyebrow">Opposing seat</p>
+                  <h2 id="invite-heading">
+                    {activeGame.invitationUrl === undefined
+                      ? "Manage the active invitation"
+                      : "Share this one-time invitation"}
+                  </h2>
+                  <p>
+                    Open it in a private window or a separate browser. This
+                    browser already owns
+                    {activeGame.seat === null
+                      ? " host controls."
+                      : ` the ${humanSide(activeGame.seat)} seat.`}
+                  </p>
+                </div>
+                {activeGame.invitationUrl === undefined ? (
+                  <p>
+                    The bearer secret is not stored in the browser. Revoke this
+                    invitation or issue a replacement if it was not shared.
+                  </p>
+                ) : (
+                  <>
+                    <input
+                      aria-label="One-time invitation URL"
+                      onFocus={(event) => event.currentTarget.select()}
+                      readOnly
+                      value={activeGame.invitationUrl}
+                    />
+                    <button onClick={() => void handleCopyInvitation()}>
+                      Copy
+                    </button>
+                  </>
+                )}
+                {activeGame.is_host && activeInvitationLookupId !== null ? (
+                  <button
+                    disabled={isBusy}
+                    onClick={() => void handleRevokeInvitation()}
+                  >
+                    Revoke
+                  </button>
+                ) : null}
+                <p aria-live="polite" className="copy-status">
+                  {copyStatus}
+                </p>
+              </section>
             )}
-            <button disabled={isBusy} onClick={() => void handleDeleteGame()}>
-              Delete game
-            </button>
-          </>
-        ) : null}
-        {activeGame.is_host && activeGame.seat === null ? (
-          <>
-            <button
-              disabled={isBusy}
-              onClick={() => void handleIssueInvitation("union")}
-            >
-              Issue Union invitation
-            </button>
-            <button
-              disabled={isBusy}
-              onClick={() => void handleIssueInvitation("confederate")}
-            >
-              Issue Confederate invitation
-            </button>
-          </>
-        ) : null}
-        {activeGame.seat === null || replayOpen ? null : (
-          <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
-            Surrender seat
-          </button>
-        )}
-      </section>
 
-      {activeGame.is_host ? (
-        <SpectatorHostControls
-          key={activeGame.game_id}
-          gameId={activeGame.game_id}
-          execute={executeHostCommand}
-        />
-      ) : null}
+            <section className="game-lifecycle" aria-label="Game lifecycle">
+              {activeGame.is_host
+                ? activeInvitations.map((invitation) => (
+                    <button
+                      disabled={isBusy}
+                      key={invitation.lookup_id}
+                      onClick={() =>
+                        void handleRevokeInvitation(invitation.lookup_id)
+                      }
+                    >
+                      Revoke {humanSide(invitation.seat)} invitation
+                    </button>
+                  ))
+                : null}
+              {activeGame.is_host ? (
+                <>
+                  {activeGame.seat === null ? null : (
+                    <button
+                      disabled={isBusy}
+                      onClick={() => void handleIssueInvitation()}
+                    >
+                      Issue opposing-seat invitation
+                    </button>
+                  )}
+                  <button
+                    disabled={isBusy}
+                    onClick={() => void handleDeleteGame()}
+                  >
+                    Delete game
+                  </button>
+                </>
+              ) : null}
+              {activeGame.is_host && activeGame.seat === null ? (
+                <>
+                  <button
+                    disabled={isBusy}
+                    onClick={() => void handleIssueInvitation("union")}
+                  >
+                    Issue Union invitation
+                  </button>
+                  <button
+                    disabled={isBusy}
+                    onClick={() => void handleIssueInvitation("confederate")}
+                  >
+                    Issue Confederate invitation
+                  </button>
+                </>
+              ) : null}
+              {activeGame.seat === null || replayOpen ? null : (
+                <button disabled={pendingCommand} onClick={handleSurrenderSeat}>
+                  Surrender seat
+                </button>
+              )}
+            </section>
+          </GameMenu>
+          {activeGame.is_host ? (
+            <GameMenu
+              label="Spectator access"
+              open={openMenu === "spectators"}
+              onOpenChange={(open) => setOpenMenu(open ? "spectators" : null)}
+            >
+              <SpectatorHostControls
+                key={activeGame.game_id}
+                gameId={activeGame.game_id}
+                execute={executeHostCommand}
+              />
+            </GameMenu>
+          ) : null}
 
-      <section className="replay-controls" aria-label="Replay controls">
-        <button
-          type="button"
-          aria-expanded={replayOpen}
-          onClick={() => setReplayOpen((open) => !open)}
-        >
-          {replayOpen ? "Return to live game" : "View replay"}
-        </button>
+          <GameMenu
+            label="Replay"
+            open={openMenu === "replay"}
+            onOpenChange={(open) => setOpenMenu(open ? "replay" : null)}
+          >
+            <button
+              type="button"
+              aria-expanded={replayOpen}
+              onClick={() => {
+                setReplayOpen((open) => !open);
+                setOpenMenu(null);
+              }}
+            >
+              {replayOpen ? "Return to live game" : "View replay"}
+            </button>
+          </GameMenu>
+        </nav>
+      </header>
+      <section
+        className="replay-controls"
+        aria-label="Replay controls"
+        hidden={!replayOpen}
+      >
         {replayOpen ? (
           <ReplayViewer
             key={activeGame.game_id}

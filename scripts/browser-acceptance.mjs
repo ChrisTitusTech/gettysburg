@@ -273,8 +273,8 @@ async function runScenario(browser, origin, options) {
     assert.match(invitation, /\/join\/[0-9a-f-]{36}#[A-Za-z0-9_-]{43}$/);
     // Do not abort the lazy notification module during deliberate reload.
     await hostPage
-      .getByRole("region", { name: "Turn notifications" })
-      .waitFor();
+      .getByRole("region", { name: "Turn notifications", includeHidden: true })
+      .waitFor({ state: "attached" });
     await hostPage.locator(".board-svg image").evaluate(async (element) => {
       const image = new Image();
       image.src = element.href.baseVal;
@@ -296,8 +296,8 @@ async function runScenario(browser, origin, options) {
       timingMode,
     );
     await hostPage
-      .getByRole("button", { exact: true, name: "Revoke" })
-      .waitFor();
+      .getByRole("button", { exact: true, name: "Revoke", includeHidden: true })
+      .waitFor({ state: "attached" });
 
     await opponentPage.goto(invitation);
     await opponentPage.getByRole("button", { name: "Claim seat" }).waitFor();
@@ -305,6 +305,45 @@ async function runScenario(browser, origin, options) {
     await opponentPage.getByRole("button", { name: "Claim seat" }).click();
     await opponentPage.getByText("connected", { exact: true }).waitFor();
     await waitForPlayerControls([hostPage, opponentPage]);
+    assert.equal(
+      await opponentPage.getByLabel("Current zoom").textContent(),
+      "100%",
+    );
+    const boardBefore = await hostPage
+      .locator(".board-workspace")
+      .boundingBox();
+    for (const name of [
+      "Notifications",
+      "Seat options",
+      "Spectator access",
+      "Replay",
+    ]) {
+      const trigger = hostPage.getByRole("button", { name, exact: true });
+      await trigger.click();
+      await auditAccessibility(
+        hostPage,
+        evidenceDirectory,
+        `${options.label}-${name.replaceAll(" ", "-").toLowerCase()}-menu`,
+      );
+      const boardAfter = await hostPage
+        .locator(".board-workspace")
+        .boundingBox();
+      assert(
+        boardBefore && boardAfter && boardBefore.y === boardAfter.y,
+        "Opening tools must not push the map down",
+      );
+      await hostPage.keyboard.press("Escape");
+      assert.equal(await trigger.getAttribute("aria-expanded"), "false");
+    }
+    const toolbar = await hostPage.locator(".game-header").boundingBox();
+    assert(
+      toolbar && toolbar.height < 160,
+      "Toolbar must remain compact at both viewports",
+    );
+    await hostPage.screenshot({
+      path: resolve(evidenceDirectory, `${options.label}-compact-toolbar.png`),
+      fullPage: true,
+    });
     await auditAccessibility(
       hostPage,
       evidenceDirectory,
@@ -422,6 +461,9 @@ async function runScenario(browser, origin, options) {
     }
     const liveVersion = options.inputMode === "keyboard" ? 4 : 3;
     await unionPage
+      .getByRole("button", { name: "Replay", exact: true })
+      .click();
+    await unionPage
       .getByRole("button", { name: "View replay", exact: true })
       .click();
     const viewer = unionPage.getByRole("region", {
@@ -509,13 +551,7 @@ async function runScenario(browser, origin, options) {
     });
     const containerBox = await replayControls.boundingBox();
     const viewerBox = await viewer.boundingBox();
-    const toggleBox = await replayControls
-      .getByRole("button", { name: "Return to live game" })
-      .boundingBox();
-    assert(containerBox && viewerBox && toggleBox);
-    assert(
-      toggleBox.height < 80 && viewerBox.y >= toggleBox.y + toggleBox.height,
-    );
+    assert(containerBox && viewerBox);
     assert(viewerBox.width > containerBox.width * 0.9);
     await captureScreenshot(unionPage, replayControls, {
       path: resolve(evidenceDirectory, `${options.label}-replay.png`),
@@ -538,14 +574,24 @@ async function runScenario(browser, origin, options) {
     });
     assert.equal(authoritativeVersion, liveVersion);
     await unionPage
+      .getByRole("button", { name: "Replay", exact: true })
+      .click();
+    await unionPage
       .getByRole("button", { name: "Return to live game", exact: true })
       .click();
     await waitForVersion(unionPage, liveVersion);
     await waitForVersion(confederatePage, liveVersion);
     await unionPage
-      .getByRole("button", { name: "Surrender seat", exact: true })
-      .waitFor();
+      .getByRole("button", {
+        name: "Surrender seat",
+        exact: true,
+        includeHidden: true,
+      })
+      .waitFor({ state: "attached" });
     const cleanupHostPage = options.hostName === "Union" ? unionPage : hostPage;
+    await cleanupHostPage
+      .getByRole("button", { name: "Seat options", exact: true })
+      .click();
     cleanupHostPage.once("dialog", (dialog) => dialog.accept());
     await cleanupHostPage
       .getByRole("button", { name: "Surrender seat" })

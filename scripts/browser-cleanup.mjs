@@ -5,6 +5,8 @@ export async function deleteAcceptanceGame(page) {
   const gameId = /^\/game\/([0-9a-f-]{36})$/.exec(location.pathname)?.[1];
   assert(gameId, "Cleanup requires the acceptance game's URL");
   const endpoint = `${location.origin}/api/games/${gameId}`;
+  const menu = page.getByRole("button", { name: "Seat options", exact: true });
+  if ((await menu.getAttribute("aria-expanded")) !== "true") await menu.click();
 
   page.once("dialog", (dialog) => dialog.accept());
   const [response] = await Promise.all([

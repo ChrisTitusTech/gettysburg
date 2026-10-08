@@ -110,6 +110,9 @@ export async function checkPushConsent(browser, origin, evidence, options) {
         return { status: response.status, body: await response.json() };
       }, endpoint);
     }
+    await host
+      .getByRole("button", { name: "Notifications", exact: true })
+      .click();
     await host.getByRole("button", { name: "Enable in this browser" }).click();
     await host
       .getByText("Notifications enabled in this browser for this seat.")
@@ -118,12 +121,18 @@ export async function checkPushConsent(browser, origin, evidence, options) {
     assert.equal((await readStatus(guest)).body.enabled, false);
     await host.reload();
     await host
+      .getByRole("button", { name: "Notifications", exact: true })
+      .click();
+    await host
       .getByText(/Enabled for this seat, possibly in another browser/)
       .waitFor();
     assert.equal(await host.evaluate(() => window.__pushRequests), 0);
     await host.getByRole("button", { name: "Turn off for this seat" }).click();
     await host.getByText("Notifications turned off for this seat.").waitFor();
     assert.equal((await readStatus(host)).body.enabled, false);
+    await guest
+      .getByRole("button", { name: "Notifications", exact: true })
+      .click();
     await guest.getByRole("button", { name: "Enable in this browser" }).click();
     await guest
       .getByText("Notifications enabled in this browser for this seat.")
@@ -132,6 +141,9 @@ export async function checkPushConsent(browser, origin, evidence, options) {
       path: resolve(evidence, `${options.label}-push-consent.png`),
     });
     guest.once("dialog", (dialog) => dialog.accept());
+    await guest
+      .getByRole("button", { name: "Seat options", exact: true })
+      .click();
     await guest.getByRole("button", { name: "Surrender seat" }).click();
     await guest.waitForURL(`${origin}/`);
     await guest

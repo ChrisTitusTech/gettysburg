@@ -581,6 +581,14 @@ priority over chrome. Common actions need keyboard and pointer access, touch
 targets must be usable on tablet, focus must be visible, and state cannot be
 communicated by color alone.
 
+Game management uses one compact top bar with notification, seat, spectator,
+and replay disclosures. Panels start closed and overlay the page without moving
+the board; only one opens at a time. Escape restores trigger focus, outside clicks
+and focus leaving the panel dismiss it, and controls keep normal keyboard/form
+semantics. Existing role checks, confirmations, invitation privacy, and opt-in
+notification consent remain unchanged. The map starts at the calibrated 100%
+fit on each load; manual zoom and pan remain available.
+
 Required workflows are create game, join game, choose/confirm seat, inspect a
 counter, move, declare and resolve combat, complete a phase, reconnect, and
 resume a saved game. Destructive choices such as concession or game deletion

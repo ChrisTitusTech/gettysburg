@@ -1,5 +1,31 @@
 # Gettysburg project tasks
 
+## Compact management bar: 2026-10-07
+
+Owner screenshot showed excessive vertical space above the map. The requested
+scope is a new PR only, not merge or deployment. Engineering owns validation.
+
+- [x] Consolidate notifications, seat/invitation actions, spectator access, and
+  replay into a compact header with overlaid, mutually exclusive disclosures.
+  Preserve permission checks, destructive confirmations, and opt-in consent.
+- [x] Start the map at 100% fit; retain manual zoom/pan. Add keyboard focus,
+  Escape, outside-click, and dismissal regression tests.
+- [x] Frozen install, formatting, lint, typecheck, 815 workspace tests, 39 harness
+  tests, build, smoke, Markdown lint, and diff checks pass. The unchanged 33
+  PostgreSQL integration cases reuse PR #77 evidence; this run's two-session
+  browser suite also uses isolated PostgreSQL.
+- [x] Desktop/tablet Chromium acceptance passes: all open-menu accessibility
+  checks, 100% initial zoom, stable board position, compact header, management,
+  opt-in consent, replay, and both complete 24-turn games with pending-result
+  reload/exact replay. Inspected screenshots are in ignored
+  `test-results/compact-toolbar`. Existing manual contrast/device gates remain.
+  Initial harness failures required explicit menu navigation and uncovered
+  Escape dismissal after async controls lost focus; a document-level Escape
+  handler and regression test resolve it. No acceptance bounds were relaxed.
+- [x] Independent Codex review found no actionable defects and independently
+  passed web/script tests, typechecking, build, and desktop/tablet acceptance.
+- [ ] Publish a ready-for-review PR after local gates pass. No VPS changes.
+
 ## Whole-point movement override: 2026-10-06
 
 The owner removed the 0.5 rule and explicitly requested the current testing game

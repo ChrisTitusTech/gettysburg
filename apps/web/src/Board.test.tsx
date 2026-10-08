@@ -221,7 +221,7 @@ function prepareBoardPoint(
       y: 0,
     }),
   });
-  const zoom = 1.15;
+  const zoom = 1;
   const viewWidth = BOARD_VIEW_BOX.width / zoom;
   const viewHeight = BOARD_VIEW_BOX.height / zoom;
   const viewX = (BOARD_VIEW_BOX.width - viewWidth) / 2;
@@ -590,7 +590,7 @@ describe("Board", () => {
   it("zooms and returns to its calibrated fit", async () => {
     const user = userEvent.setup();
     render(<Board onMove={vi.fn()} seat="union" state={state} />);
-    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("115%");
+    expect(screen.getByLabelText("Current zoom")).toHaveTextContent("100%");
     await user.click(screen.getByRole("button", { name: "Fit" }));
     await user.click(screen.getByRole("button", { name: "Zoom out" }));
     expect(screen.getByLabelText("Current zoom")).toHaveTextContent("65%");
@@ -623,7 +623,7 @@ describe("Board", () => {
         y: 0,
       }),
     });
-    const zoom = 1.15;
+    const zoom = 1;
     const viewWidth = BOARD_VIEW_BOX.width / zoom;
     const viewHeight = BOARD_VIEW_BOX.height / zoom;
     const viewX = (BOARD_VIEW_BOX.width - viewWidth) / 2;

@@ -44,11 +44,15 @@ export async function checkReplayManagement(
     for (const page of [host, guest])
       await page.getByText("connected", { exact: true }).waitFor();
     host.once("dialog", (dialog) => dialog.accept());
+    await host
+      .getByRole("button", { name: "Seat options", exact: true })
+      .click();
     await host.getByRole("button", { name: "Surrender seat" }).click();
     await host
       .getByRole("heading", { name: "Host controls recovered" })
       .waitFor();
     await guest.getByText("v1", { exact: true }).first().waitFor();
+    await guest.getByRole("button", { name: "Replay", exact: true }).click();
     await guest
       .getByRole("button", { name: "View replay", exact: true })
       .click();
@@ -58,6 +62,9 @@ export async function checkReplayManagement(
       .waitFor();
     await replay.getByRole("button", { name: "Latest event" }).click();
     await replay.getByText(/Viewing event 1 of 1/).waitFor();
+    await host
+      .getByRole("button", { name: "Seat options", exact: true })
+      .click();
     await host
       .getByRole("button", {
         name: "Issue Confederate invitation",

@@ -70,6 +70,7 @@ for (const failCleanup of [false, true])
         goto: async () => {},
         url: () => url,
         getByRole: (_role, { name }) => ({
+          getAttribute: async () => "true",
           click: async () => {
             if (name === "Host as Confederate") url = gameUrl;
             if (name === "Delete game") {

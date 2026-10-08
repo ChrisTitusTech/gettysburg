@@ -53,6 +53,12 @@ export async function checkSpectatorManagement(
     const gameId = new URL(host.url()).pathname.split("/").at(-1);
     let previousUrl = "";
     const issue = async () => {
+      const menu = host.getByRole("button", {
+        name: "Spectator access",
+        exact: true,
+      });
+      if ((await menu.getAttribute("aria-expanded")) !== "true")
+        await menu.click();
       await host.getByRole("button", { name: "Create spectator link" }).click();
       await host.waitForFunction((previous) => {
         const input = document.querySelector('input[value*="/observe/join/"]');
@@ -110,6 +116,7 @@ export async function checkSpectatorManagement(
     await observer
       .getByText("Read-only live board; no commands are sent.")
       .waitFor();
+    await host.keyboard.press("Escape");
     await host
       .getByRole("button", { name: "End movement phase", exact: true })
       .click();
@@ -161,6 +168,9 @@ export async function checkSpectatorManagement(
       observer.evaluate(async (path) => (await fetch(path)).status, path);
     assert.equal(await observerStatus(`/api/games/${gameId}/spectator`), 200);
     await host.reload();
+    await host
+      .getByRole("button", { name: "Spectator access", exact: true })
+      .click();
     assert.equal(
       await host.getByLabel("Private spectator invitation URL").count(),
       0,

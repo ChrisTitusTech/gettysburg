@@ -85,7 +85,7 @@ interface UnitDrag {
 
 const MIN_ZOOM = 0.65;
 const FIT_ZOOM = 1;
-const DEFAULT_ZOOM = 1.15;
+const DEFAULT_ZOOM = 1;
 const MAX_ZOOM = 2.4;
 
 const UNIT_KIND_MARKS = {
