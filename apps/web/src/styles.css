@@ -701,6 +701,11 @@ summary {
   fill: #668cad;
 }
 
+.counter-reduced-stripe {
+  fill: #d52832;
+  pointer-events: none;
+}
+
 .counter-kind rect {
   fill: rgb(255 248 226 / 18%);
   stroke: #17120d;

@@ -1153,7 +1153,7 @@ export function Board({
               return (
                 <g
                   key={unit.id}
-                  aria-label={`${unit.label}, ${unit.location}${readOnly || unit.side === seat ? ", selectable" : ""}, ${details}, ${unit.organization}`}
+                  aria-label={`${unit.label}, ${unit.location}${readOnly || unit.side === seat ? ", selectable" : ""}, ${details}, ${unit.organization}${unit.strength === "reduced" ? ", reduced strength" : ""}`}
                   aria-pressed={selected}
                   className={`counter counter-${unit.side}${retreatRequired ? " retreat-required" : ""}${advanceEligible ? " advance-eligible" : ""}${selected ? " selected" : ""}${draggedPath === null ? "" : " dragging"}`}
                   data-combat={currentCombat ?? ""}
@@ -1177,8 +1177,16 @@ export function Board({
                   <title>
                     {unit.label}: {details}; {unit.organization}; arrives turn{" "}
                     {unit.entry_turn ?? 1}
+                    {unit.strength === "reduced" ? "; reduced strength" : ""}
                   </title>
                   <rect height="56" rx="4" width="56" x="-28" y="-28" />
+                  {unit.strength === "reduced" && (
+                    <path
+                      aria-hidden="true"
+                      className="counter-reduced-stripe"
+                      d="M -26.5 -20 L -20 -26.5 L -12 -26.5 L -26.5 -12 Z"
+                    />
+                  )}
                   <text className="counter-name" x="0" y="-17">
                     {unit.label}
                   </text>
