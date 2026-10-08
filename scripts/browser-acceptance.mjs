@@ -177,7 +177,9 @@ async function dragWithinMovement(page, prefix, inputMode) {
     name: /Wadsworth, F4, selectable/,
   });
   const target = page.locator('[data-coordinate="W11"]');
-  await counter.scrollIntoViewIfNeeded();
+  // Keep both endpoints visible before taking coordinates. Scrolling only the
+  // counter can leave the destination below the viewport at the default fit.
+  await page.locator(".board-svg").scrollIntoViewIfNeeded();
   const startBox = await counter.boundingBox();
   const targetBox = await target.boundingBox();
   assert(startBox !== null);
@@ -190,6 +192,12 @@ async function dragWithinMovement(page, prefix, inputMode) {
     x: targetBox.x + targetBox.width / 2,
     y: targetBox.y + targetBox.height / 2,
   };
+  const viewport = page.viewportSize();
+  assert(viewport !== null);
+  for (const point of [from, to]) {
+    assert(point.x > 0 && point.x < viewport.width);
+    assert(point.y > 0 && point.y < viewport.height);
+  }
   const touch =
     inputMode === "touch" ? await page.context().newCDPSession(page) : null;
   if (touch) {
@@ -340,7 +348,7 @@ async function runScenario(browser, origin, options) {
       toolbar && toolbar.height < 160,
       "Toolbar must remain compact at both viewports",
     );
-    await hostPage.screenshot({
+    await captureScreenshot(hostPage, hostPage, {
       path: resolve(evidenceDirectory, `${options.label}-compact-toolbar.png`),
       fullPage: true,
     });

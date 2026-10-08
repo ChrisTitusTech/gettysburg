@@ -3,7 +3,8 @@
 ## Compact management bar: 2026-10-07
 
 Owner screenshot showed excessive vertical space above the map. The requested
-scope is a new PR only, not merge or deployment. Engineering owns validation.
+scope initially requested a new PR; the owner subsequently authorized merging
+PR #79. Deployment remains outside this increment. Engineering owns validation.
 
 - [x] Consolidate notifications, seat/invitation actions, spectator access, and
   replay into a compact header with overlaid, mutually exclusive disclosures.
@@ -24,8 +25,20 @@ scope is a new PR only, not merge or deployment. Engineering owns validation.
   handler and regression test resolve it. No acceptance bounds were relaxed.
 - [x] Independent Codex review found no actionable defects and independently
   passed web/script tests, typechecking, build, and desktop/tablet acceptance.
-- [ ] Hosted exact-head CI after PR publication. The owner requested a PR only;
-  merge and deployment are outside this increment. No VPS changes.
+- Initial hosted compatibility checks found two harness regressions: the new
+  toolbar capture bypassed the existing WebKit screenshot diagnostic helper,
+  and Firefox's drag destination fell below the viewport with the fitted map.
+  Reuse the screenshot helper without weakening CSP; scroll the entire board
+  before dragging and assert both endpoints are inside the viewport. No game
+  rule, security policy, test deadline, or acceptance bound was relaxed.
+- [x] Corrected harness passes Chromium, Firefox, and WebKit desktop/tablet
+  acceptance, including both full 24-turn games per engine. Formatting, lint,
+  30 browser-harness tests, Markdown lint, and diff checks pass. One initial
+  local WebKit push fixture timed out creating an invitation; the unchanged
+  rerun passed. The original hosted Application job also passed its database
+  and complete Chromium checks. Unchanged application gates above are reused.
+- [ ] Hosted exact-head CI after the compatibility fixes. Engineering must
+  verify the new head and unresolved review threads before merge. No VPS changes.
 
 ## Whole-point movement override: 2026-10-06
 
