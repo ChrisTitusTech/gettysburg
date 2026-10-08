@@ -50,7 +50,11 @@ export function mandatoryNightWithdrawals(
         continue;
       const ids = movers.map((unit) => unit.id);
       const source = movers[0]!.location!;
-      const plan = planNormalMove(settled.normal_movement, movers);
+      const plan = planNormalMove(
+        settled.normal_movement,
+        movers,
+        settled.ruleset_version,
+      );
       if (
         !plan.ok ||
         plan.allowance <= 0 ||

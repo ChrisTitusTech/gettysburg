@@ -3,12 +3,19 @@ import type { HexCoordinate } from "./coordinates.js";
 import type { GameState, MovementEdges, Side, UnitKind } from "./protocol.js";
 import { enemyZoneOfControl } from "./zoc.js";
 import { hasCombatSupport, isUnsupportedGeneral } from "./generals.js";
-import { WHOLE_POINT_RULESET_VERSION } from "./protocol.js";
+import {
+  WHOLE_POINT_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
+} from "./protocol.js";
 
 export type { MovementEdges } from "./protocol.js";
 
 export function roadMovementCost(state: GameState): number {
-  return state.ruleset_version === WHOLE_POINT_RULESET_VERSION ? 1 : 0.5;
+  return [WHOLE_POINT_RULESET_VERSION, FLAT_MOVEMENT_RULESET_VERSION].includes(
+    state.ruleset_version,
+  )
+    ? 1
+    : 0.5;
 }
 
 export interface MovementRoute {
@@ -35,7 +42,9 @@ export function terrainMovementCost(
   const rough = terrain?.kind === "rough_hill";
   return woods && rough && kinds.includes("artillery")
     ? null
-    : 1 + Number(woods) + Number(rough);
+    : state.ruleset_version === FLAT_MOVEMENT_RULESET_VERSION
+      ? 1
+      : 1 + Number(woods) + Number(rough);
 }
 
 function linked(
@@ -101,8 +110,11 @@ function stepCalculator(
       const cost = roadMovementCost(state);
       return { cost, road: true, terrain: cost, stream: 0, zoc: 0 };
     }
-    const streamCost = Number(linked(edges.streams, origin, destination));
-    const zocCost = Number(zoc.has(destination));
+    const flat = state.ruleset_version === FLAT_MOVEMENT_RULESET_VERSION;
+    const streamCost = flat
+      ? 0
+      : Number(linked(edges.streams, origin, destination));
+    const zocCost = flat ? 0 : Number(zoc.has(destination));
     return {
       cost: terrainCost + streamCost + zocCost,
       road: false,
@@ -126,7 +138,8 @@ export function normalMovementStep(
 
 // Dijkstra, not shortest hex count: a longer connected road can be cheaper.
 // Positive half-integer weights are exact in JS; stable insertion/neighbor
-// order breaks equal-cost ties without relying on unit or edge array order.
+// order preserves historical routes. V6 charges one per legal hex and breaks
+// equal-length ties by distance from the origin-to-target line.
 export function normalMovementRoute(
   state: GameState,
   side: Side,
@@ -181,6 +194,24 @@ export function normalMovementRange(
   return searchMovement(state, side, kinds, edges, origin, budget).costs;
 }
 
+// Integer coordinates proportional to the board's staggered hex centers.
+// Squared cross products rank distance to the origin/target line without
+// floating-point tie instability. The constant scale is common to every path.
+function lineDeviation(
+  origin: HexCoordinate,
+  destination: HexCoordinate,
+  coordinate: HexCoordinate,
+): number {
+  const point = (hex: HexCoordinate) => {
+    const x = hex.charCodeAt(0) - 65;
+    return { x, y: 2 * (Number(hex.slice(1)) - 1) + (x % 2) };
+  };
+  const a = point(origin);
+  const b = point(destination);
+  const c = point(coordinate);
+  return ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) ** 2;
+}
+
 function searchMovement(
   state: GameState,
   side: Side,
@@ -193,6 +224,10 @@ function searchMovement(
   const step = stepCalculator(state, side, kinds, edges);
   const costs = new Map<HexCoordinate, number>([[origin, 0]]);
   const previous = new Map<HexCoordinate, HexCoordinate>();
+  const deviations = new Map<HexCoordinate, number>([[origin, 0]]);
+  const direct =
+    state.ruleset_version === FLAT_MOVEMENT_RULESET_VERSION &&
+    destination !== undefined;
   const frontier = new Set<HexCoordinate>([origin]);
   const visited = new Set<HexCoordinate>();
   while (frontier.size > 0) {
@@ -200,7 +235,12 @@ function searchMovement(
     let cheapest = Infinity;
     for (const candidate of frontier) {
       const cost = costs.get(candidate) ?? Infinity;
-      if (cost < cheapest) {
+      if (
+        cost < cheapest ||
+        (direct &&
+          cost === cheapest &&
+          deviations.get(candidate)! < deviations.get(current)!)
+      ) {
         current = candidate;
         cheapest = cost;
       }
@@ -213,8 +253,19 @@ function searchMovement(
       const move = step(current, neighbor);
       if (move === null) continue;
       const cost = cheapest + move.cost;
-      if (cost > budget || cost >= (costs.get(neighbor) ?? Infinity)) continue;
+      const deviation =
+        deviations.get(current)! +
+        (direct ? lineDeviation(origin, destination, neighbor) : 0);
+      const knownCost = costs.get(neighbor) ?? Infinity;
+      if (
+        cost > budget ||
+        cost > knownCost ||
+        (cost === knownCost &&
+          !(direct && deviation < (deviations.get(neighbor) ?? Infinity)))
+      )
+        continue;
       costs.set(neighbor, cost);
+      deviations.set(neighbor, deviation);
       previous.set(neighbor, current);
       frontier.add(neighbor);
     }

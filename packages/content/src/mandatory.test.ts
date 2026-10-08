@@ -11,6 +11,7 @@ import {
 } from "@gettysburg/game";
 import {
   createMandatoryInitialState,
+  createFlatMovementInitialState,
   createWholePointInitialState,
   MANDATORY_CONTENT_REVISION,
   MANDATORY_MOVEMENT_EDGES,
@@ -20,6 +21,61 @@ import { SCENARIO_CONTENT_REVISION, SCENARIO_UNITS } from "./scenario";
 import { BOARD_TERRAIN } from "./terrain";
 
 describe("pinned mandatory Scenario Five content", () => {
+  it("pins flat movement without changing v4 or v5 content", () => {
+    const state = createFlatMovementInitialState("content-fingerprint");
+    expect(
+      createHash("sha256").update(JSON.stringify(state)).digest("hex"),
+    ).toBe("042b374ac1deb8993dfdced7e2758515f0a75cb3dd3743641d3344c6ada255fe");
+    expect(state).toEqual({
+      ...createMandatoryInitialState("content-fingerprint"),
+      ruleset_version: "gettysburg-mandatory-v6",
+      content_revision: "gettysburg-mandatory-board-v3",
+    });
+  });
+
+  it.each(["infantry", "cavalry", "artillery", "general"] as const)(
+    "charges exactly one on every legal v6 %s step",
+    (kind) => {
+      const state = { ...createFlatMovementInitialState("fixture"), units: {} };
+      for (const from of BOARD_HEXES)
+        for (const to of adjacentHexes(from)) {
+          const step = normalMovementStep(
+            state,
+            "union",
+            [kind],
+            state.movement_edges!,
+            from,
+            to,
+          );
+          if (step) expect(step.cost).toBe(1);
+        }
+    },
+  );
+
+  it.each(BOARD_EDGE_HEXES)(
+    "charges one for v6 reinforcement entry at %s regardless of roads and terrain",
+    (hex) => {
+      const initial = createFlatMovementInitialState("fixture");
+      const arrival = {
+        ...initial.units["u-barlow"]!,
+        entry_hexes: [hex],
+        entry_turn: 1,
+      };
+      expect(
+        prepareReinforcement(
+          { ...initial, units: { [arrival.id]: arrival } },
+          "union",
+          [arrival.id],
+          hex,
+        ),
+      ).toMatchObject({
+        ok: true,
+        cost: 1,
+        patch: { normal_movement: { bonus_unit_ids: [] } },
+      });
+    },
+  );
+
   it("pins the new whole-point revision without changing the retained v4 fingerprint", () => {
     const state = createWholePointInitialState("content-fingerprint");
     expect(

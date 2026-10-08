@@ -31,7 +31,11 @@ export function normalMovementGroups(
         .map((group) => [...group, unit]),
     ];
   return groups.flatMap((movers) => {
-    const plan = planNormalMove(state.normal_movement, movers);
+    const plan = planNormalMove(
+      state.normal_movement,
+      movers,
+      state.ruleset_version,
+    );
     const ids = movers.map((unit) => unit.id).sort();
     return plan.ok &&
       plan.allowance > 0 &&

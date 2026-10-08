@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { FLAT_MOVEMENT_RULESET_VERSION } from "./protocol";
 import { planNormalMove } from "./normal-move";
 import type { NormalMovementActivation, UnitState } from "./protocol";
 
@@ -182,5 +183,49 @@ describe("continuous movement policy (not yet activated)", () => {
       allowance: 5,
       activation: { closed_unit_ids: [] },
     });
+  });
+});
+
+describe("flat movement stack allowance", () => {
+  it("uses the slowest remaining printed movement and never adds a general bonus", () => {
+    const infantry = unit("a");
+    const artillery = unit("b", { kind: "artillery", movement: 4 });
+    expect(
+      planNormalMove(
+        undefined,
+        [infantry, general],
+        FLAT_MOVEMENT_RULESET_VERSION,
+      ),
+    ).toMatchObject({
+      ok: true,
+      allowance: 5,
+      activation: { bonus_unit_ids: [] },
+    });
+    expect(
+      planNormalMove(
+        undefined,
+        [infantry, artillery, general],
+        FLAT_MOVEMENT_RULESET_VERSION,
+      ),
+    ).toMatchObject({
+      ok: true,
+      allowance: 4,
+      activation: { bonus_unit_ids: [] },
+    });
+    const current = activation([infantry, general]);
+    expect(
+      planNormalMove(
+        current,
+        [{ ...infantry, movement_spent: 2 }, general],
+        FLAT_MOVEMENT_RULESET_VERSION,
+      ),
+    ).toMatchObject({ ok: true, allowance: 3 });
+    expect(
+      planNormalMove(
+        undefined,
+        [infantry, { ...general, movement_spent: 8 }],
+        FLAT_MOVEMENT_RULESET_VERSION,
+      ),
+    ).toMatchObject({ ok: true, allowance: 2 });
   });
 });

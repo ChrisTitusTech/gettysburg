@@ -6,6 +6,9 @@ import {
   COMMAND_SCHEMA_VERSION,
   MANDATORY_RULESET_VERSION,
   RULESET_VERSION,
+  WHOLE_POINT_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
+  gameplayCommandSchema,
 } from "./protocol";
 import type {
   GameState,
@@ -86,6 +89,54 @@ function accepted(
 }
 
 describe("mandatory movement authoritative/preview integration", () => {
+  it.each([false, true])(
+    "applies the v6 direct route for a stack=%s without changing historical paths",
+    (stack) => {
+      const current = state({
+        ruleset_version: WHOLE_POINT_RULESET_VERSION,
+        units: {
+          a: unit("a", { location: "F5" }),
+          ...(stack
+            ? {
+                g: unit("g", { location: "F5", kind: "general", combat: null }),
+              }
+            : {}),
+        },
+        objectives: { H5: { value: 1, controlled_by: "union" } },
+      });
+      const ids = stack ? ["a", "g"] : ["a"];
+      const legacy = move(current, ids, "K5");
+      const command = gameplayCommandSchema.parse({
+        command_id: "22222222-2222-4222-8222-222222222222",
+        command_name: stack ? "moveStack" : "moveUnit",
+        expected_version: 0,
+        game_id: current.game_id,
+        schema: COMMAND_SCHEMA_VERSION,
+        payload: {
+          ...(stack ? { unit_ids: ids } : { unit_id: "a" }),
+          destination: "K5",
+        },
+      });
+      const flat = {
+        ...current,
+        ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+      };
+      const direct = reduceGameplayCommand(flat, "confederate", command);
+      expect(direct.ok).toBe(true);
+      expect(legacy.ok).toBe(true);
+      if (!direct.ok || !legacy.ok) return;
+      expect(direct.state.units.a).toMatchObject({
+        location: "K5",
+        movement_spent: 5,
+      });
+      expect(direct.state.objectives.H5?.controlled_by).toBe("confederate");
+      expect(legacy.state.objectives.H5?.controlled_by).toBe("union");
+      expect(reduceGameplayCommand(flat, "confederate", command)).toEqual(
+        direct,
+      );
+    },
+  );
+
   it("uses the exact preview patch and increments state/event once", () => {
     const current = state({ terrain: { B2: woods } });
     const before = JSON.stringify(current);

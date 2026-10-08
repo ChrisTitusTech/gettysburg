@@ -4,14 +4,16 @@ import { isHexCoordinate, type HexCoordinate } from "./coordinates.js";
 
 export const LEGACY_RULESET_VERSION = "phase-2-tabletop-v1";
 export const RULESET_VERSION = "gettysburg-terrain-v3";
-// Retained v4 saves keep half-point roads. New v5 games use whole-point roads;
-// an existing game changes only through an explicitly recorded transition.
+// Retained saves preserve their costs and bonuses; v6 uses one point per
+// legal hex and the slowest remaining printed allowance in a moving group.
 export const MANDATORY_RULESET_VERSION = "gettysburg-mandatory-v4";
 export const WHOLE_POINT_RULESET_VERSION = "gettysburg-mandatory-v5";
+export const FLAT_MOVEMENT_RULESET_VERSION = "gettysburg-mandatory-v6";
 export function isMandatoryRuleset(version: string): boolean {
   return (
     version === MANDATORY_RULESET_VERSION ||
-    version === WHOLE_POINT_RULESET_VERSION
+    version === WHOLE_POINT_RULESET_VERSION ||
+    version === FLAT_MOVEMENT_RULESET_VERSION
   );
 }
 export const COMMAND_SCHEMA_VERSION = "gettysburg-command/v1";

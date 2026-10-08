@@ -1,3 +1,4 @@
+import { FLAT_MOVEMENT_RULESET_VERSION } from "./protocol.js";
 import type { NormalMovementActivation, UnitState } from "./protocol.js";
 
 export type NormalMovePlan =
@@ -19,7 +20,9 @@ function sameIds(left: readonly string[], right: readonly string[]): boolean {
 export function planNormalMove(
   current: NormalMovementActivation | undefined,
   movers: readonly UnitState[],
+  rulesetVersion?: string,
 ): NormalMovePlan {
+  const flat = rulesetVersion === FLAT_MOVEMENT_RULESET_VERSION;
   const ids = movers.map((unit) => unit.id).sort();
   const first = movers[0];
   if (
@@ -54,15 +57,16 @@ export function planNormalMove(
           ]),
         ].sort(),
         // A late-arriving general cannot retroactively accompany earlier steps.
-        bonus_unit_ids: movers.some((unit) => unit.kind === "general")
-          ? movers
-              .filter(
-                (unit) =>
-                  unit.kind !== "general" && (unit.movement_spent ?? 0) === 0,
-              )
-              .map((unit) => unit.id)
-              .sort()
-          : [],
+        bonus_unit_ids:
+          !flat && movers.some((unit) => unit.kind === "general")
+            ? movers
+                .filter(
+                  (unit) =>
+                    unit.kind !== "general" && (unit.movement_spent ?? 0) === 0,
+                )
+                .map((unit) => unit.id)
+                .sort()
+            : [],
       };
   const allowance = Math.max(
     0,
@@ -70,7 +74,7 @@ export function planNormalMove(
       ...movers.map(
         (unit) =>
           unit.movement +
-          Number(activation.bonus_unit_ids.includes(unit.id)) -
+          Number(!flat && activation.bonus_unit_ids.includes(unit.id)) -
           (unit.movement_spent ?? 0),
       ),
     ),
