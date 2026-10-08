@@ -15,7 +15,12 @@ export const ACCESSIBILITY_TAGS = Object.freeze([
 export async function waitForPlayerControls(pages) {
   await Promise.all(
     pages.map((page) =>
-      page.getByRole("region", { name: "Turn notifications" }).waitFor(),
+      page
+        .getByRole("region", {
+          name: "Turn notifications",
+          includeHidden: true,
+        })
+        .waitFor({ state: "attached" }),
     ),
   );
 }

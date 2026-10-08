@@ -37,6 +37,8 @@ function fixture(options = {}) {
     },
     getByRole: (role, options) => {
       assert.equal(role, "button");
+      if (options.name === "Seat options")
+        return { getAttribute: async () => "true" };
       assert.equal(options.name, "Delete game");
       return { click: async () => events.push("clicked") };
     },
