@@ -20,7 +20,23 @@ VPS deployment. Engineering owns implementation and rollout verification.
   deadline was weakened. Markdown lint passes.
 - [x] Pre-deployment encrypted backup `20261008T042307Z` passes isolated restore
   and verified off-host copy.
-- [ ] Complete exact-head hosted checks, deployment, and live restart/resume.
+- [x] Artwork commit `75c5949` pushed directly to main as explicitly requested.
+  Exact-head Application, Firefox/WebKit, Documentation, Security, and CodeQL
+  checks pass, including full games and container smoke.
+- [x] Deployed `75c5949` as immutable image
+  `324d3d05bab78194279203ed9d16a0396bda054686e57609f2d795852b43edc7`.
+  Verified Trivy 0.74.0 (the runbook's pinned binary checksum) found no
+  HIGH/CRITICAL vulnerabilities. Pre-rollout backup `20261008T042534Z` passed
+  restore/off-host verification. Deployment readiness, non-root image checks,
+  HTTPS/WebSocket two-client smoke, and exact saved-session restart/resume pass.
+- [x] Public desktop/tablet two-session Chromium acceptance passes, including
+  image decoding, movement, reconnect, replay, spectators, and accessibility
+  automation. Screenshots are in ignored `test-results/unit-artwork-public`.
+  Final backup `20261008T043511Z` passes isolated restore/off-host verification.
+  Both services remain healthy; final application logs contain only normal
+  startup, and public health/readiness pass. Existing manual device/contrast
+  checks remain release gates. Documentation-only rollout evidence follows the
+  deployed application commit; it does not require another service restart.
   This presentation increment does not close any existing phase/release gates.
 
 ## Compact management bar: 2026-10-07

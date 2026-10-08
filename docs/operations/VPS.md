@@ -1,5 +1,32 @@
 # Gettysburg VPS baseline and deployment plan
 
+## Current unit-artwork deployment: 2026-10-07
+
+The owner approved the illustrated counters, direct push to main, and VPS
+deployment. Application source `75c5949e5c83c69f5cbaace2f8123deef5b2684c` runs as
+immutable image
+`324d3d05bab78194279203ed9d16a0396bda054686e57609f2d795852b43edc7`.
+Exact-head Application, Firefox/WebKit, Documentation, Security, and CodeQL pass.
+The deployed base was `7e49664`; this increment changes presentation and browser
+image-loading validation, with no game-rule or database-schema change.
+
+Trivy 0.74.0, verified against binary SHA-256
+`d89bcc6510a267f11b773398cbf1be5520ce39f9e8b6633178c4487f05b7d791`, found no
+HIGH/CRITICAL vulnerabilities in the exact image. Pre-rollout encrypted backup
+`20261008T042534Z` passed isolated restore and off-host verification. The reviewed
+deployment script passed readiness, non-root/exact-image checks, and public
+two-client HTTPS/WebSocket smoke. Both saved probe sessions resumed identical
+state across deployment; only the owned probe was normally deleted afterward.
+Both rootless services are healthy and application startup logs are clean.
+
+Rollback units, previous Caddy configuration, and scan evidence are retained in
+`/srv/gettysburg/backups/deploy-20261008T043249Z`. Workstation evidence is under
+`~/.local/state/gettysburg/acceptance/20261007-unit-artwork`. Public desktop/tablet
+two-session browser acceptance passes, including rendered artwork, reconnect,
+movement, replay, and spectators. Final encrypted backup `20261008T043511Z`
+passed isolated restore and off-host verification. Final public health/readiness
+pass; existing manual device/contrast and release gates remain in `TASKS.md`.
+
 ## Current whole-point and capacity deployment: 2026-10-07
 
 Reviewed PR #77 merged as `d018e92bf20f10e39afa98926126ff33accc575a` after
