@@ -10,7 +10,7 @@ export function GameMenu({
   readonly label: string;
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
-  readonly children: ReactNode;
+  readonly children: ReactNode | ((close: () => void) => ReactNode);
 }) {
   const id = useId();
   const root = useRef<HTMLDivElement>(null);
@@ -62,7 +62,12 @@ export function GameMenu({
         aria-label={`${label} menu`}
         hidden={!open}
       >
-        {children}
+        {typeof children === "function"
+          ? children(() => {
+              onOpenChange(false);
+              trigger.current?.focus();
+            })
+          : children}
       </div>
     </div>
   );

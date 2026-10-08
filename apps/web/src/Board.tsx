@@ -378,7 +378,11 @@ export function Board({
       const movers = unitIds.flatMap((id) =>
         state.units[id] ? [state.units[id]!] : [],
       );
-      const plan = planNormalMove(state.normal_movement, movers);
+      const plan = planNormalMove(
+        state.normal_movement,
+        movers,
+        state.ruleset_version,
+      );
       return plan.ok && movers.length === unitIds.length ? plan.allowance : 0;
     }
     return unitIds.reduce(

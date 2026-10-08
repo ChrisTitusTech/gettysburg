@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
+import { createFlatMovementInitialState } from "@gettysburg/content";
 import {
   MANDATORY_RULESET_VERSION,
   WHOLE_POINT_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
   planNormalMove,
   prepareNormalMovement,
   type GameState,
+  type HexCoordinate,
   type UnitState,
 } from "@gettysburg/game";
 import { previewMandatoryMovement } from "./movement-preview";
@@ -55,6 +58,127 @@ function state(patch: Partial<GameState> = {}): GameState {
   };
 }
 describe("mandatory movement preview", () => {
+  it("limits Reynolds/Wadsworth to five hexes across terrain with no general bonus", () => {
+    const current = createFlatMovementInitialState(
+      "11111111-1111-4111-8111-111111111111",
+    );
+    const ids = ["u-reynolds", "u-wadsworth"];
+    for (const group of [["u-wadsworth"], ids]) {
+      const preview = previewMandatoryMovement(
+        current,
+        "union",
+        group,
+        "D8",
+        true,
+      );
+      expect(preview).toMatchObject({
+        ok: true,
+        allowance: 5,
+        route: { cost: 5, path: ["D3", "D4", "D5", "D6", "D7", "D8"] },
+      });
+      expect(preview).toEqual(
+        prepareNormalMovement(current, "union", group, "D8"),
+      );
+    }
+    expect(
+      previewMandatoryMovement(current, "union", ids, "D9", true),
+    ).toMatchObject({
+      ok: true,
+      allowance: 5,
+      route: { cost: 5, path: ["D3", "D4", "D5", "D6", "D7", "D8"] },
+    });
+    expect(previewMandatoryMovement(current, "union", ids, "D9")).toMatchObject(
+      { ok: false, error: "movement_exceeded" },
+    );
+  });
+
+  it("uses all five points, realigns while dragging, and agrees with the authoritative route", () => {
+    const current = state({
+      ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+      units: { a: unit("a", { location: "F5", movement: 5 }) },
+    });
+    for (const [target, path] of [
+      ["K5", ["F5", "G5", "H5", "I5", "J5", "K5"]],
+      ["F10", ["F5", "F6", "F7", "F8", "F9", "F10"]],
+      ["K5", ["F5", "G5", "H5", "I5", "J5", "K5"]],
+    ] as const) {
+      const preview = previewMandatoryMovement(
+        current,
+        "confederate",
+        ["a"],
+        target,
+        true,
+      );
+      expect(preview).toMatchObject({
+        ok: true,
+        allowance: 5,
+        route: { cost: 5, path },
+      });
+      expect(preview).toEqual(
+        prepareNormalMovement(current, "confederate", ["a"], target),
+      );
+    }
+    expect(
+      previewMandatoryMovement(current, "confederate", ["a"], "F11", true),
+    ).toMatchObject({
+      ok: true,
+      route: { cost: 5, path: ["F5", "F6", "F7", "F8", "F9", "F10"] },
+    });
+    expect(current.units.a?.movement_spent).toBeUndefined();
+  });
+
+  it("can use the complete remaining budget after a first drag", () => {
+    const current = state({
+      ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+      units: { a: unit("a", { location: "F5", movement: 5 }) },
+    });
+    const first = previewMandatoryMovement(
+      current,
+      "confederate",
+      ["a"],
+      "G5",
+      true,
+    );
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const next = { ...current, ...first.patch };
+    expect(
+      previewMandatoryMovement(next, "confederate", ["a"], "K5", true),
+    ).toMatchObject({
+      ok: true,
+      allowance: 4,
+      route: { cost: 4 },
+      patch: { units: { a: { location: "K5", movement_spent: 5 } } },
+    });
+  });
+
+  it.each([0, 1])(
+    "charges entered hexes, never the origin, with %s point already spent",
+    (spent) => {
+      const current = state({
+        ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+        units: {
+          a: unit("a", { location: "F5", movement: 5, movement_spent: spent }),
+        },
+      });
+      const destination = `F${10 - spent}` as HexCoordinate;
+      expect(
+        previewMandatoryMovement(
+          current,
+          "confederate",
+          ["a"],
+          destination,
+          true,
+        ),
+      ).toMatchObject({
+        ok: true,
+        allowance: 5 - spent,
+        route: { cost: 5 - spent },
+        patch: { units: { a: { movement_spent: 5 } } },
+      });
+    },
+  );
+
   it("uses one point per v5 road step in preview, overshoot clamping, and server validation", () => {
     const current = state({ ruleset_version: WHOLE_POINT_RULESET_VERSION });
     expect(

@@ -27,7 +27,11 @@ export function previewMandatoryMovement(
     return prepared;
   const movers = ids.map((id) => state.units[id]!);
   const origin = movers[0]?.location;
-  const plan = planNormalMove(state.normal_movement, movers);
+  const plan = planNormalMove(
+    state.normal_movement,
+    movers,
+    state.ruleset_version,
+  );
   if (!origin || !state.movement_edges || !plan.ok) return prepared;
   const kinds = movers.map((unit) => unit.kind);
   const route = normalMovementRoute(

@@ -1,8 +1,12 @@
 // Imported only by the development-server browser harness, never by the app.
-import { BOARD_TERRAIN } from "@gettysburg/content";
+import {
+  BOARD_TERRAIN,
+  createFlatMovementInitialState,
+} from "@gettysburg/content";
 import {
   COMMAND_SCHEMA_VERSION,
   MANDATORY_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
   gameplayCommandSchema,
   reduceGameplayCommand,
   type GameState,
@@ -16,6 +20,8 @@ import { Board } from "../Board";
 import "../styles.css";
 
 export type MovementFixtureName =
+  | "reynolds"
+  | "direct"
   | "roads"
   | "woods"
   | "activation"
@@ -24,6 +30,10 @@ export type MovementFixtureName =
   | "group"
   | "exit";
 function initialState(name: MovementFixtureName): GameState {
+  if (name === "reynolds")
+    return createFlatMovementInitialState(
+      "11111111-1111-4111-8111-111111111111",
+    );
   const accompanied = name === "bonus" || name === "continuation";
   const a: UnitState = {
     id: "a",
@@ -32,7 +42,7 @@ function initialState(name: MovementFixtureName): GameState {
     location: name === "exit" ? "A2" : "F5",
     kind: "infantry",
     combat: 3,
-    movement: 1,
+    movement: name === "direct" ? 5 : 1,
     entry_hexes: [],
     entry_turn: null,
     organization: "fixture",
@@ -43,7 +53,10 @@ function initialState(name: MovementFixtureName): GameState {
   };
   return {
     game_id: "11111111-1111-4111-8111-111111111111",
-    ruleset_version: MANDATORY_RULESET_VERSION,
+    ruleset_version:
+      name === "direct"
+        ? FLAT_MOVEMENT_RULESET_VERSION
+        : MANDATORY_RULESET_VERSION,
     content_revision: "browser-fixture",
     version: 0,
     event_sequence: 0,
@@ -53,10 +66,13 @@ function initialState(name: MovementFixtureName): GameState {
     night: false,
     combats: {},
     objectives: {},
-    terrain: {
-      ...BOARD_TERRAIN,
-      F4: { ...BOARD_TERRAIN.F4, kind: "woods", woods: true, defense: 2 },
-    },
+    terrain:
+      name === "direct"
+        ? {}
+        : {
+            ...BOARD_TERRAIN,
+            F4: { ...BOARD_TERRAIN.F4, kind: "woods", woods: true, defense: 2 },
+          },
     movement_edges: {
       roads:
         name === "woods"
@@ -117,7 +133,11 @@ function MovementFixture({ name }: { readonly name: MovementFixtureName }) {
       command_name,
       payload,
     });
-    const result = reduceGameplayCommand(state, "confederate", command);
+    const result = reduceGameplayCommand(
+      state,
+      state.active_side ?? "union",
+      command,
+    );
     if (result.ok) {
       setState(result.state);
       setError(undefined);
@@ -125,8 +145,15 @@ function MovementFixture({ name }: { readonly name: MovementFixtureName }) {
   }
   function move(unitIds: readonly string[], destination: HexCoordinate) {
     if (unitIds.length === 1)
-      dispatch("moveUnit", { unit_id: unitIds[0], destination });
-    else dispatch("moveStack", { unit_ids: [...unitIds], destination });
+      dispatch("moveUnit", {
+        unit_id: unitIds[0],
+        destination,
+      });
+    else
+      dispatch("moveStack", {
+        unit_ids: [...unitIds],
+        destination,
+      });
   }
   return (
     <main>
@@ -139,7 +166,7 @@ function MovementFixture({ name }: { readonly name: MovementFixtureName }) {
       </output>
       <Board
         state={state}
-        seat="confederate"
+        seat={state.active_side ?? "union"}
         onMove={move}
         error={error}
         onExit={(unit_ids) => dispatch("exitBoard", { unit_ids })}

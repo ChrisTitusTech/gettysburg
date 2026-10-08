@@ -15,6 +15,17 @@ The approved painted A-W board and typed terrain replace the source map's
 coordinates. Existing owner terrain overrides (+2 woods, +4 rough heights,
 connected-terrain cancellation) remain authoritative.
 
+On 2026-10-07 the owner removed all numeric movement penalties and bonuses.
+New v6 / mandatory-board-v3 games charge one per legal normal step, reinforcement
+entry, and normal board exit; the slowest remaining printed allowance limits a
+stack. Generals grant no movement bonus. Terrain, roads, streams, and ZOC do not
+change costs. Existing occupancy, stacking, night/ZOC and artillery prohibitions
+remain, as do combat terrain effects and free combat retreat/advance. V6 routes
+minimize legal hex count and realign toward the target during drag. V4/v5 saves
+retain their pinned behavior and historical routes; no existing game is migrated
+by creating this PR. The numeric movement rows below describe retained rules
+where they conflict with this override.
+
 On 2026-10-06 the owner removed half-point movement: eligible road/rail steps
 and road/rail reinforcement entry now cost 1 instead of 0.5. They still replace
 terrain/stream costs, and enemy-ZOC/artillery restrictions remain. This explicit

@@ -1005,16 +1005,18 @@ export function App({
             open={openMenu === "replay"}
             onOpenChange={(open) => setOpenMenu(open ? "replay" : null)}
           >
-            <button
-              type="button"
-              aria-expanded={replayOpen}
-              onClick={() => {
-                setReplayOpen((open) => !open);
-                setOpenMenu(null);
-              }}
-            >
-              {replayOpen ? "Return to live game" : "View replay"}
-            </button>
+            {(closeMenu) => (
+              <button
+                type="button"
+                aria-expanded={replayOpen}
+                onClick={() => {
+                  setReplayOpen((open) => !open);
+                  closeMenu();
+                }}
+              >
+                {replayOpen ? "Return to live game" : "View replay"}
+              </button>
+            )}
           </GameMenu>
         </nav>
       </header>

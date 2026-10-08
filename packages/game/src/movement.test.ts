@@ -4,7 +4,10 @@ import type { HexCoordinate } from "./coordinates";
 import { normalMovementRoute, normalMovementStep } from "./movement";
 import type { MovementEdges } from "./movement";
 import type { GameState, HexTerrain, UnitKind, UnitState } from "./protocol";
-import { WHOLE_POINT_RULESET_VERSION } from "./protocol";
+import {
+  WHOLE_POINT_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
+} from "./protocol";
 
 const emptyEdges: MovementEdges = { roads: [], railroads: [], streams: [] };
 const clear: HexTerrain = {
@@ -248,6 +251,91 @@ describe("mandatory movement step calculator (not yet activated)", () => {
 });
 
 describe("least-cost movement routes", () => {
+  it("aligns v6 shortest routes with the target while preserving historical routes", () => {
+    expect(
+      normalMovementRoute(
+        base,
+        "confederate",
+        ["infantry"],
+        emptyEdges,
+        "F5",
+        "K5",
+      ),
+    ).toEqual({ cost: 5, path: ["F5", "G5", "H4", "I4", "J4", "K5"] });
+    expect(
+      normalMovementRoute(
+        { ...base, ruleset_version: FLAT_MOVEMENT_RULESET_VERSION },
+        "confederate",
+        ["infantry"],
+        emptyEdges,
+        "F5",
+        "K5",
+      ),
+    ).toEqual({ cost: 5, path: ["F5", "G5", "H5", "I5", "J5", "K5"] });
+  });
+
+  it("charges one in v6 for combined terrain, stream, and ZOC entry without permitting illegal transitions", () => {
+    const current = {
+      ...base,
+      ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+      units: { enemy },
+    };
+    expect(
+      step(
+        { kind: "rough_hill", woods: true },
+        { ...emptyEdges, streams: [["A2", "B2"]] },
+        current,
+      ),
+    ).toEqual({ cost: 1, road: false, terrain: 1, stream: 0, zoc: 0 });
+    expect(
+      normalMovementStep(
+        current,
+        "confederate",
+        ["infantry"],
+        emptyEdges,
+        "B1",
+        "B2",
+      ),
+    ).toBeNull();
+    expect(step({}, emptyEdges, { ...current, night: true })).toBeNull();
+    expect(
+      step({ kind: "rough_hill", woods: true }, emptyEdges, current, [
+        "artillery",
+      ]),
+    ).toBeNull();
+    expect(
+      step({}, emptyEdges, {
+        ...current,
+        units: { enemy: { ...enemy, location: "B2" } },
+      }),
+    ).toBeNull();
+  });
+
+  it("takes the shortest v6 route through terrain instead of detouring for roads", () => {
+    const current = {
+      ...base,
+      ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+      terrain: { B2: { ...clear, woods: true, kind: "rough_hill" as const } },
+    };
+    const edges: MovementEdges = {
+      ...emptyEdges,
+      roads: [
+        ["A2", "A3"],
+        ["A3", "B2"],
+      ],
+    };
+    expect(
+      normalMovementRoute(
+        current,
+        "confederate",
+        ["infantry"],
+        edges,
+        "A2",
+        "B2",
+      ),
+    ).toEqual({ cost: 1, path: ["A2", "B2"] });
+  });
+
   it("chooses a longer cheap road over a one-step wooded rough hill entry", () => {
     const state = {
       ...base,

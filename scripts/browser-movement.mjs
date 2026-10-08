@@ -143,6 +143,109 @@ try {
       } else await page.mouse.up();
       await state().filter({ hasText: "v1: a=F3" }).waitFor();
 
+      await fixture("direct");
+      const directStart = await counter().boundingBox();
+      assert(directStart);
+      const directTouch = hasTouch ? await context.newCDPSession(page) : null;
+      const startPoint = {
+        x: directStart.x + directStart.width / 2,
+        y: directStart.y + directStart.height / 2,
+      };
+      if (directTouch) {
+        await directTouch.send("Input.dispatchTouchEvent", {
+          type: "touchStart",
+          touchPoints: [startPoint],
+        });
+      } else {
+        await page.mouse.move(startPoint.x, startPoint.y);
+        await page.mouse.down();
+      }
+      for (const [target, expected] of [
+        ["K5", ["F5", "G5", "H5", "I5", "J5", "K5"]],
+        ["F11", ["F5", "F6", "F7", "F8", "F9", "F10"]],
+        ["K5", ["F5", "G5", "H5", "I5", "J5", "K5"]],
+      ]) {
+        const box = await hex(target).boundingBox();
+        assert(box);
+        const point = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        if (directTouch)
+          await directTouch.send("Input.dispatchTouchEvent", {
+            type: "touchMove",
+            touchPoints: [point],
+          });
+        else await page.mouse.move(point.x, point.y, { steps: 5 });
+        await page
+          .getByText(`5 of 5 movement points to ${expected.at(-1)}`)
+          .waitFor();
+        assert.equal(
+          await page.locator(".movement-route text").textContent(),
+          "5 / 5",
+        );
+        const rendered = await page
+          .locator(".movement-route polyline")
+          .getAttribute("points");
+        const wanted = await page.evaluate(
+          (path) =>
+            path.map((coordinate) => {
+              const polygon = document.querySelector(
+                `[data-coordinate="${coordinate}"]`,
+              );
+              const points = polygon
+                .getAttribute("points")
+                .split(" ")
+                .map((point) => point.split(",").map(Number));
+              const x =
+                points.reduce((sum, point) => sum + point[0], 0) /
+                points.length;
+              const y =
+                points.reduce((sum, point) => sum + point[1], 0) /
+                points.length;
+              return [x, y];
+            }),
+          expected,
+        );
+        const actual = rendered
+          .split(" ")
+          .map((point) => point.split(",").map(Number));
+        assert.equal(actual.length, wanted.length);
+        for (let i = 0; i < actual.length; i += 1) {
+          assert(Math.abs(actual[i][0] - wanted[i][0]) < 0.01);
+          assert(Math.abs(actual[i][1] - wanted[i][1]) < 0.01);
+        }
+      }
+      await page.screenshot({
+        fullPage: true,
+        path: resolve(evidence, `${name}-direct-five-point-drag.png`),
+      });
+      if (directTouch) {
+        await directTouch.send("Input.dispatchTouchEvent", {
+          type: "touchEnd",
+          touchPoints: [],
+        });
+        await directTouch.detach();
+      } else await page.mouse.up();
+      await state().filter({ hasText: "v1: a=K5" }).waitFor();
+
+      await fixture("reynolds");
+      const wadsworth = page.getByRole("button", {
+        name: /Wadsworth, D3, selectable/,
+      });
+      if (hasTouch) await wadsworth.tap();
+      else await wadsworth.press("Enter");
+      await page
+        .getByRole("radio", {
+          name: /Reynolds.*Wadsworth.*5 movement remaining/,
+        })
+        .waitFor();
+      if (hasTouch) await hex("D8").tap();
+      else await hex("D8").press("Enter");
+      await state()
+        .filter({ hasText: "u-reynolds=D8, u-wadsworth=D8" })
+        .waitFor();
+      await page.locator(".board-workspace").screenshot({
+        path: resolve(evidence, `${name}-reynolds-five-hexes.png`),
+      });
+
       await fixture("woods");
       await selectTarget("F4");
       await page

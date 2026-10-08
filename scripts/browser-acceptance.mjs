@@ -220,7 +220,7 @@ async function dragWithinMovement(page, prefix, inputMode) {
     await page.mouse.down();
     await page.mouse.move(to.x, to.y, { steps: 10 });
   }
-  await page.locator(".movement-route").getByText("4 / 4").waitFor();
+  await page.locator(".movement-route").getByText("3 / 3").waitFor();
   // Do not auto-scroll an element while its pointer capture is active.
   await captureScreenshot(page, page, {
     fullPage: true,
@@ -403,7 +403,7 @@ async function runScenario(browser, origin, options) {
       })
       .click();
     await unionPage.locator('[data-coordinate="U11"]').click();
-    await unionPage.getByText(/this group has 5 remaining/i).waitFor();
+    await unionPage.getByText(/this group has 4 remaining/i).waitFor();
     await waitForVersion(unionPage, 1);
 
     const unionGameUrl = unionPage.url();
@@ -448,7 +448,7 @@ async function runScenario(browser, origin, options) {
     await waitForVersion(confederatePage, 3);
     await confederatePage
       .getByRole("button", {
-        name: /Wadsworth, J5/,
+        name: /Wadsworth, I6/,
       })
       .waitFor();
 
@@ -458,7 +458,7 @@ async function runScenario(browser, origin, options) {
       await waitForVersion(unionPage, 4);
       await waitForVersion(confederatePage, 4);
       await confederatePage
-        .getByRole("button", { name: /Wadsworth, J5/ })
+        .getByRole("button", { name: /Wadsworth, I6/ })
         .waitFor();
       await confederatePage
         .getByRole("button", { name: /Gamble, P5/ })
@@ -471,9 +471,17 @@ async function runScenario(browser, origin, options) {
     await unionPage
       .getByRole("button", { name: "Replay", exact: true })
       .click();
-    await unionPage
-      .getByRole("button", { name: "View replay", exact: true })
-      .click();
+    const viewReplay = unionPage.getByRole("button", {
+      name: "View replay",
+      exact: true,
+    });
+    await viewReplay.focus();
+    await viewReplay.press("Enter");
+    assert(
+      await unionPage
+        .getByRole("button", { name: "Replay", exact: true })
+        .evaluate((button) => document.activeElement === button),
+    );
     const viewer = unionPage.getByRole("region", {
       name: "Read-only game replay",
     });
@@ -506,9 +514,9 @@ async function runScenario(browser, origin, options) {
     await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
     const replayBoard = viewer.locator(".board-svg");
     const beforePan = await replayBoard.getAttribute("viewBox");
-    await viewer.locator('[data-coordinate="J5"]').scrollIntoViewIfNeeded();
+    await viewer.locator('[data-coordinate="I6"]').scrollIntoViewIfNeeded();
     const panStart = await viewer
-      .locator('[data-coordinate="J5"]')
+      .locator('[data-coordinate="I6"]')
       .boundingBox();
     assert(panStart);
     const start = {
@@ -571,7 +579,7 @@ async function runScenario(browser, origin, options) {
       .getByText(new RegExp(`Viewing event ${liveVersion} of`))
       .waitFor();
     await viewer
-      .getByRole("button", { name: /Wadsworth, J5, selectable/ })
+      .getByRole("button", { name: /Wadsworth, I6, selectable/ })
       .waitFor();
     const authoritativeVersion = await unionPage.evaluate(async () => {
       const id = window.location.pathname.split("/").at(-1);
@@ -584,9 +592,17 @@ async function runScenario(browser, origin, options) {
     await unionPage
       .getByRole("button", { name: "Replay", exact: true })
       .click();
-    await unionPage
-      .getByRole("button", { name: "Return to live game", exact: true })
-      .click();
+    const returnToLive = unionPage.getByRole("button", {
+      name: "Return to live game",
+      exact: true,
+    });
+    await returnToLive.focus();
+    await returnToLive.press("Enter");
+    assert(
+      await unionPage
+        .getByRole("button", { name: "Replay", exact: true })
+        .evaluate((button) => document.activeElement === button),
+    );
     await waitForVersion(unionPage, liveVersion);
     await waitForVersion(confederatePage, liveVersion);
     await unionPage

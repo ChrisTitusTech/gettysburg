@@ -15,7 +15,7 @@ function Tools() {
           open={active === label}
           onOpenChange={(open) => setActive(open ? label : null)}
         >
-          <button>{label} action</button>
+          {(closeMenu) => <button onClick={closeMenu}>{label} action</button>}
         </GameMenu>
       ))}
       <button>Board</button>
@@ -24,6 +24,21 @@ function Tools() {
 }
 
 describe("game toolbar disclosures", () => {
+  it("restores trigger focus when a keyboard action closes its panel", async () => {
+    const user = userEvent.setup();
+    render(<Tools />);
+    const trigger = screen.getByRole("button", { name: "Seat options" });
+    await user.click(trigger);
+    await user.tab();
+    expect(
+      screen.getByRole("button", { name: "Seat options action" }),
+    ).toHaveFocus();
+    await user.keyboard("{Enter}");
+    expect(trigger).toHaveFocus();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Board" })).toHaveFocus();
+  });
   it("starts collapsed, switches panels, and restores focus on Escape", async () => {
     const user = userEvent.setup();
     render(<Tools />);

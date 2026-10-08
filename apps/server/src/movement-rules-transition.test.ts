@@ -165,10 +165,10 @@ describe("explicit whole-point rules transition", () => {
     expect(() => restored.getReplay(host.credential, host.gameId)).toThrow();
   });
 
-  it("creates v5 games and replays cursor zero without inferring v4", () => {
+  it("creates v6 games and replays cursor zero without inferring old versions", () => {
     const service = new InMemoryGameService();
     const host = service.createGame("union");
-    expect(host.state.ruleset_version).toBe(WHOLE_POINT_RULESET_VERSION);
+    expect(host.state.ruleset_version).toBe("gettysburg-mandatory-v6");
     expect(host.state.ruleset_version).not.toBe(MANDATORY_RULESET_VERSION);
     expect(service.getReplay(host.credential, host.gameId, 0).state).toEqual(
       host.state,

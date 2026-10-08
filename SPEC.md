@@ -31,7 +31,9 @@ The owner approved the original generated board, original counter symbols, and
 clearly marked reduced strength for public release; supplied scans stay private.
 `docs/references/MANDATORY_RULES.md` records the remaining rules contract.
 
-The 2026-10-06 owner override removes half-point movement. New games use
+The 2026-10-07 flat movement override is specified below under movement route
+selection. It supersedes numeric movement costs/bonuses for new v6 games.
+The earlier 2026-10-06 override removed half-point movement. Those v5 games use
 `gettysburg-mandatory-v5` / `gettysburg-mandatory-board-v2`: connected road/rail
 movement and eligible road/rail reinforcement entry cost 1. Terrain/stream
 replacement and ZOC/artillery restrictions are unchanged. Retained v4 games
@@ -340,8 +342,8 @@ gameplay events, delete retries during soft deletion, and the post-purge
 ### Rules enforcement stages
 
 The current source candidate creates new games under the complete pinned
-`gettysburg-mandatory-v5` / `gettysburg-mandatory-board-v2` pair. The mandatory
-contract in `docs/references/MANDATORY_RULES.md` governs their weighted movement,
+`gettysburg-mandatory-v6` / `gettysburg-mandatory-board-v3` pair. The mandatory
+contract in `docs/references/MANDATORY_RULES.md` governs their flat movement,
 continuous-move activation, reinforcement costs, terrain defense, retreat,
 advance, and night behavior. Preview controls and authoritative reducers share
 the same legality calculations. Missing or changed pinned content fails closed.
@@ -374,6 +376,30 @@ retreat, eligible advance, objective control, casualty scoring, automatic-victor
 checks, and final victory.
 The interface must distinguish a hard rejection from a warning that players may
 acknowledge under a future optional-rule policy.
+
+### Flat movement and route selection
+
+The 2026-10-07 owner override removes movement penalties and bonuses. New games
+use `gettysburg-mandatory-v6` / `gettysburg-mandatory-board-v3`. Every legal normal
+step, reinforcement entry, and normal board exit costs one point. Roads,
+railroads, woods, rough hills, streams, and enemy ZOC do not modify that cost.
+A moving stack uses the lowest remaining printed movement among its members;
+there is no general accompaniment bonus. Reynolds/Wadsworth therefore have five
+points before moving, and can cross five legal hexes, including through woods.
+The starting hex costs nothing. Entering as a reinforcement still spends one
+point, and repeated drags spend the remaining budget of the same active group.
+
+Enemy occupancy, stacking, activation, night/ZOC movement prohibitions, and
+artillery's wooded-rough-hill restriction remain. Combat modifiers and free
+combat retreat/advance are unchanged. The server finds the shortest legal route;
+equal-length routes prefer the least total squared distance from the
+start-to-target line. The drag preview recalculates from the current origin on
+every pointer update, clamping overshoots to the affordable endpoint.
+
+Retained v4/v5 games keep their original costs, bonuses, and route tie-breaking
+for exact replay. No saved game or action is rewritten. This PR changes new-game
+creation; deployment and an explicit existing-game transition are separate
+owner-authorized operations.
 
 ### Phase 2 movement command contract
 
