@@ -146,7 +146,11 @@ export function prepareReinforcement(
     state.movement_edges.entry_roads?.includes(destination) === true
       ? roadMovementCost(state)
       : terrain;
-  const plan = planNormalMove(state.normal_movement, arriving);
+  const plan = planNormalMove(
+    state.normal_movement,
+    arriving,
+    state.ruleset_version,
+  );
   if (!plan.ok)
     return reject("phase_invalid", "That group's movement has already ended.");
   if (cost > plan.allowance)

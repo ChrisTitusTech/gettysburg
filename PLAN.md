@@ -29,6 +29,12 @@ browser evidence, and an explicit pause point. `ROADMAP.md` defines the gates.
 
 ## Current delivery status
 
+The 2026-10-07 owner override replaces numeric movement penalties and bonuses
+with one point per legal hex and the slowest remaining printed movement in a
+stack. New mandatory-v6 games use shortest legal paths that realign during drag.
+Retained saves preserve their pinned rules and replay. This separate PR does
+not deploy or migrate existing games; validation is recorded in `TASKS.md`.
+
 The 2026-09-06 approved terrain follow-up expands the development board to A-W,
 records best-guess connections, and implements terrain defense. The owner
 confirmed no live/production games require compatibility. That initial Phase 3

@@ -10,7 +10,7 @@ import { createPushVapidFile, loadPushVapid } from "./push-config.js";
 import { COMMAND_SCHEMA_VERSION, type Side } from "@gettysburg/game";
 import {
   createMandatoryInitialState,
-  createWholePointInitialState,
+  createFlatMovementInitialState,
 } from "@gettysburg/content";
 import { Client as PgClient, Pool, type PoolClient } from "pg";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -1573,8 +1573,8 @@ postgres("PostgreSQL durability", () => {
     );
     expect(rows.rows[0]).toMatchObject({
       action_count: "1",
-      content_revision: "gettysburg-mandatory-board-v2",
-      ruleset_version: "gettysburg-mandatory-v5",
+      content_revision: "gettysburg-mandatory-board-v3",
+      ruleset_version: "gettysburg-mandatory-v6",
       snapshot_count: "2",
     });
     await restarted.close();
@@ -1588,7 +1588,7 @@ postgres("PostgreSQL durability", () => {
     await first.migrate();
     const created = await first.createGame("union");
     await first.close();
-    const initial = createWholePointInitialState(created.gameId);
+    const initial = createFlatMovementInitialState(created.gameId);
     expect(created.state).toEqual(initial);
     const service = new PostgresGameService({
       connectionString: connectionString!,
@@ -1607,15 +1607,18 @@ postgres("PostgreSQL durability", () => {
       expected_version: 0,
       game_id: created.gameId,
       schema: COMMAND_SCHEMA_VERSION,
-      payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "E4" },
+      payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "D8" },
     };
     const accepted = await service.executeCommand(authorization, command);
     expect(accepted).toMatchObject({
       ok: true,
       state: {
         version: 1,
-        units: { "u-wadsworth": { location: "E4", movement_spent: 1 } },
-        normal_movement: { active_unit_ids: ["u-reynolds", "u-wadsworth"] },
+        units: { "u-wadsworth": { location: "D8", movement_spent: 5 } },
+        normal_movement: {
+          active_unit_ids: ["u-reynolds", "u-wadsworth"],
+          bonus_unit_ids: [],
+        },
       },
     });
     await service.close();
@@ -1647,6 +1650,9 @@ postgres("PostgreSQL durability", () => {
       expect(persisted.rows[0]!.state).toEqual(
         await restarted.getGameState(created.gameId),
       );
+      expect(
+        (await restarted.getReplay(created.credential, created.gameId)).state,
+      ).toEqual(await restarted.getGameState(created.gameId));
       expect(await restarted.isReady()).toBe(true);
     } finally {
       await restarted.close();

@@ -10,7 +10,8 @@ import {
 } from "node:crypto";
 
 import {
-  createWholePointInitialState,
+  createFlatMovementInitialState,
+  FLAT_MOVEMENT_CONTENT_REVISION,
   MANDATORY_CONTENT_REVISION,
   WHOLE_POINT_CONTENT_REVISION,
   SCENARIO_CONTENT_REVISION,
@@ -24,6 +25,7 @@ import {
   LEGACY_RULESET_VERSION,
   MANDATORY_RULESET_VERSION,
   WHOLE_POINT_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
   isMandatoryRuleset,
   reduceGameplayCommand,
   RULESET_VERSION,
@@ -687,6 +689,14 @@ interface GameVersionHandler {
 }
 
 const gameVersionRegistry = new Map<string, GameVersionHandler>([
+  [
+    `${FLAT_MOVEMENT_RULESET_VERSION}\u0000${FLAT_MOVEMENT_CONTENT_REVISION}`,
+    {
+      accepts: hasPinnedMandatoryContent,
+      normalize: (state) => state,
+      replay: replayMandatoryActions,
+    },
+  ],
   [
     `${WHOLE_POINT_RULESET_VERSION}\u0000${WHOLE_POINT_CONTENT_REVISION}`,
     {
@@ -1411,7 +1421,7 @@ export class InMemoryGameService {
       creationCredential,
     );
     const gameId = randomUUID();
-    const state = createWholePointInitialState(gameId);
+    const state = createFlatMovementInitialState(gameId);
 
     const invitation = this.#createInvitation(gameId, otherSide(side));
     this.#games.set(gameId, {

@@ -1,5 +1,6 @@
 import {
   MANDATORY_RULESET_VERSION,
+  FLAT_MOVEMENT_RULESET_VERSION,
   WHOLE_POINT_RULESET_VERSION,
   type GameState,
   type HexCoordinate,
@@ -12,6 +13,7 @@ import { RAIL_LINKS, ROAD_LINKS, STREAM_CROSSINGS } from "./terrain-edges.js";
 // Never repurpose this revision after activation. Its complete initial-state
 // fingerprint is pinned in mandatory.test.ts; changed content needs a new pair.
 export const MANDATORY_CONTENT_REVISION = "gettysburg-mandatory-board-v1";
+export const FLAT_MOVEMENT_CONTENT_REVISION = "gettysburg-mandatory-board-v3";
 export const WHOLE_POINT_CONTENT_REVISION = "gettysburg-mandatory-board-v2";
 
 /** Owner's whole-point road/rail revision; v4 construction stays immutable. */
@@ -20,6 +22,15 @@ export function createWholePointInitialState(gameId: string): GameState {
     ...createMandatoryInitialState(gameId),
     ruleset_version: WHOLE_POINT_RULESET_VERSION,
     content_revision: WHOLE_POINT_CONTENT_REVISION,
+  };
+}
+
+/** Flat movement costs and no general accompaniment bonus; older pairs stay pinned. */
+export function createFlatMovementInitialState(gameId: string): GameState {
+  return {
+    ...createMandatoryInitialState(gameId),
+    ruleset_version: FLAT_MOVEMENT_RULESET_VERSION,
+    content_revision: FLAT_MOVEMENT_CONTENT_REVISION,
   };
 }
 
@@ -38,6 +49,11 @@ export function createPinnedMandatoryState(
     revision === WHOLE_POINT_CONTENT_REVISION
   )
     return createWholePointInitialState(gameId);
+  if (
+    ruleset === FLAT_MOVEMENT_RULESET_VERSION &&
+    revision === FLAT_MOVEMENT_CONTENT_REVISION
+  )
+    return createFlatMovementInitialState(gameId);
   throw new Error("Unknown mandatory version pair");
 }
 

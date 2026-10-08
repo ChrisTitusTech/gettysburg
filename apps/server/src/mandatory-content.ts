@@ -1,5 +1,6 @@
 import {
   createMandatoryInitialState,
+  createFlatMovementInitialState,
   createWholePointInitialState,
 } from "@gettysburg/content";
 import type { GameState } from "@gettysburg/game";
@@ -40,6 +41,7 @@ function immutableContent(state: GameState) {
 const expectedContent = new Map(
   [
     createMandatoryInitialState("pinned"),
+    createFlatMovementInitialState("pinned"),
     createWholePointInitialState("pinned"),
   ].map((state) => [
     `${state.ruleset_version}\u0000${state.content_revision}`,

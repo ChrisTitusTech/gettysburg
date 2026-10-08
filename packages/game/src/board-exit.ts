@@ -66,7 +66,11 @@ export function prepareBoardExit(
       return reject("wrong_seat", "Exit only your own counters.");
     movers.push(unit);
   }
-  const plan = planNormalMove(state.normal_movement, movers);
+  const plan = planNormalMove(
+    state.normal_movement,
+    movers,
+    state.ruleset_version,
+  );
   if (!plan.ok)
     return reject(
       "phase_invalid",

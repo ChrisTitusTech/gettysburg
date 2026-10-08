@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID } from "node:crypto";
 import {
   createMandatoryInitialState,
-  createWholePointInitialState,
+  createFlatMovementInitialState,
   SCENARIO_CONTENT_REVISION,
 } from "@gettysburg/content";
 import {
@@ -39,9 +39,54 @@ function restoredGame(
 }
 
 describe("mandatory saved-version handler", () => {
+  it("enforces flat stack movement through terrain and replays it exactly after restore", () => {
+    const pepper = randomBytes(32);
+    const service = new InMemoryGameService({ pepper });
+    const host = service.createGame("union");
+    const actor = service.authenticate(host.credential, host.gameId);
+    const command = {
+      command_id: randomUUID(),
+      command_name: "moveStack",
+      expected_version: 0,
+      game_id: host.gameId,
+      schema: COMMAND_SCHEMA_VERSION,
+      payload: { unit_ids: ["u-reynolds", "u-wadsworth"], destination: "D8" },
+    };
+    const result = service.executeCommand(actor, command);
+    expect(result.ok).toBe(true);
+    const moved = service.getGameState(host.gameId);
+    for (const id of command.payload.unit_ids)
+      expect(moved.units[id]).toMatchObject({
+        location: "D8",
+        movement_spent: 5,
+      });
+    expect(moved.normal_movement?.bonus_unit_ids).toEqual([]);
+    const denied = service.executeCommand(actor, {
+      ...command,
+      command_id: randomUUID(),
+      expected_version: 1,
+      payload: { ...command.payload, destination: "D9" },
+    });
+    expect(denied).toMatchObject({ ok: false, error: "movement_exceeded" });
+    expect(service.getGameState(host.gameId)).toEqual(moved);
+    const restored = new InMemoryGameService({
+      pepper,
+      snapshot: service.exportSnapshot(),
+    });
+    expect(restored.getReplay(host.credential, host.gameId).state).toEqual(
+      moved,
+    );
+    expect(
+      restored.executeCommand(
+        restored.authenticate(host.credential, host.gameId),
+        command,
+      ),
+    ).toEqual(result);
+  });
+
   it("creates new games from the complete mandatory pinned opening", () => {
     const game = new InMemoryGameService().createGame("union");
-    expect(game.state).toEqual(createWholePointInitialState(game.gameId));
+    expect(game.state).toEqual(createFlatMovementInitialState(game.gameId));
   });
 
   it("restores the exact state without legacy opening or combat-choice repairs", () => {

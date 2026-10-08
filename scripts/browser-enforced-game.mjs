@@ -121,7 +121,7 @@ export async function runEnforcedGame(browser, origin, evidence, options) {
     for (const page of Object.values(pages))
       await page.getByText("connected", { exact: true }).waitFor();
     await synchronize(0);
-    assert.equal(state.ruleset_version, "gettysburg-mandatory-v5");
+    assert.equal(state.ruleset_version, "gettysburg-mandatory-v6");
 
     await move("union", "u-gamble", "P3");
     assert.equal(state.units["u-buford"].location, "P3");
